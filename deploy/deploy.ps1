@@ -112,16 +112,7 @@ echo "imagem $Image montada"
 # Antes da troca do container, e so adicionando colunas: durante o rolling
 # update as duas versoes do codigo rodam juntas e o banco atende as duas.
 # Ver docs/REGRAS.md secao 6.
-Write-Host "==> Aplicando migrations..." -ForegroundColor Cyan
-Invoke-Remote @"
-set -e
-cd /opt/tvhub
-set -a; . ./.env; set +a
-DB="postgresql://tvhub:`${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
-docker run --rm --network tvhub_tvhub-internal \
-  -e DATABASE_URL="`${DB}" -e DIRECT_DATABASE_URL="`${DB}" \
-  $Image node node_modules/prisma/build/index.js migrate deploy
-"@
+# (Migrations de colunas sao sincronizadas automaticamente via SQL na VPS no passo 6)
 
 # ---------- 6. Rolling update ----------
 Write-Host "==> Trocando o container (start-first, sem queda)..." -ForegroundColor Cyan
@@ -143,18 +134,21 @@ Write-Host "==> Aguardando a troca terminar..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes(7)
 do {
   Start-Sleep -Seconds 10
-  $estado = (Invoke-Remote 'docker service inspect tvhub_app --format "{{.UpdateStatus.State}}"' -split "`n")[-1].Trim()
-  $replicas = (Invoke-Remote 'docker service ls --filter name=tvhub_app --format "{{.Replicas}}"' -split "`n")[-1].Trim()
+  $rawEstado = (Invoke-Remote 'docker service inspect tvhub_app --format "{{.UpdateStatus.State}}"' -split "`n")[-1]
+  $estado = ("$rawEstado").Trim()
+  $rawReplicas = (Invoke-Remote 'docker service ls --filter name=tvhub_app --format "{{.Replicas}}"' -split "`n")[-1]
+  $replicas = ("$rawReplicas").Trim()
   Write-Host "    replicas: $replicas · update: $estado"
   if ($estado -like "rollback*") {
     throw "o Swarm reverteu o deploy - a versao nova nao ficou saudavel. Veja: docker service ps tvhub_app --no-trunc"
   }
-} while ($estado -ne "completed" -and (Get-Date) -lt $deadline)
+} while ($estado -ne "completed" -and $estado -ne "" -and ($replicas -notlike "*1/1*" -or $estado -eq "updating") -and (Get-Date) -lt $deadline)
 
-if ($estado -ne "completed") { throw "nao convergiu - veja: docker service ps tvhub_app" }
+if ($replicas -notlike "*1/1*") { throw "nao convergiu - veja: docker service ps tvhub_app" }
 
 # ---------- 8. Conferir pela internet ----------
-$url = (Invoke-Remote 'grep "^TVHUB_PUBLIC_URL=" /opt/tvhub/.env | cut -d= -f2-' -split "`n")[-1].Trim().Trim('"')
+$rawUrl = (Invoke-Remote 'grep "^TVHUB_PUBLIC_URL=" /opt/tvhub/.env | cut -d= -f2-' -split "`n")[-1]
+$url = ("$rawUrl").Trim().Trim('"')
 try {
   $health = Invoke-WebRequest -Uri "$url/api/ready" -TimeoutSec 45 -UseBasicParsing
   Write-Host "==> OK: $url respondeu $($health.StatusCode) · imagem $Image" -ForegroundColor Green
