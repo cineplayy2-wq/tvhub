@@ -1,0 +1,293 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+    /* Impede que o iOS aumente a fonte ao girar o aparelho no player */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::selection {
+    @apply bg-primary/25 text-foreground;
+  }
+
+  /* Foco visível só via teclado — o anel não deve piscar a cada clique de mouse */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/70 ring-offset-2 ring-offset-background;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border-strong;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Carrossel: rolagem horizontal sem barra visível */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hero: escurece a base da imagem para o texto respirar sobre qualquer arte */
+  .hero-fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  }
+
+  /* Hero: gradiente lateral, para o bloco de texto ter contraste garantido */
+  .hero-scrim {
+    background-image: linear-gradient(
+        90deg,
+        #0a0b0d 0%,
+        rgba(10, 11, 13, 0.85) 35%,
+        rgba(10, 11, 13, 0) 75%
+      ),
+      linear-gradient(0deg, #0a0b0d 0%, rgba(10, 11, 13, 0) 45%);
+  }
+
+  /* Vinheta cinematográfica sutil sobre o player e o hero */
+  .vignette {
+    box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.55);
+  }
+
+  /* Grão de filme.
+     SVG inline em data URI: nenhuma requisição de rede e nada para falhar.
+     Sem ele, áreas grandes de preto quase puro mostram banding em degradê
+     — a textura quebra as faixas e é o que dá a sensação "de película". */
+  .film-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Texto vazado, para o número gigante das seções não competir com o título */
+  .text-outline {
+    -webkit-text-stroke: 1px #3a3f49;
+    color: transparent;
+  }
+
+  /* Numeral do Top 10. Traço mais grosso e claro que o .text-outline comum:
+     atrás de um pôster iluminado, 1px em #3a3f49 simplesmente some. */
+  .rank-numeral {
+    -webkit-text-stroke: 2px #59606d;
+    color: transparent;
+    transition: -webkit-text-stroke-color 300ms ease;
+  }
+
+  .group:hover .rank-numeral {
+    -webkit-text-stroke-color: #e8b44c;
+  }
+
+  /* Barra de navegação: indica que há mais itens fora da área visível */
+  .nav-fade {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 28px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  }
+
+  /* Trilha horizontal: as bordas somem em vez de cortar o card no meio.
+     Sem isto o último card fica guilhotinado e a linha parece quebrada. */
+  .rail-fade {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black 24px,
+      black calc(100% - 24px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black 24px,
+      black calc(100% - 24px),
+      transparent 100%
+    );
+  }
+
+  /* Barra fixa translúcida — usada na navegação e nos filtros grudados.
+     O desfoque é caro: em Android de entrada, cada elemento com
+     `backdrop-filter` custa uma cópia da tela por quadro. Por isso ele existe
+     em exatamente dois lugares (barra do topo e barra de baixo) e em nenhum
+     card. Onde o navegador não suporta, sobra um fundo sólido, que é o
+     comportamento correto de qualquer forma. */
+  .glass {
+    @apply border-white/[0.06] bg-background/95;
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    .glass {
+      @apply bg-background/70 backdrop-blur-lg;
+    }
+  }
+
+  /* Etiqueta sobre arte (AO VIVO, 4K). Fundo sólido em vez de desfoque:
+     são dezenas por tela e o desfoque multiplicado é o que derruba o FPS
+     ao rolar uma trilha. */
+  .chip-over-art {
+    @apply rounded-md bg-background/85 px-1.5 py-0.5;
+  }
+
+  /* Conteúdo fora da tela não é renderizado até chegar perto dela.
+     Em uma home com ~10 trilhas e mais de cem cards, é a diferença entre
+     rolagem travada e rolagem lisa num celular fraco. O tamanho estimado
+     evita que a barra de rolagem fique pulando. */
+  .defer-paint {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+
+  /* Contorno padrão de card. Um valor só, para toda a área logada ter a
+     mesma espessura de traço — é o que faz a tela parecer desenhada junto. */
+  .card-edge {
+    @apply ring-1 ring-inset ring-white/[0.07];
+  }
+
+  /* Scrim do hero: escurece à esquerda e embaixo, preserva a arte à direita */
+  .scrim-hero {
+    background-image:
+      linear-gradient(
+        to right,
+        #0a0b0d 0%,
+        rgba(10, 11, 13, 0.92) 28%,
+        rgba(10, 11, 13, 0.55) 55%,
+        rgba(10, 11, 13, 0) 85%
+      ),
+      linear-gradient(
+        to top,
+        #0a0b0d 0%,
+        rgba(10, 11, 13, 0.6) 22%,
+        rgba(10, 11, 13, 0) 60%
+      );
+  }
+
+  /* Área infantil: fundo colorido sem virar carnaval. Dois halos suaves
+     sobre o mesmo preto do resto do app mantém a identidade do produto. */
+  .kids-canvas {
+    background-image:
+      radial-gradient(
+        70rem 40rem at 12% -10%,
+        rgba(129, 140, 248, 0.22) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        60rem 36rem at 95% 5%,
+        rgba(244, 114, 182, 0.16) 0%,
+        transparent 62%
+      );
+  }
+
+  /* Placeholder de carregamento dos cards do catálogo */
+  .skeleton {
+    @apply animate-shimmer bg-surface-hover;
+    background-image: linear-gradient(
+      90deg,
+      #1a1c21 0%,
+      #22252b 50%,
+      #1a1c21 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+/* Respeita quem desativou animações no sistema — obrigatório com Framer Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   MODO LEVE — TV antiga, celular de entrada, WebView velho
+   ============================================================
+   Ativado por .tier-lite no <html> (ver device-tier-provider).
+
+   O que sai daqui é o que custa GPU e CPU em aparelho sem aceleração:
+   desfoque de fundo, sombra grande, gradiente animado e transição. Em uma
+   Tizen de 2015 cada elemento com backdrop-filter força uma cópia da tela
+   por quadro — é a diferença entre rolar liso e rolar aos trancos. */
+.tier-lite *,
+.tier-lite *::before,
+.tier-lite *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Superfícies viram cor chapada: sem alfa, o navegador não precisa compor */
+.tier-lite .glass,
+.tier-lite [class*="bg-surface/"],
+.tier-lite [class*="bg-background/"] {
+  background-color: #15151f !important;
+}
+
+/* content-visibility é ótimo onde existe e ignorado onde não existe;
+   o tamanho estimado evita a barra de rolagem pulando na TV. */
+.tier-lite .defer-paint {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
+}
+
+/* Grão de filme é textura decorativa: em CPU fraca não compensa */
+.tier-lite .film-grain::after {
+  display: none;
+}
+
+/* ============================================================
+   CONTROLE REMOTO / TECLADO
+   ============================================================
+   Em TV não há mouse: navega-se com o direcional. O anel de foco precisa ser
+   grosso e visível a três metros de distância, não o contorno discreto que
+   serve para um monitor a 50 cm. */
+@media (hover: none) and (pointer: coarse), (pointer: none) {
+  :focus-visible {
+    outline: 3px solid #B15CFF;
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+}
+
+.tier-lite :focus-visible {
+  outline: 3px solid #B15CFF;
+  outline-offset: 3px;
+}

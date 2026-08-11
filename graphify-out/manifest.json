@@ -1,0 +1,757 @@
+{
+  ".eslintrc.json": {
+    "mtime": 1786151352.367184,
+    "ast_hash": "1e6cbfeaf2a7b57d6a506b9cdcc3e87e",
+    "semantic_hash": "1e6cbfeaf2a7b57d6a506b9cdcc3e87e"
+  },
+  "app/(app)/assistir/[id]/page.tsx": {
+    "mtime": 1786236819.0863037,
+    "ast_hash": "989087afbd48044a7c055121bf81ebde",
+    "semantic_hash": "989087afbd48044a7c055121bf81ebde"
+  },
+  "app/(app)/busca/page.tsx": {
+    "mtime": 1786236835.8656702,
+    "ast_hash": "a1791e64cabfee2e9df6b12e1afe4bcf",
+    "semantic_hash": "a1791e64cabfee2e9df6b12e1afe4bcf"
+  },
+  "app/(app)/inicio/page.tsx": {
+    "mtime": 1786280648.9504404,
+    "ast_hash": "c37b9cdcaf35842d4ec2ade26530107d",
+    "semantic_hash": "c37b9cdcaf35842d4ec2ade26530107d"
+  },
+  "app/(app)/layout.tsx": {
+    "mtime": 1786153553.982903,
+    "ast_hash": "f5235309b6b332a48867157908455b9d",
+    "semantic_hash": "f5235309b6b332a48867157908455b9d"
+  },
+  "app/(app)/minha-lista/page.tsx": {
+    "mtime": 1786236871.3371508,
+    "ast_hash": "1dcaa3c2b7194ecd167c2224c2aaa492",
+    "semantic_hash": "1dcaa3c2b7194ecd167c2224c2aaa492"
+  },
+  "app/(app)/perfis/page.tsx": {
+    "mtime": 1786153551.848888,
+    "ast_hash": "323f4afec7c57e754c52308391ede56f",
+    "semantic_hash": "323f4afec7c57e754c52308391ede56f"
+  },
+  "app/(app)/titulo/[slug]/page.tsx": {
+    "mtime": 1786236619.9760299,
+    "ast_hash": "bf2ec4afc20eae8941327f44e9188646",
+    "semantic_hash": "bf2ec4afc20eae8941327f44e9188646"
+  },
+  "app/(app)/tv/[groupSlug]/page.tsx": {
+    "mtime": 1786297991.4176133,
+    "ast_hash": "c123659b5d22c314287e80c7feae783d",
+    "semantic_hash": "c123659b5d22c314287e80c7feae783d"
+  },
+  "app/(app)/tv/assistir/[channelId]/page.tsx": {
+    "mtime": 1786297931.609359,
+    "ast_hash": "f3107ca18df2d714a2f8df8c9c70f03c",
+    "semantic_hash": "f3107ca18df2d714a2f8df8c9c70f03c"
+  },
+  "app/(app)/tv/busca/page.tsx": {
+    "mtime": 1786239823.3987548,
+    "ast_hash": "b7f2fb8a026082eef40a1f47765ccd3a",
+    "semantic_hash": "b7f2fb8a026082eef40a1f47765ccd3a"
+  },
+  "app/(app)/tv/layout.tsx": {
+    "mtime": 1786239759.5881493,
+    "ast_hash": "f2d8c1e69f2f9fb02c3c86089cc88e23",
+    "semantic_hash": "f2d8c1e69f2f9fb02c3c86089cc88e23"
+  },
+  "app/(app)/tv/page.tsx": {
+    "mtime": 1786298051.7334511,
+    "ast_hash": "ee18608a2f1620427f4cccc5d2a01532",
+    "semantic_hash": "ee18608a2f1620427f4cccc5d2a01532"
+  },
+  "app/(app)/tv/serie/[seriesName]/page.tsx": {
+    "mtime": 1786298067.1730738,
+    "ast_hash": "d177e00f389dbb7d4667f46d16049dda",
+    "semantic_hash": "d177e00f389dbb7d4667f46d16049dda"
+  },
+  "app/(app)/tv/serie/[seriesName]/season-tabs.tsx": {
+    "mtime": 1786297998.778738,
+    "ast_hash": "83ba5e6a0f26be69ea1fa4a98915b8ca",
+    "semantic_hash": "83ba5e6a0f26be69ea1fa4a98915b8ca"
+  },
+  "app/(auth)/cadastro/page.tsx": {
+    "mtime": 1786152494.7471302,
+    "ast_hash": "89b1bf4f9719986bf1a60486e305fc8b",
+    "semantic_hash": "89b1bf4f9719986bf1a60486e305fc8b"
+  },
+  "app/(auth)/layout.tsx": {
+    "mtime": 1786152485.0535457,
+    "ast_hash": "6ef7ca4f060c8628e22a74caf297e8fb",
+    "semantic_hash": "6ef7ca4f060c8628e22a74caf297e8fb"
+  },
+  "app/(auth)/login/page.tsx": {
+    "mtime": 1786153482.5211444,
+    "ast_hash": "f37ff8a3afeb0b02cb27f4a4bf62d15c",
+    "semantic_hash": "f37ff8a3afeb0b02cb27f4a4bf62d15c"
+  },
+  "app/(marketing)/layout.tsx": {
+    "mtime": 1786152420.8576744,
+    "ast_hash": "650eaa3d4736b3182f7d758d4fc2061f",
+    "semantic_hash": "650eaa3d4736b3182f7d758d4fc2061f"
+  },
+  "app/(marketing)/page.tsx": {
+    "mtime": 1786195214.2860997,
+    "ast_hash": "229f6963cefae2d19798406da5fec7ad",
+    "semantic_hash": "229f6963cefae2d19798406da5fec7ad"
+  },
+  "app/actions/admin.ts": {
+    "mtime": 1786196405.8483472,
+    "ast_hash": "8aa412d5cc448b5dd6e1e387d3822143",
+    "semantic_hash": "8aa412d5cc448b5dd6e1e387d3822143"
+  },
+  "app/actions/auth.ts": {
+    "mtime": 1786153381.0353765,
+    "ast_hash": "917e0b252fd47cd53338dcddbd952141",
+    "semantic_hash": "917e0b252fd47cd53338dcddbd952141"
+  },
+  "app/actions/iptv.ts": {
+    "mtime": 1786296826.3841045,
+    "ast_hash": "5f4f2ab415e760faab4c87cca06452a6",
+    "semantic_hash": "5f4f2ab415e760faab4c87cca06452a6"
+  },
+  "app/actions/playback.ts": {
+    "mtime": 1786236794.4988053,
+    "ast_hash": "b11b07fe54477f2ab6915f8a05dd83cf",
+    "semantic_hash": "b11b07fe54477f2ab6915f8a05dd83cf"
+  },
+  "app/actions/profiles.ts": {
+    "mtime": 1786280953.630545,
+    "ast_hash": "563d8147a47fbbd7d94852bd66ecba04",
+    "semantic_hash": "563d8147a47fbbd7d94852bd66ecba04"
+  },
+  "app/actions/watchlist.ts": {
+    "mtime": 1786236647.805823,
+    "ast_hash": "0ee7a49eaea9cdcaa59a61fb384625b4",
+    "semantic_hash": "0ee7a49eaea9cdcaa59a61fb384625b4"
+  },
+  "app/admin/clientes/[id]/page.tsx": {
+    "mtime": 1786239723.932004,
+    "ast_hash": "8bacb6279f45ca516cfb77e304bf201a",
+    "semantic_hash": "8bacb6279f45ca516cfb77e304bf201a"
+  },
+  "app/admin/clientes/page.tsx": {
+    "mtime": 1786154344.3040705,
+    "ast_hash": "e2a58d805a36a14204514b2b08197845",
+    "semantic_hash": "e2a58d805a36a14204514b2b08197845"
+  },
+  "app/admin/conteudo/[id]/page.tsx": {
+    "mtime": 1786154399.5579355,
+    "ast_hash": "aedc52bd00a3ceb0f7f4ba69dbe8fedd",
+    "semantic_hash": "aedc52bd00a3ceb0f7f4ba69dbe8fedd"
+  },
+  "app/admin/conteudo/novo/page.tsx": {
+    "mtime": 1786154395.2614667,
+    "ast_hash": "372edece4b116d5fc7d371093238dc65",
+    "semantic_hash": "372edece4b116d5fc7d371093238dc65"
+  },
+  "app/admin/conteudo/page.tsx": {
+    "mtime": 1786154389.422398,
+    "ast_hash": "9913eb8e0167fed4c5e97c2135d5189c",
+    "semantic_hash": "9913eb8e0167fed4c5e97c2135d5189c"
+  },
+  "app/admin/iptv/[userId]/page.tsx": {
+    "mtime": 1786296839.5032697,
+    "ast_hash": "350523f424c182a0e430832221d08141",
+    "semantic_hash": "350523f424c182a0e430832221d08141"
+  },
+  "app/admin/iptv/page.tsx": {
+    "mtime": 1786239711.3199759,
+    "ast_hash": "8660ebdf8500cbbd1003db0cff3885a1",
+    "semantic_hash": "8660ebdf8500cbbd1003db0cff3885a1"
+  },
+  "app/admin/layout.tsx": {
+    "mtime": 1786154320.079681,
+    "ast_hash": "c7ec602075883f185fc5d491944d41e7",
+    "semantic_hash": "c7ec602075883f185fc5d491944d41e7"
+  },
+  "app/admin/page.tsx": {
+    "mtime": 1786154329.5269253,
+    "ast_hash": "4cbd3e1d0b96e2957f4e81d35172ab31",
+    "semantic_hash": "4cbd3e1d0b96e2957f4e81d35172ab31"
+  },
+  "app/api/admin/tmdb/route.ts": {
+    "mtime": 1786196331.8179252,
+    "ast_hash": "a37f5fa69918b1d174f62a6099615d97",
+    "semantic_hash": "a37f5fa69918b1d174f62a6099615d97"
+  },
+  "app/api/admin/upload/route.ts": {
+    "mtime": 1786154076.9661224,
+    "ast_hash": "edf66376eab1a990f00b1580d19d4c40",
+    "semantic_hash": "edf66376eab1a990f00b1580d19d4c40"
+  },
+  "app/api/auth/[...nextauth]/route.ts": {
+    "mtime": 1786153328.7844975,
+    "ast_hash": "64f6d6799ab87d3850d5c17b77ad8345",
+    "semantic_hash": "64f6d6799ab87d3850d5c17b77ad8345"
+  },
+  "app/api/health/route.ts": {
+    "mtime": 1786191863.3687756,
+    "ast_hash": "462c3102157e2888d472ff368dd7c099",
+    "semantic_hash": "462c3102157e2888d472ff368dd7c099"
+  },
+  "app/api/iptv/preview/route.ts": {
+    "mtime": 1786239754.0716388,
+    "ast_hash": "67f35eb83b8035e413d88c0a645d7785",
+    "semantic_hash": "67f35eb83b8035e413d88c0a645d7785"
+  },
+  "app/api/iptv/stream/route.ts": {
+    "mtime": 1786296782.6537373,
+    "ast_hash": "cfc37af16a0b23a4512d4b03cfc99453",
+    "semantic_hash": "cfc37af16a0b23a4512d4b03cfc99453"
+  },
+  "app/api/iptv/sync/route.ts": {
+    "mtime": 1786286343.9040327,
+    "ast_hash": "9584ff316e8e93e5d813f2675090a426",
+    "semantic_hash": "9584ff316e8e93e5d813f2675090a426"
+  },
+  "app/layout.tsx": {
+    "mtime": 1786194812.36783,
+    "ast_hash": "8ad8c32dacebb18c93460efe344c4f7e",
+    "semantic_hash": "8ad8c32dacebb18c93460efe344c4f7e"
+  },
+  "auth.config.ts": {
+    "mtime": 1786239694.9998338,
+    "ast_hash": "99a551fb0e64af5d7378004f60b03318",
+    "semantic_hash": "99a551fb0e64af5d7378004f60b03318"
+  },
+  "auth.ts": {
+    "mtime": 1786153322.217726,
+    "ast_hash": "2e4ef1beb9b26fd75f41cbe0dd6a50a4",
+    "semantic_hash": "2e4ef1beb9b26fd75f41cbe0dd6a50a4"
+  },
+  "components/admin/admin-sidebar.tsx": {
+    "mtime": 1786239723.8945866,
+    "ast_hash": "c800a370879997a7c16d98229d8cc0ba",
+    "semantic_hash": "c800a370879997a7c16d98229d8cc0ba"
+  },
+  "components/admin/block-user-button.tsx": {
+    "mtime": 1786154227.5202382,
+    "ast_hash": "6731795562df66f8697457c56650daab",
+    "semantic_hash": "6731795562df66f8697457c56650daab"
+  },
+  "components/admin/episodes-manager.tsx": {
+    "mtime": 1786154313.0972848,
+    "ast_hash": "12e31c36f1994c1ca2e4b150076e497d",
+    "semantic_hash": "12e31c36f1994c1ca2e4b150076e497d"
+  },
+  "components/admin/image-upload.tsx": {
+    "mtime": 1786154244.590834,
+    "ast_hash": "a5fa5e1a2243878b9b2d2b331cf0052b",
+    "semantic_hash": "a5fa5e1a2243878b9b2d2b331cf0052b"
+  },
+  "components/admin/iptv/category-lock-controls.tsx": {
+    "mtime": 1786296822.1178274,
+    "ast_hash": "55d20608c74f022ff1458d02f48868b9",
+    "semantic_hash": "55d20608c74f022ff1458d02f48868b9"
+  },
+  "components/admin/iptv/m3u-channel-preview.tsx": {
+    "mtime": 1786239959.6564379,
+    "ast_hash": "90b03ceaa098a535a924ba879451bdd8",
+    "semantic_hash": "90b03ceaa098a535a924ba879451bdd8"
+  },
+  "components/admin/iptv/m3u-form.tsx": {
+    "mtime": 1786282713.531399,
+    "ast_hash": "066dfaea08635fe6f56501eca80c6f63",
+    "semantic_hash": "066dfaea08635fe6f56501eca80c6f63"
+  },
+  "components/admin/iptv/m3u-sync-status.tsx": {
+    "mtime": 1786239698.1756237,
+    "ast_hash": "90f798b2b958f7351b85727db6dbf492",
+    "semantic_hash": "90f798b2b958f7351b85727db6dbf492"
+  },
+  "components/admin/iptv/sync-button.tsx": {
+    "mtime": 1786239710.9954672,
+    "ast_hash": "0260eff39f5eb25213bbf22e5496b95a",
+    "semantic_hash": "0260eff39f5eb25213bbf22e5496b95a"
+  },
+  "components/admin/pagination.tsx": {
+    "mtime": 1786154216.1228008,
+    "ast_hash": "c60dca6dee97ef8eb60b52efbc27a770",
+    "semantic_hash": "c60dca6dee97ef8eb60b52efbc27a770"
+  },
+  "components/admin/search-field.tsx": {
+    "mtime": 1786154210.367869,
+    "ast_hash": "bd8c79a6a0aed09003857acfb4f2014d",
+    "semantic_hash": "bd8c79a6a0aed09003857acfb4f2014d"
+  },
+  "components/admin/stat-card.tsx": {
+    "mtime": 1786154195.7906759,
+    "ast_hash": "fe66b854048feba5c4f5a5f766f83411",
+    "semantic_hash": "fe66b854048feba5c4f5a5f766f83411"
+  },
+  "components/admin/status-pill.tsx": {
+    "mtime": 1786154180.3116899,
+    "ast_hash": "b9e6e55dfbfde944ba0b8d5179fd6b65",
+    "semantic_hash": "b9e6e55dfbfde944ba0b8d5179fd6b65"
+  },
+  "components/admin/title-form.tsx": {
+    "mtime": 1786196511.7962081,
+    "ast_hash": "1bd6cf0b979634be19f80af75e3be030",
+    "semantic_hash": "1bd6cf0b979634be19f80af75e3be030"
+  },
+  "components/admin/tmdb-import.tsx": {
+    "mtime": 1786196369.6581,
+    "ast_hash": "de097c5b09dba7f66a1a8c55b1203415",
+    "semantic_hash": "de097c5b09dba7f66a1a8c55b1203415"
+  },
+  "components/auth/auth-shell.tsx": {
+    "mtime": 1786152451.1021583,
+    "ast_hash": "1266915192dffb74c20ab182a271f0d3",
+    "semantic_hash": "1266915192dffb74c20ab182a271f0d3"
+  },
+  "components/auth/login-form.tsx": {
+    "mtime": 1786153459.813835,
+    "ast_hash": "fabc7a243833b4c46829bba2f958b966",
+    "semantic_hash": "fabc7a243833b4c46829bba2f958b966"
+  },
+  "components/auth/register-form.tsx": {
+    "mtime": 1786153474.9150977,
+    "ast_hash": "166d2e62ec5c77668703bde0eba805bc",
+    "semantic_hash": "166d2e62ec5c77668703bde0eba805bc"
+  },
+  "components/catalog/app-header.tsx": {
+    "mtime": 1786280640.1689932,
+    "ast_hash": "7d9c85c4d55c1cfe729501b192833a70",
+    "semantic_hash": "7d9c85c4d55c1cfe729501b192833a70"
+  },
+  "components/catalog/catalog-row.tsx": {
+    "mtime": 1786236502.8376489,
+    "ast_hash": "767c3bcbcfcf1f243c44e4f69d48b1e7",
+    "semantic_hash": "767c3bcbcfcf1f243c44e4f69d48b1e7"
+  },
+  "components/catalog/hero-banner.tsx": {
+    "mtime": 1786236528.3644063,
+    "ast_hash": "86fc130cff5aa887f6d164dc9ccc63ba",
+    "semantic_hash": "86fc130cff5aa887f6d164dc9ccc63ba"
+  },
+  "components/catalog/search-input.tsx": {
+    "mtime": 1786236850.6715698,
+    "ast_hash": "79fa142e00ee8f92cba7f68e9475d471",
+    "semantic_hash": "79fa142e00ee8f92cba7f68e9475d471"
+  },
+  "components/catalog/title-card.tsx": {
+    "mtime": 1786236477.415688,
+    "ast_hash": "7d4e5d065743ceaf803604b675cb9699",
+    "semantic_hash": "7d4e5d065743ceaf803604b675cb9699"
+  },
+  "components/catalog/watchlist-button.tsx": {
+    "mtime": 1786236633.2965236,
+    "ast_hash": "d6303e9229512d8d84248495bb6e5dfd",
+    "semantic_hash": "d6303e9229512d8d84248495bb6e5dfd"
+  },
+  "components/iptv/category-nav.tsx": {
+    "mtime": 1786239753.6977708,
+    "ast_hash": "296307202ddeaa9a52ed1b995f7e6a91",
+    "semantic_hash": "296307202ddeaa9a52ed1b995f7e6a91"
+  },
+  "components/iptv/channel-card.tsx": {
+    "mtime": 1786296801.08417,
+    "ast_hash": "df73158aedced47e57f93ef62531ba5e",
+    "semantic_hash": "df73158aedced47e57f93ef62531ba5e"
+  },
+  "components/iptv/channel-carousel.tsx": {
+    "mtime": 1786239721.3089635,
+    "ast_hash": "728dc7da893e65a1bd52abb1fd0c6eed",
+    "semantic_hash": "728dc7da893e65a1bd52abb1fd0c6eed"
+  },
+  "components/iptv/favorite-button.tsx": {
+    "mtime": 1786239690.7472522,
+    "ast_hash": "6e8465804ec95c116eae41595c0336c8",
+    "semantic_hash": "6e8465804ec95c116eae41595c0336c8"
+  },
+  "components/iptv/iptv-hero.tsx": {
+    "mtime": 1786281576.3854382,
+    "ast_hash": "5a34420ae245da886277ab9cfed8da87",
+    "semantic_hash": "5a34420ae245da886277ab9cfed8da87"
+  },
+  "components/iptv/iptv-player.tsx": {
+    "mtime": 1786297971.1968367,
+    "ast_hash": "980709951442d8e7198a01fe0b99be5b",
+    "semantic_hash": "980709951442d8e7198a01fe0b99be5b"
+  },
+  "components/iptv/quality-badge.tsx": {
+    "mtime": 1786239681.7058408,
+    "ast_hash": "0e2aa3153453a8ee6f4ddecebb0848c8",
+    "semantic_hash": "0e2aa3153453a8ee6f4ddecebb0848c8"
+  },
+  "components/iptv/series-card.tsx": {
+    "mtime": 1786297998.5392642,
+    "ast_hash": "abb9ec7366922ee37c943fd03782b5e8",
+    "semantic_hash": "abb9ec7366922ee37c943fd03782b5e8"
+  },
+  "components/marketing/announcement-bar.tsx": {
+    "mtime": 1786194892.3450637,
+    "ast_hash": "1adebe9c59760d536d38d5262e9db682",
+    "semantic_hash": "1adebe9c59760d536d38d5262e9db682"
+  },
+  "components/marketing/faq.tsx": {
+    "mtime": 1786195278.2235415,
+    "ast_hash": "9411f3b4d1534bca777d07f24abb5cba",
+    "semantic_hash": "9411f3b4d1534bca777d07f24abb5cba"
+  },
+  "components/marketing/features.tsx": {
+    "mtime": 1786194964.4585254,
+    "ast_hash": "1eb9aea3358578f75e11bd60e6a1636e",
+    "semantic_hash": "1eb9aea3358578f75e11bd60e6a1636e"
+  },
+  "components/marketing/final-cta.tsx": {
+    "mtime": 1786195130.036289,
+    "ast_hash": "04391673baf9f9853c36db86632ca570",
+    "semantic_hash": "04391673baf9f9853c36db86632ca570"
+  },
+  "components/marketing/hero.tsx": {
+    "mtime": 1786195189.3908517,
+    "ast_hash": "ce7b46617d7888156ea0f82b7d24cac6",
+    "semantic_hash": "ce7b46617d7888156ea0f82b7d24cac6"
+  },
+  "components/marketing/how-it-works.tsx": {
+    "mtime": 1786194983.1599498,
+    "ast_hash": "1a858a8c744d8d235e65c9026ec828a3",
+    "semantic_hash": "1a858a8c744d8d235e65c9026ec828a3"
+  },
+  "components/marketing/manifesto.tsx": {
+    "mtime": 1786195100.570549,
+    "ast_hash": "e4587af762f560ed7ac90c749b2df050",
+    "semantic_hash": "e4587af762f560ed7ac90c749b2df050"
+  },
+  "components/marketing/pricing.tsx": {
+    "mtime": 1786195037.0370219,
+    "ast_hash": "22b4cdd10c6a58c1d84cdd5bb5682c2a",
+    "semantic_hash": "22b4cdd10c6a58c1d84cdd5bb5682c2a"
+  },
+  "components/marketing/showcase.tsx": {
+    "mtime": 1786195007.730395,
+    "ast_hash": "f1a8f71dc3706fe5030434c908a4ab8d",
+    "semantic_hash": "f1a8f71dc3706fe5030434c908a4ab8d"
+  },
+  "components/marketing/site-footer.tsx": {
+    "mtime": 1786152413.8801963,
+    "ast_hash": "d05747866a187ade8645eea99f3ccac3",
+    "semantic_hash": "d05747866a187ade8645eea99f3ccac3"
+  },
+  "components/marketing/site-header.tsx": {
+    "mtime": 1786152313.5602717,
+    "ast_hash": "273e83ea97d73b2e522b574cafcf737d",
+    "semantic_hash": "273e83ea97d73b2e522b574cafcf737d"
+  },
+  "components/marketing/stats.tsx": {
+    "mtime": 1786194944.1156573,
+    "ast_hash": "73cd2ed752ee537a1f47b0f85256d7b9",
+    "semantic_hash": "73cd2ed752ee537a1f47b0f85256d7b9"
+  },
+  "components/marketing/ticker.tsx": {
+    "mtime": 1786194899.7301788,
+    "ast_hash": "e9603d6853ab32283f4d4f6656ca1eca",
+    "semantic_hash": "e9603d6853ab32283f4d4f6656ca1eca"
+  },
+  "components/player/video-player.tsx": {
+    "mtime": 1786236779.0689504,
+    "ast_hash": "8b8003dca9e86e701be29256a4b2c11a",
+    "semantic_hash": "8b8003dca9e86e701be29256a4b2c11a"
+  },
+  "components/profile/pin-dialog.tsx": {
+    "mtime": 1786153507.9220784,
+    "ast_hash": "66272772ecdf1fbca90bfed684de3928",
+    "semantic_hash": "66272772ecdf1fbca90bfed684de3928"
+  },
+  "components/profile/profile-avatar.tsx": {
+    "mtime": 1786153499.588602,
+    "ast_hash": "9d6b64dfd97d0e1857780ecdea7a2eb2",
+    "semantic_hash": "9d6b64dfd97d0e1857780ecdea7a2eb2"
+  },
+  "components/profile/profile-form-modal.tsx": {
+    "mtime": 1786153526.82425,
+    "ast_hash": "6113872a1b6a8bf728219af17036b614",
+    "semantic_hash": "6113872a1b6a8bf728219af17036b614"
+  },
+  "components/profile/profile-grid.tsx": {
+    "mtime": 1786153544.2851002,
+    "ast_hash": "77140a07ff81b50ff2c461ad174ca4b6",
+    "semantic_hash": "77140a07ff81b50ff2c461ad174ca4b6"
+  },
+  "components/shared/logo.tsx": {
+    "mtime": 1786152317.2062836,
+    "ast_hash": "b2e04e75c809bac0eddf606837f974dc",
+    "semantic_hash": "b2e04e75c809bac0eddf606837f974dc"
+  },
+  "components/ui/accordion.tsx": {
+    "mtime": 1786152279.7631555,
+    "ast_hash": "bcfb639e268172891eac9a41f395e706",
+    "semantic_hash": "bcfb639e268172891eac9a41f395e706"
+  },
+  "components/ui/badge.tsx": {
+    "mtime": 1786152255.5895452,
+    "ast_hash": "534a2040caff62d51a2e26f7848a6825",
+    "semantic_hash": "534a2040caff62d51a2e26f7848a6825"
+  },
+  "components/ui/button.tsx": {
+    "mtime": 1786152248.6359186,
+    "ast_hash": "49ab754f1481e7d6991c5d0b8f367f03",
+    "semantic_hash": "49ab754f1481e7d6991c5d0b8f367f03"
+  },
+  "components/ui/form-error.tsx": {
+    "mtime": 1786153451.6627781,
+    "ast_hash": "690f36ceb72687931efba23faae4967c",
+    "semantic_hash": "690f36ceb72687931efba23faae4967c"
+  },
+  "components/ui/input.tsx": {
+    "mtime": 1786152242.6132445,
+    "ast_hash": "be39d9b874ca232e93efccf53d2b96ae",
+    "semantic_hash": "be39d9b874ca232e93efccf53d2b96ae"
+  },
+  "components/ui/modal.tsx": {
+    "mtime": 1786193743.5457702,
+    "ast_hash": "e2131e1d822223bc0b3036a804c0ff24",
+    "semantic_hash": "e2131e1d822223bc0b3036a804c0ff24"
+  },
+  "components/ui/select.tsx": {
+    "mtime": 1786154157.696951,
+    "ast_hash": "f0c510c67a605a260747e541939cd88f",
+    "semantic_hash": "f0c510c67a605a260747e541939cd88f"
+  },
+  "components/ui/skeleton.tsx": {
+    "mtime": 1786152258.0192237,
+    "ast_hash": "53092c4685c365a8836b5a7867c44a15",
+    "semantic_hash": "53092c4685c365a8836b5a7867c44a15"
+  },
+  "components/ui/submit-button.tsx": {
+    "mtime": 1786153450.0132177,
+    "ast_hash": "97ab14f0ccff1315e6347748667ac757",
+    "semantic_hash": "97ab14f0ccff1315e6347748667ac757"
+  },
+  "components/ui/textarea.tsx": {
+    "mtime": 1786154162.0522938,
+    "ast_hash": "18fe0c055a871ea96060c907783f00d9",
+    "semantic_hash": "18fe0c055a871ea96060c907783f00d9"
+  },
+  "deploy/deploy.ps1": {
+    "mtime": 1786281288.4833872,
+    "ast_hash": "84f5e9396821d32b00ae9bfaee849a20",
+    "semantic_hash": "84f5e9396821d32b00ae9bfaee849a20"
+  },
+  "lib/audit.ts": {
+    "mtime": 1786154054.4977026,
+    "ast_hash": "d3076736aaeee505ec962241dc875be7",
+    "semantic_hash": "d3076736aaeee505ec962241dc875be7"
+  },
+  "lib/auth/password.ts": {
+    "mtime": 1786153781.7042806,
+    "ast_hash": "1ec99a1a9eca1ac11a19d0bbe01ea840",
+    "semantic_hash": "1ec99a1a9eca1ac11a19d0bbe01ea840"
+  },
+  "lib/auth/session.ts": {
+    "mtime": 1786153354.929468,
+    "ast_hash": "206c1fa2c5c6c28899b206a5e80c5fe4",
+    "semantic_hash": "206c1fa2c5c6c28899b206a5e80c5fe4"
+  },
+  "lib/commons.ts": {
+    "mtime": 1786237688.8008635,
+    "ast_hash": "9a482ab8c0a1e776b55891997a702b8f",
+    "semantic_hash": "9a482ab8c0a1e776b55891997a702b8f"
+  },
+  "lib/constants.ts": {
+    "mtime": 1786195252.335441,
+    "ast_hash": "f0af12be6527e3ecbf3602520533fe77",
+    "semantic_hash": "f0af12be6527e3ecbf3602520533fe77"
+  },
+  "lib/iptv/category-detector.ts": {
+    "mtime": 1786292534.2515192,
+    "ast_hash": "fa757de45ccb2545a56ef18eb6ac7f34",
+    "semantic_hash": "fa757de45ccb2545a56ef18eb6ac7f34"
+  },
+  "lib/iptv/m3u-parser.ts": {
+    "mtime": 1786286872.2444196,
+    "ast_hash": "acd066d9132e637943424c57a02f8056",
+    "semantic_hash": "acd066d9132e637943424c57a02f8056"
+  },
+  "lib/iptv/sync-service.ts": {
+    "mtime": 1786286887.200021,
+    "ast_hash": "f514b0c5462ceea5ee669618da295b96",
+    "semantic_hash": "f514b0c5462ceea5ee669618da295b96"
+  },
+  "lib/iptv/xtream-client.ts": {
+    "mtime": 1786282599.0011694,
+    "ast_hash": "e9bed9ce90bdf9b66c48aa94be2556a0",
+    "semantic_hash": "e9bed9ce90bdf9b66c48aa94be2556a0"
+  },
+  "lib/payments/provider.ts": {
+    "mtime": 1786153432.5609279,
+    "ast_hash": "8d70549c49e62609ed2e6d7a63c0d219",
+    "semantic_hash": "8d70549c49e62609ed2e6d7a63c0d219"
+  },
+  "lib/prisma.ts": {
+    "mtime": 1786150992.3497014,
+    "ast_hash": "90e0f1aff90ef0a6d89e3d51adcc9999",
+    "semantic_hash": "90e0f1aff90ef0a6d89e3d51adcc9999"
+  },
+  "lib/queries/admin.ts": {
+    "mtime": 1786154430.6354823,
+    "ast_hash": "78bf2d0901c77e6a8d56b9adf5b8b6eb",
+    "semantic_hash": "78bf2d0901c77e6a8d56b9adf5b8b6eb"
+  },
+  "lib/queries/browse.ts": {
+    "mtime": 1786238166.2517164,
+    "ast_hash": "c554c75d128386d9a11dcb0a4a09d3f0",
+    "semantic_hash": "c554c75d128386d9a11dcb0a4a09d3f0"
+  },
+  "lib/queries/catalog.ts": {
+    "mtime": 1786195229.8593526,
+    "ast_hash": "2dcb9c725caaf02a627bb4f84b72629f",
+    "semantic_hash": "2dcb9c725caaf02a627bb4f84b72629f"
+  },
+  "lib/queries/iptv.ts": {
+    "mtime": 1786297972.393801,
+    "ast_hash": "150cb33521e1b4d88606fcca85804419",
+    "semantic_hash": "150cb33521e1b4d88606fcca85804419"
+  },
+  "lib/queries/plans.ts": {
+    "mtime": 1786152746.3782341,
+    "ast_hash": "f42b28e10e43cf2613259a97d948c033",
+    "semantic_hash": "f42b28e10e43cf2613259a97d948c033"
+  },
+  "lib/queries/subscription.ts": {
+    "mtime": 1786153442.8468885,
+    "ast_hash": "3ed50bd3df4abe20c06e7fbeb54ac240",
+    "semantic_hash": "3ed50bd3df4abe20c06e7fbeb54ac240"
+  },
+  "lib/rate-limit.ts": {
+    "mtime": 1786153340.3184426,
+    "ast_hash": "835da1bf3eb4f6c56dd0548e072ddca5",
+    "semantic_hash": "835da1bf3eb4f6c56dd0548e072ddca5"
+  },
+  "lib/redis.ts": {
+    "mtime": 1786196300.3689387,
+    "ast_hash": "f29b4051a5e1a48022ab1718d07cc1c6",
+    "semantic_hash": "f29b4051a5e1a48022ab1718d07cc1c6"
+  },
+  "lib/storage/provider.ts": {
+    "mtime": 1786154067.4957352,
+    "ast_hash": "91f9977b978ed09054c473836c180032",
+    "semantic_hash": "91f9977b978ed09054c473836c180032"
+  },
+  "lib/tmdb/client.ts": {
+    "mtime": 1786281660.164459,
+    "ast_hash": "9743b6f921ac04bd5611d9c785fbb106",
+    "semantic_hash": "9743b6f921ac04bd5611d9c785fbb106"
+  },
+  "lib/utils.ts": {
+    "mtime": 1786151048.408283,
+    "ast_hash": "3f952d08aa17803fcf7c7c8eb488b5de",
+    "semantic_hash": "3f952d08aa17803fcf7c7c8eb488b5de"
+  },
+  "lib/validations/admin.ts": {
+    "mtime": 1786196396.8247995,
+    "ast_hash": "6bbb1bb1c9247317bbd1382839f101ec",
+    "semantic_hash": "6bbb1bb1c9247317bbd1382839f101ec"
+  },
+  "lib/validations/auth.ts": {
+    "mtime": 1786152442.7920666,
+    "ast_hash": "e79fc5cbf7294f0697771fd68e5167f3",
+    "semantic_hash": "e79fc5cbf7294f0697771fd68e5167f3"
+  },
+  "lib/validations/iptv.ts": {
+    "mtime": 1786239738.3808944,
+    "ast_hash": "9a579776ceeeb65ba54101fafc11a457",
+    "semantic_hash": "9a579776ceeeb65ba54101fafc11a457"
+  },
+  "lib/validations/profile.ts": {
+    "mtime": 1786153387.711096,
+    "ast_hash": "52f88202dd4ad88ac33a2591d5d9c0a1",
+    "semantic_hash": "52f88202dd4ad88ac33a2591d5d9c0a1"
+  },
+  "middleware.ts": {
+    "mtime": 1786153327.7702944,
+    "ast_hash": "7e4ae1a845fe0639a2e7646625c06876",
+    "semantic_hash": "7e4ae1a845fe0639a2e7646625c06876"
+  },
+  "next.config.js": {
+    "mtime": 1786237658.852178,
+    "ast_hash": "79f093800e35335b283652effe539ab3",
+    "semantic_hash": "79f093800e35335b283652effe539ab3"
+  },
+  "package.json": {
+    "mtime": 1786297813.6300693,
+    "ast_hash": "2ff1a97efbf65f122fef1331dd93bb52",
+    "semantic_hash": "2ff1a97efbf65f122fef1331dd93bb52"
+  },
+  "postcss.config.js": {
+    "mtime": 1786149898.983368,
+    "ast_hash": "8640f9b2e6475cc3f5b1ff4548925765",
+    "semantic_hash": "8640f9b2e6475cc3f5b1ff4548925765"
+  },
+  "prisma/migrations/20260808123305_init/migration.sql": {
+    "mtime": 1786192385.7773545,
+    "ast_hash": "305896faff8a2b4e2bee63ca4562ef39",
+    "semantic_hash": "305896faff8a2b4e2bee63ca4562ef39"
+  },
+  "prisma/migrations/20260808140000_tmdb_integration/migration.sql": {
+    "mtime": 1786197216.896362,
+    "ast_hash": "2b5b799b1d879b1290091430bfa51284",
+    "semantic_hash": "2b5b799b1d879b1290091430bfa51284"
+  },
+  "prisma/open-catalog.ts": {
+    "mtime": 1786237731.7334442,
+    "ast_hash": "febdac060ffb3fa26f078e4cacf83645",
+    "semantic_hash": "febdac060ffb3fa26f078e4cacf83645"
+  },
+  "prisma/seed-open-content.ts": {
+    "mtime": 1786237766.3520617,
+    "ast_hash": "7976a2733acdac47cb516030c58f30ea",
+    "semantic_hash": "7976a2733acdac47cb516030c58f30ea"
+  },
+  "prisma/seed.ts": {
+    "mtime": 1786151110.297681,
+    "ast_hash": "42d52bb76592e0f16bd4d1954c77acb8",
+    "semantic_hash": "42d52bb76592e0f16bd4d1954c77acb8"
+  },
+  "scratch/import-m3u-vps.js": {
+    "mtime": 1786286830.618351,
+    "ast_hash": "528962e0194503e0c8add76a603ac7df",
+    "semantic_hash": "528962e0194503e0c8add76a603ac7df"
+  },
+  "scratch/remote-sync.ps1": {
+    "mtime": 1786285668.6162014,
+    "ast_hash": "3b3f4543749327129734db279bc64a17",
+    "semantic_hash": "3b3f4543749327129734db279bc64a17"
+  },
+  "scratch/run-import.ps1": {
+    "mtime": 1786286803.7383566,
+    "ast_hash": "88a772b6a65c2ee5862084dd032c3b44",
+    "semantic_hash": "88a772b6a65c2ee5862084dd032c3b44"
+  },
+  "tailwind.config.ts": {
+    "mtime": 1786195653.4203558,
+    "ast_hash": "c65a7d8e62041d7cb1bff5557a8de407",
+    "semantic_hash": "c65a7d8e62041d7cb1bff5557a8de407"
+  },
+  "tsconfig.json": {
+    "mtime": 1786151372.6584418,
+    "ast_hash": "4040d1a1a17763183a871218b9fcc816",
+    "semantic_hash": "4040d1a1a17763183a871218b9fcc816"
+  },
+  "types/index.ts": {
+    "mtime": 1786151338.1585271,
+    "ast_hash": "80beb68243087af0025578ac60ef7571",
+    "semantic_hash": "80beb68243087af0025578ac60ef7571"
+  },
+  "types/next-auth.d.ts": {
+    "mtime": 1786153618.0608797,
+    "ast_hash": "f242c095e32e179cb2388bc4ba70e73a",
+    "semantic_hash": "f242c095e32e179cb2388bc4ba70e73a"
+  },
+  "deploy/tvhub-stack.yml": {
+    "mtime": 1786281678.6110785,
+    "ast_hash": "6f83b129eaaa5d416100972e4d92d232",
+    "semantic_hash": "6f83b129eaaa5d416100972e4d92d232"
+  },
+  "docker-compose.yml": {
+    "mtime": 1786151610.4937348,
+    "ast_hash": "19923427485631dc113bea1b612f8adc",
+    "semantic_hash": "19923427485631dc113bea1b612f8adc"
+  }
+}

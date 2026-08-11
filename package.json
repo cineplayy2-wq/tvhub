@@ -1,0 +1,66 @@
+{
+  "name": "tvhub",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:open": "tsx prisma/seed-open-content.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.4.1",
+    "@prisma/client": "^5.16.1",
+    "@types/nodemailer": "^8.0.1",
+    "bcryptjs": "^2.4.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.2.12",
+    "hls.js": "^1.6.17",
+    "ioredis": "^5.4.1",
+    "lucide-react": "^0.400.0",
+    "mpegts.js": "^1.8.1",
+    "next": "14.2.4",
+    "next-auth": "^5.0.0-beta.19",
+    "nodemailer": "^8.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.9",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.4",
+    "postcss": "^8.4.38",
+    "prisma": "^5.16.1",
+    "tailwindcss": "^3.4.4",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.2"
+  },
+  "browserslist": [
+    "chrome >= 49",
+    "firefox >= 52",
+    "safari >= 10",
+    "edge >= 18",
+    "opera >= 40",
+    "samsung >= 5",
+    "and_chr >= 49",
+    "ios_saf >= 10",
+    "not dead"
+  ]
+}

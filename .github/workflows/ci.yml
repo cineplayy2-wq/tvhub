@@ -1,0 +1,108 @@
+# Verificação de todo commit que ainda NÃO está na main.
+#
+# É o portão que separa "funciona na minha máquina" de "pode ir para a main".
+# Com o time distribuído, ninguém consegue mais rodar tudo antes de abrir um
+# PR — então roda aqui, igual para todo mundo, no mesmo Linux que gera a
+# imagem de produção.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+# Um PR que recebe três pushes seguidos não precisa de três execuções
+# completas: cancela as antigas e roda só a última.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Tipos, lint, migrations e build
+    runs-on: ubuntu-latest
+
+    services:
+      # Postgres descartável, só para provar que as migrations reconstroem o
+      # banco do zero. Nada aqui toca no banco de produção.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tvhub
+          POSTGRES_PASSWORD: tvhub
+          POSTGRES_DB: tvhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tvhub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://tvhub:tvhub@localhost:5432/tvhub?schema=public
+      DIRECT_DATABASE_URL: postgresql://tvhub:tvhub@localhost:5432/tvhub?schema=public
+      SHADOW_DATABASE_URL: postgresql://tvhub:tvhub@localhost:5432/shadow?schema=public
+      AUTH_SECRET: placeholder-de-ci-nao-usado-em-runtime
+      AUTH_TRUST_HOST: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependências
+        # `npm ci`, não `npm install`: respeita o lockfile à risca. É o que
+        # garante que a árvore de dependências daqui é a mesma da imagem.
+        run: npm ci
+
+      - name: Gerar o client do Prisma
+        run: npx prisma generate
+
+      - name: Checagem de tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Aplicar as migrations num banco vazio
+        # Se este passo falha, a migration é inválida — e teria falhado em
+        # produção, com o site no ar.
+        run: npx prisma migrate deploy
+
+      - name: Criar o banco sombra
+        run: PGPASSWORD=tvhub psql -h localhost -U tvhub -d tvhub -c 'CREATE DATABASE shadow;'
+
+      # -----------------------------------------------------------------
+      # TRAVA ANTI-DRIFT — o passo mais importante deste arquivo.
+      # -----------------------------------------------------------------
+      # Compara o banco que as migrations produzem com o schema.prisma.
+      # Qualquer diferença reprova o PR.
+      #
+      # Isto existe porque o projeto já viveu o problema: as tabelas
+      # M3uPlaylist, M3uGroup e M3uChannel — o núcleo do IPTV — foram criadas
+      # com `prisma db push` e nunca viraram migration. Quem clonasse o repo e
+      # rodasse `migrate deploy` recebia um banco SEM a metade do sistema, e o
+      # erro só aparecia em runtime. Colunas soltas aplicadas via ALTER TABLE
+      # direto no deploy fizeram o mesmo estrago.
+      #
+      # Regra que este passo impõe: mudou o schema.prisma, gerou migration.
+      # `prisma db push` é para brincar em banco local descartável, nunca para
+      # um banco que alguém mais vai usar.
+      - name: Migrations precisam reproduzir o schema.prisma
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code
+        # --exit-code: 0 = idênticos, 2 = há diferença (reprova)
+
+      - name: Build de produção
+        run: npm run build

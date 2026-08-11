@@ -1,0 +1,224 @@
+# Stack Swarm do TVHub.
+#
+# Convive com as stacks já existentes (odoo, postgres, redis, traefik, portainer)
+# nesta VPS. Nada aqui toca nelas: nomes, volumes e rede interna são próprios.
+#
+# Limites de memória são obrigatórios, não opcionais: a VPS tem ~830 MB livres e
+# roda um ERP em produção. Sem limite, um pico do Node aciona o OOM killer,
+# que escolhe a vítima pelo consumo — e a vítima provável seria o Odoo.
+#
+# Todas as variáveis ${...} vêm de /opt/tvhub/.env na VPS. Esse arquivo NÃO
+# está no Git e nunca deve estar: é o único lugar onde moram as senhas de
+# produção. O deploy o carrega com `set -a; . ./.env; set +a` antes de aplicar.
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tvhub
+      POSTGRES_PASSWORD: ${TVHUB_DB_PASSWORD}
+      POSTGRES_DB: tvhub
+    # Sem `ports`. O Swarm não aceita IP de bind na publicação, então publicar
+    # significaria 0.0.0.0 — banco exposto à internet, varrido em horas.
+    # Acesso externo só via proxy temporário na rede attachable + túnel SSH.
+    volumes:
+      - tvhub-pgdata:/var/lib/postgresql/data
+    networks:
+      - tvhub-internal
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+      restart_policy:
+        # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
+        # reprovado, o processo sai com código 0. Com on-failure isso é lido
+        # como término bem-sucedido e o serviço fica parado em 0/1 para sempre.
+        condition: any
+        delay: 10s
+      update_config:
+        # stop-first aqui, ao contrário do app: dois Postgres apontando para o
+        # mesmo volume ao mesmo tempo corrompem o banco. Banco não faz rolling.
+        order: stop-first
+
+  redis:
+    image: redis:7-alpine
+    # appendonly: as sessões de reprodução sobrevivem a restart do container.
+    # maxmemory-policy noeviction: a trava de 2 telas não pode ter chave
+    # despejada por pressão de memória — isso liberaria telas extras em silêncio.
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 32mb
+      --maxmemory-policy noeviction
+    volumes:
+      - tvhub-redisdata:/data
+    networks:
+      - tvhub-internal
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 64M
+      restart_policy:
+        # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
+        # reprovado, o processo sai com código 0. Com on-failure isso é lido
+        # como término bem-sucedido e o serviço fica parado em 0/1 para sempre.
+        condition: any
+        delay: 10s
+      update_config:
+        # Mesmo motivo do Postgres: um volume, um escritor.
+        order: stop-first
+
+  app:
+    # Nunca `:latest`. A tag carrega o SHA do commit, então `docker service ps`
+    # e `docker service rollback` dizem exatamente qual código está no ar.
+    # Com :latest o Swarm não consegue distinguir uma versão da outra e o
+    # rollback vira loteria. O valor vem de TVHUB_IMAGE em /opt/tvhub/.env,
+    # que o pipeline reescreve a cada deploy.
+    image: ${TVHUB_IMAGE}
+
+    # 120 segundos entre o SIGTERM e o SIGKILL.
+    #
+    # O padrão do Swarm é 10s, e é ele que cortava o vídeo de quem estava
+    # assistindo: o /api/iptv/stream faz proxy do stream pelo próprio Node,
+    # então cada espectador é uma conexão aberta contra o container.
+    # O server-entry.js usa essa janela para sair de rotação, parar de aceitar
+    # conexão nova e deixar as abertas terminarem — ele próprio encerra aos
+    # 100s, antes do SIGKILL, para que a saída seja limpa.
+    #
+    # Canal ao vivo em MPEG-TS bruto mantém UMA conexão por horas e não termina
+    # sozinho. Nesse caso o corte aos 100s é inevitável e o player reconecta.
+    # Aumentar este número não resolve isso — só estica o tempo em que dois
+    # containers de 320 MB dividem a RAM da VPS.
+    stop_grace_period: 120s
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      # Teto de heap ABAIXO do limite do container (320M).
+      # Sem isto o V8 dimensiona o heap pela RAM da máquina, não pelo limite do
+      # cgroup: ele adia a coleta achando que tem folga, encosta no limite do
+      # container e o processo morre com "heap out of memory" em vez de
+      # simplesmente coletar. Os ~80 MB de diferença são para o que vive fora
+      # do heap (buffers, engine do Prisma, pilha nativa).
+      NODE_OPTIONS: "--max-old-space-size=240"
+      # Nomes QUALIFICADOS da stack (tvhub_*), nunca os curtos.
+      # O app precisa estar em `minha_rede` para o Traefik alcançá-lo, e nessa
+      # rede já existem serviços chamados `postgres` e `redis` de outra stack.
+      # Com o nome curto, o DNS do Swarm resolve para o banco alheio: foi o que
+      # aconteceu aqui, e só não virou corrupção de dados porque a senha diferia.
+      DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public&connection_limit=5
+      DIRECT_DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public
+      REDIS_URL: redis://tvhub_redis:6379
+      AUTH_SECRET: ${TVHUB_AUTH_SECRET}
+      AUTH_URL: ${TVHUB_PUBLIC_URL}
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_APP_URL: ${TVHUB_PUBLIC_URL}
+      PAYMENT_GATEWAY: PIX_PROVIDER
+      # Gatilho da sincronização da lista. Sem ela a rota /api/iptv/sync
+      # responde 503 — de propósito: antes, a ausência da variável deixava
+      # o endpoint aberto para qualquer um na internet.
+      IPTV_SYNC_API_KEY: ${TVHUB_SYNC_KEY}
+      # URL do XMLTV da grade. Opcional; também configurável pelo admin.
+      EPG_XMLTV_URL: ${TVHUB_EPG_URL:-}
+      TMDB_API_KEY: ${TMDB_API_KEY:-45ae8f447f288ac95304e25ca1f4686f}
+      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:-eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NWFlOGY0NDdmMjg4YWM5NTMwNGUyNWNhMWY0Njg2ZiIsIm5iZiI6MTc2MjA4OTUxNy41MzcsInN1YiI6IjY5MDc1YTJkM2EwMDgzM2Q2MjRjODUwNiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.dBQJLpOU_iDGFLl07WSS-WhO4b1W2fmtl4XGiFf0e54}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-0613a39080294b46bef589aba9effab8}
+      DEEPSEEK_API_URL: ${DEEPSEEK_API_URL:-https://api.deepseek.com/v1}
+
+    networks:
+      - tvhub-internal
+      # Rede que o Traefik enxerga (--providers.docker.network=minha_rede)
+      - minha_rede
+
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 320M
+
+      # ---------------------------------------------------------------
+      # O CORAÇÃO DO DEPLOY SEM QUEDA
+      # ---------------------------------------------------------------
+      update_config:
+        # start-first é a linha mais importante deste arquivo.
+        #
+        # O padrão do Swarm é stop-first: ele DERRUBA a task antiga e só então
+        # sobe a nova. Com replicas: 1 isso significa que o site fica fora do ar
+        # durante todo o boot do Next — era a queda de todo deploy.
+        #
+        # Com start-first a task nova sobe em paralelo, passa no healthcheck, e
+        # só depois disso a antiga recebe SIGTERM e começa a drenar.
+        #
+        # Custo: durante a troca existem dois containers de 320 MB ao mesmo
+        # tempo (640 MB). A VPS tem ~830 MB livres, então cabe — mas é por isso
+        # que o limite de 320M acima não pode subir sem antes medir a folga.
+        order: start-first
+        parallelism: 1
+        # Só conta como "atualizado" depois de 90s saudável. Um crash-loop que
+        # só aparece no primeiro request seria dado como sucesso sem isto.
+        monitor: 90s
+        delay: 10s
+        # Deu ruim, volta sozinho para a versão anterior. Ninguém precisa estar
+        # acordado às 3h para o site continuar de pé.
+        failure_action: rollback
+        max_failure_ratio: 0
+
+      rollback_config:
+        # O rollback também não pode derrubar o site. Mesmo cuidado da ida.
+        order: start-first
+        parallelism: 1
+        delay: 10s
+
+      restart_policy:
+        # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
+        # reprovado, o processo sai com código 0. Com on-failure isso é lido
+        # como término bem-sucedido e o serviço fica parado em 0/1 para sempre.
+        condition: any
+        delay: 10s
+
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.tvhub.rule: "Host(`${TVHUB_HOST}`)"
+        traefik.http.routers.tvhub.entrypoints: "websecure"
+        traefik.http.routers.tvhub.tls: "true"
+        traefik.http.routers.tvhub.tls.certresolver: "letsencryptresolver"
+        traefik.http.services.tvhub.loadbalancer.server.port: "3000"
+        # Sem isto o Traefik não sabe por qual rede falar com o serviço,
+        # já que o app está em duas.
+        traefik.docker.network: "minha_rede"
+
+        # Healthcheck do Traefik — a outra metade do deploy sem queda.
+        #
+        # Aponta para /api/ready, NÃO para /api/health. Assim que o container
+        # antigo recebe SIGTERM, o /api/ready passa a responder 503 e o Traefik
+        # o tira de rotação em ~5s, antes de o listener fechar. Sem isto, o
+        # Traefik continuaria mandando requisição para um socket que já não
+        # aceita conexão: 502 na tela de quem estava navegando.
+        traefik.http.services.tvhub.loadbalancer.healthcheck.path: "/api/ready"
+        traefik.http.services.tvhub.loadbalancer.healthcheck.interval: "5s"
+        traefik.http.services.tvhub.loadbalancer.healthcheck.timeout: "3s"
+
+        # lbswarm=false (padrão, explicitado para não ser perdido numa edição):
+        # o Traefik balanceia entre os IPs das tasks em vez de usar o VIP do
+        # Swarm. É o que permite o healthcheck acima enxergar cada container
+        # individualmente — com o VIP ele veria um alvo só e não teria como
+        # tirar de rotação apenas o que está drenando.
+        traefik.docker.lbswarm: "false"
+
+networks:
+  tvhub-internal:
+    driver: overlay
+    # attachable: permite plugar um container avulso nesta rede para rodar
+    # migration/seed por túnel SSH, sem publicar porta de banco em lugar nenhum.
+    attachable: true
+  minha_rede:
+    external: true
+
+volumes:
+  tvhub-pgdata:
+  tvhub-redisdata:

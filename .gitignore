@@ -1,0 +1,52 @@
+# dependências
+/node_modules
+/.pnp
+.pnp.js
+
+# build
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# ambiente — nunca commitar credenciais
+.env
+.env.local
+.env.*.local
+
+# prisma
+/prisma/migrations/dev.db*
+
+# logs
+npm-debug.log*
+yarn-error.log*
+*.log
+
+# editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# testes / cobertura
+/coverage
+*.tsbuildinfo
+
+# uploads locais
+/public/uploads
+
+# rascunhos locais — não fazem parte do produto
+/scratch
+
+# Claude Code: as permissões locais são de cada máquina, não do time.
+# O launch.json fica versionado de propósito: é o que faz `npm run dev`
+# funcionar igual para todo mundo.
+.claude/settings.local.json
+
+# graphify: o grafo (graph.json / graph.html / GRAPH_REPORT.md) é versionado
+# para quem clona já abrir o mapa do projeto sem reprocessar nada.
+# Os intermediários abaixo são derivados e pesam à toa.
+/graphify-out/cache/
+/graphify-out/.graphify_ast.json
+/graphify-out/.graphify_extract.json

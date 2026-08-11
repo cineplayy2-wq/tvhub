@@ -1,0 +1,61 @@
+# Imagem de runtime do caminho de EMERGÊNCIA (deploy/deploy.ps1).
+#
+# O caminho normal usa o Dockerfile da raiz, que compila tudo no GitHub
+# Actions. Este aqui só EMPACOTA um `.next` que já veio pronto da máquina do
+# desenvolvedor — por isso é barato o suficiente para rodar na própria VPS.
+#
+# NÃO roda `next build`. A VPS tem ~830 MB livres e o build do Next precisaria
+# de mais que isso, derrubando o Odoo junto.
+#
+# Mexeu no Dockerfile da raiz? Confira se este precisa acompanhar. Os dois
+# produzem a mesma imagem de runtime por caminhos diferentes.
+#
+# Debian slim (não Alpine) porque a engine do Prisma foi gerada para
+# debian-openssl-3.0.x. Trocar a base sem trocar o binaryTargets quebra em runtime.
+FROM node:20-bookworm-slim
+
+# openssl: exigido pela engine do Prisma
+# curl: usado pelo healthcheck do Swarm
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl curl \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Saída standalone: server.js + node_modules já reduzido ao necessário
+COPY standalone/ ./
+COPY static/ ./.next/static/
+COPY public/ ./public/
+COPY schema.prisma ./schema.prisma
+COPY schema.prisma ./prisma/schema.prisma
+
+# Envelope de desligamento com drenagem — o que impede o deploy de cortar o
+# vídeo de quem está assistindo. Não vem no standalone porque o tracer do Next
+# só inclui o que o app importa, e este arquivo importa o app.
+COPY server-entry.js ./server-entry.js
+
+# Garante a engine do Prisma na imagem. O tracer do Next carrega a engine
+# dinamicamente e nem sempre a inclui no standalone — quando falta, o erro
+# só aparece na primeira query, em produção.
+COPY prisma-client/ ./node_modules/.prisma/client/
+
+# CLI do Prisma + migrations: o deploy roda `migrate deploy` com esta mesma
+# imagem antes de trocar o container, então schema e código sobem juntos.
+COPY migrations/ ./prisma/migrations/
+COPY prisma-cli/prisma/  ./node_modules/prisma/
+COPY prisma-cli/engines/ ./node_modules/@prisma/engines/
+
+EXPOSE 3000
+ENV PORT=3000 HOSTNAME=0.0.0.0
+
+# LIVENESS, não readiness. Aponta para /api/health de propósito: esse endpoint
+# responde ok até durante a drenagem. Se apontasse para /api/ready, o Swarm
+# veria a task ficar doente ao receber SIGTERM e a mataria no meio do dreno —
+# cortando justamente os streams que o dreno existe para preservar.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
+
+# server-entry.js, não server.js: é ele que transforma o SIGTERM em saída
+# ordenada de rotação em vez de tesourada nas conexões abertas.
+CMD ["node", "server-entry.js"]

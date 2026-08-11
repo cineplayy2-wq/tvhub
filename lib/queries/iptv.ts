@@ -1,0 +1,653 @@
+import "server-only";
+
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { cached, TTL } from "@/lib/cache";
+import { dedupeChannels, cleanSeriesTitle } from "@/lib/utils";
+
+
+const PAGE_SIZE = 20;
+
+export async function listAllPlaylists({
+  query,
+  page = 1,
+}: {
+  query?: string;
+  page?: number;
+}) {
+  const where: Prisma.M3uPlaylistWhereInput = query
+    ? {
+        OR: [
+          { label: { contains: query, mode: "insensitive" } },
+          { user: { name: { contains: query, mode: "insensitive" } } },
+          { user: { email: { contains: query, mode: "insensitive" } } },
+        ],
+      }
+    : {};
+
+  const [items, total] = await prisma.$transaction([
+    prisma.m3uPlaylist.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        userId: true,
+        label: true,
+        sourceType: true,
+        syncStatus: true,
+        lastSyncAt: true,
+        lastSyncError: true,
+        totalChannels: true,
+        totalGroups: true,
+        autoSyncHours: true,
+        updatedAt: true,
+        user: {
+          select: { name: true, email: true },
+        },
+      },
+    }),
+    prisma.m3uPlaylist.count({ where }),
+  ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  };
+}
+
+export async function getUserPlaylist(userId: string) {
+  return prisma.m3uPlaylist.findUnique({
+    where: { userId },
+    include: {
+      groups: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          _count: { select: { channels: true } },
+        },
+      },
+      _count: { select: { channels: true } },
+    },
+  });
+}
+
+const SYNC_STALE_AFTER_MS = 45 * 60 * 1000;
+
+export type ViewablePlaylist = NonNullable<
+  Awaited<ReturnType<typeof getUserPlaylist>>
+> & {
+  hasChannels: boolean;
+  isSyncing: boolean;
+  isSyncStale: boolean;
+};
+
+export async function getViewablePlaylist(
+  userId: string,
+): Promise<ViewablePlaylist | null> {
+  const playlist = await getUserPlaylist(userId);
+  if (!playlist) return null;
+
+  const totalChannels = playlist._count.channels;
+  const isSyncing = playlist.syncStatus === "SYNCING";
+  const isSyncStale =
+    isSyncing &&
+    playlist.updatedAt.getTime() < Date.now() - SYNC_STALE_AFTER_MS;
+
+  return {
+    ...playlist,
+    hasChannels: totalChannels > 0,
+    isSyncing,
+    isSyncStale,
+  };
+}
+
+export async function getPlaylistChannels({
+  playlistId,
+  groupId,
+  search,
+  category,
+  favoritesOnly,
+  page = 1,
+  pageSize = PAGE_SIZE,
+}: {
+  playlistId: string;
+  groupId?: string;
+  search?: string;
+  category?: string;
+  favoritesOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+}) {
+  const where: Prisma.M3uChannelWhereInput = {
+    playlistId,
+    isActive: true,
+  };
+
+  if (groupId) where.groupId = groupId;
+  if (favoritesOnly) where.isFavorite = true;
+
+  const extraWhere: Prisma.M3uChannelWhereInput[] = [];
+
+  if (search) {
+    extraWhere.push({
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { tvgName: { contains: search, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (category === "movies") {
+    extraWhere.push({
+      OR: [
+        { streamUrl: { contains: "/movie/" } },
+        { group: { category: "movies", isHidden: false } },
+      ],
+    });
+  } else if (category === "series") {
+    extraWhere.push({
+      OR: [
+        { streamUrl: { contains: "/series/" } },
+        { group: { category: "series", isHidden: false } },
+      ],
+    });
+  } else if (category === "live") {
+    extraWhere.push({
+      AND: [
+        { NOT: { streamUrl: { contains: "/movie/" } } },
+        { NOT: { streamUrl: { contains: "/series/" } } },
+        { group: { category: "live", isHidden: false } },
+      ],
+    });
+  } else if (category === "sports") {
+    extraWhere.push({
+      group: { category: "sports", isHidden: false },
+    });
+  } else if (category === "kids") {
+    extraWhere.push({
+      group: { category: "kids", isHidden: false },
+    });
+  } else if (category === "adult") {
+    extraWhere.push({
+      group: { category: "adult" },
+    });
+  }
+
+  if (category !== "adult") {
+    where.group = {
+      ...((where.group as Prisma.M3uGroupWhereInput) || {}),
+      category: { not: "adult" },
+      isHidden: false,
+    };
+  }
+
+  if (extraWhere.length > 0) {
+    where.AND = [
+      ...((where.AND as Prisma.M3uChannelWhereInput[]) ?? []),
+      ...extraWhere,
+    ];
+  }
+
+  const [items, total] = await prisma.$transaction([
+    prisma.m3uChannel.findMany({
+      where,
+      orderBy: { sortOrder: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        name: true,
+        streamUrl: true,
+        logoUrl: true,
+        quality: true,
+        language: true,
+        country: true,
+        isFavorite: true,
+        relevanceScore: true,
+        group: { select: { name: true, slug: true, category: true } },
+      },
+    }),
+    prisma.m3uChannel.count({ where }),
+  ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export async function getFeaturedChannels(playlistId: string, limit = 10) {
+  const items = await prisma.m3uChannel.findMany({
+    where: { playlistId, isActive: true, group: { category: { not: "adult" }, isHidden: false } },
+    orderBy: { relevanceScore: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return dedupeChannels(items);
+}
+
+export async function getRegionalChannels(playlistId: string, limit = 18) {
+  const items = await prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      group: { isHidden: false, category: { not: "adult" } },
+      OR: [
+        { name: { contains: "GLOBO", mode: "insensitive" } },
+        { name: { contains: "SBT", mode: "insensitive" } },
+        { name: { contains: "RECORD", mode: "insensitive" } },
+        { name: { contains: "BAND", mode: "insensitive" } },
+      ],
+    },
+    orderBy: { relevanceScore: "desc" },
+    take: limit * 2,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return dedupeChannels(items).slice(0, limit);
+}
+
+export async function getStateChannels(
+  playlistId: string,
+  stateTerms: string[],
+  limit = 18,
+) {
+  if (stateTerms.length === 0) return [];
+
+  const items = await prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      group: { isHidden: false, category: { not: "adult" } },
+      OR: stateTerms.map((term) => ({
+        name: { contains: term, mode: "insensitive" },
+      })),
+    },
+    orderBy: { relevanceScore: "desc" },
+    take: limit * 2,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return dedupeChannels(items).slice(0, limit);
+}
+
+export async function getNovelasList(playlistId: string, limit = 18) {
+  const items = await prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      group: { isHidden: false, category: { not: "adult" } },
+      OR: [
+        { group: { name: { contains: "NOVELA", mode: "insensitive" } } },
+        { group: { name: { contains: "DORAMA", mode: "insensitive" } } },
+        { name: { contains: "NOVELA", mode: "insensitive" } },
+        { name: { contains: "DORAMA", mode: "insensitive" } },
+      ],
+    },
+    orderBy: { relevanceScore: "desc" },
+    take: limit * 3,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return dedupeChannels(items).slice(0, limit);
+}
+
+export async function getChannelsByCategory(
+  playlistId: string,
+  category: string,
+  limit = 18,
+) {
+  const where: Prisma.M3uChannelWhereInput = {
+    playlistId,
+    isActive: true,
+    group: { isHidden: false, category: { not: "adult" } },
+  };
+
+  if (category === "movies") {
+    where.streamUrl = { contains: "/movie/" };
+    where.AND = [
+      { NOT: { name: { contains: "24H", mode: "insensitive" } } },
+      { NOT: { group: { name: { contains: "24H", mode: "insensitive" } } } },
+    ];
+
+    const releases = await prisma.m3uChannel.findMany({
+      where: {
+        ...where,
+        OR: [
+          { group: { name: { contains: "CINEMA", mode: "insensitive" } } },
+          { group: { name: { contains: "LANÇAMENTO", mode: "insensitive" } } },
+          { group: { name: { contains: "2024", mode: "insensitive" } } },
+          { group: { name: { contains: "2025", mode: "insensitive" } } },
+          { group: { name: { contains: "2026", mode: "insensitive" } } },
+          { group: { name: { contains: "FILMES", mode: "insensitive" } } },
+        ],
+      },
+      orderBy: { id: "desc" },
+      take: limit * 3,
+      select: {
+        id: true,
+        name: true,
+        streamUrl: true,
+        logoUrl: true,
+        quality: true,
+        isFavorite: true,
+        relevanceScore: true,
+        group: { select: { name: true, slug: true, category: true } },
+      },
+    });
+
+    if (releases.length >= Math.min(limit, 8)) {
+      return dedupeChannels(releases).slice(0, limit);
+    }
+  } else if (category === "series") {
+    where.streamUrl = { contains: "/series/" };
+    where.AND = [
+      { NOT: { name: { contains: "24H", mode: "insensitive" } } },
+      { NOT: { group: { name: { contains: "24H", mode: "insensitive" } } } },
+    ];
+
+    const releases = await prisma.m3uChannel.findMany({
+      where: {
+        ...where,
+        OR: [
+          { group: { name: { contains: "NETFLIX", mode: "insensitive" } } },
+          { group: { name: { contains: "GLOBOPLAY", mode: "insensitive" } } },
+          { group: { name: { contains: "OUTRAS PRODUTORAS", mode: "insensitive" } } },
+          { group: { name: { contains: "SERIES", mode: "insensitive" } } },
+        ],
+      },
+      orderBy: { id: "desc" },
+      take: limit * 3,
+      select: {
+        id: true,
+        name: true,
+        streamUrl: true,
+        logoUrl: true,
+        quality: true,
+        isFavorite: true,
+        relevanceScore: true,
+        group: { select: { name: true, slug: true, category: true } },
+      },
+    });
+
+    if (releases.length >= Math.min(limit, 8)) {
+      return dedupeChannels(releases).slice(0, limit);
+    }
+  } else if (category === "live") {
+    where.AND = [
+      { NOT: { streamUrl: { contains: "/movie/" } } },
+      { NOT: { streamUrl: { contains: "/series/" } } },
+      { group: { category: "live", isHidden: false } },
+    ];
+  } else {
+    where.group = { category, isHidden: false };
+  }
+
+  const items = await prisma.m3uChannel.findMany({
+    where,
+    orderBy: { id: "desc" },
+    take: limit * 3,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return dedupeChannels(items).slice(0, limit);
+}
+
+export async function getChannelById(channelId: string) {
+  return prisma.m3uChannel.findUnique({
+    where: { id: channelId },
+    include: {
+      group: { select: { id: true, name: true, slug: true, category: true } },
+      playlist: { select: { id: true, userId: true } },
+    },
+  });
+}
+
+export async function getGroupBySlug(playlistId: string, slug: string) {
+  return prisma.m3uGroup.findFirst({
+    where: { playlistId, slug },
+    include: {
+      _count: { select: { channels: true } },
+    },
+  });
+}
+
+export async function getPlaylistCategories(playlistId: string) {
+  const groups = await prisma.m3uGroup.findMany({
+    where: { playlistId, isHidden: false },
+    select: { category: true, name: true, slug: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const categories = new Set<string>();
+  for (const g of groups) {
+    if (g.category) categories.add(g.category);
+  }
+  return Array.from(categories);
+}
+
+export async function toggleChannelFavorite(channelId: string, isFavorite: boolean) {
+  return prisma.m3uChannel.update({
+    where: { id: channelId },
+    data: { isFavorite },
+  });
+}
+
+export async function toggleGroupLock(groupId: string, isHidden: boolean) {
+  return prisma.m3uGroup.update({
+    where: { id: groupId },
+    data: { isHidden },
+  });
+}
+
+export async function toggleCategoryLock(playlistId: string, category: string, isHidden: boolean) {
+  const groups = await prisma.m3uGroup.findMany({
+    where: { playlistId, category },
+    select: { id: true },
+  });
+
+  const groupIds = groups.map((g) => g.id);
+
+  if (groupIds.length === 0) return false;
+
+  await prisma.m3uGroup.updateMany({
+    where: { id: { in: groupIds } },
+    data: { isHidden },
+  });
+
+  return true;
+}
+
+export async function getSeriesEpisodes(playlistId: string, seriesName: string) {
+  const cleanStem = cleanSeriesTitle(seriesName);
+  const words = cleanStem.split(/\s+/).filter((w) => w.length > 2);
+  const searchStem = words.slice(0, 3).join(" ");
+
+  return prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      name: { contains: searchStem || cleanStem || seriesName, mode: "insensitive" },
+    },
+    orderBy: { name: "asc" },
+    take: 300,
+    select: {
+      id: true,
+      name: true,
+      streamUrl: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      relevanceScore: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+}
+
+export type SeriesListItem = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  quality: string | null;
+  episodeCount: number;
+  firstEpisodeId: string;
+  group: { name: string; slug: string; category: string | null } | null;
+};
+
+/**
+ * Padrão de episódio nas listas M3U: "Nome S02E05", "Nome T02E05", "Nome 2x05".
+ * Tudo a partir daí é descartado para sobrar o nome da série.
+ */
+const RECORTE_EPISODIO =
+  "[[:space:]]*[-–]?[[:space:]]*" +
+  "([sStT][0-9]{1,2}[[:space:]]*[eExX][0-9]{1,3}|[0-9]{1,2}[xX][0-9]{1,3})" +
+  ".*$";
+
+/**
+ * Lista de séries AGRUPADAS, uma linha por série.
+ *
+ * A versão anterior devolvia um item por episódio, com `episodeCount: 1` fixo:
+ * a aba Séries virava uma parede de "Fulano S01E09", "Fulano S01E10", cada um
+ * como se fosse uma série diferente, e clicar levava direto para o player em
+ * vez da página de temporadas.
+ *
+ * O agrupamento é feito no Postgres, não em JS. São quase 39 mil episódios —
+ * trazer tudo para a memória para agrupar aqui é o mesmo erro que já derrubou
+ * o contêiner antes. O banco devolve só as séries, já contadas.
+ */
+export async function getSeriesList(playlistId: string, limitArg?: number | string): Promise<SeriesListItem[]> {
+  const limit = typeof limitArg === "number" ? limitArg : Number(limitArg) || 4000;
+  const teto = Math.min(limit, 5000);
+
+  const linhas = await prisma.$queryRaw<
+    Array<{
+      serie: string;
+      episodeCount: number;
+      firstEpisodeId: string;
+      logoUrl: string | null;
+      quality: string | null;
+      groupName: string | null;
+      groupSlug: string | null;
+      groupCategory: string | null;
+    }>
+  >`
+    WITH eps AS (
+      SELECT
+        c.id, c.name, c."logoUrl", c.quality, c."sortOrder",
+        g.name AS "groupName", g.slug AS "groupSlug", g.category AS "groupCategory",
+        NULLIF(btrim(regexp_replace(c.name, ${RECORTE_EPISODIO}, '', 'g')), '') AS serie
+      FROM "M3uChannel" c
+      LEFT JOIN "M3uGroup" g ON g.id = c."groupId"
+      WHERE c."playlistId" = ${playlistId}
+        AND c."isActive" = true
+        AND (
+          c."streamUrl" LIKE '%/series/%'
+          OR (g.category = 'series' AND g."isHidden" = false)
+        )
+    )
+    SELECT
+      serie,
+      COUNT(*)::int                                              AS "episodeCount",
+      (array_agg(id            ORDER BY name ASC))[1]            AS "firstEpisodeId",
+      (array_agg("logoUrl"     ORDER BY ("logoUrl" IS NULL), name ASC))[1] AS "logoUrl",
+      (array_agg(quality       ORDER BY (quality IS NULL), name ASC))[1]   AS quality,
+      (array_agg("groupName"   ORDER BY name ASC))[1]            AS "groupName",
+      (array_agg("groupSlug"   ORDER BY name ASC))[1]            AS "groupSlug",
+      (array_agg("groupCategory" ORDER BY name ASC))[1]          AS "groupCategory"
+    FROM eps
+    WHERE serie IS NOT NULL
+    GROUP BY serie
+    ORDER BY MIN("sortOrder") ASC, serie ASC
+    LIMIT ${teto}
+  `;
+
+  return linhas.map((l) => ({
+    id: l.firstEpisodeId,
+    name: l.serie,
+    logoUrl: l.logoUrl,
+    quality: l.quality,
+    episodeCount: l.episodeCount,
+    firstEpisodeId: l.firstEpisodeId,
+    group: l.groupSlug
+      ? { name: l.groupName ?? l.serie, slug: l.groupSlug, category: l.groupCategory }
+      : null,
+  }));
+}
+
+export async function getLiveCategoryOverview(playlistId: string) {
+  const groups = await prisma.m3uGroup.findMany({
+    where: { playlistId, isHidden: false, category: "live" },
+    select: {
+      category: true,
+      channels: {
+        where: { isActive: true },
+        take: 3,
+        select: { logoUrl: true },
+      },
+      _count: { select: { channels: true } },
+    },
+  });
+
+  return groups.map((g) => ({
+    category: g.category ?? "live",
+    count: g._count.channels,
+    logos: g.channels.map((c) => c.logoUrl).filter((l): l is string => Boolean(l)),
+  }));
+}
+
+export async function getLiveChannelsByCategory(playlistId: string, category: string, limit = 18) {
+  return getChannelsByCategory(playlistId, "live", limit);
+}

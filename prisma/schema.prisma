@@ -1,0 +1,680 @@
+// ==========================================================
+// TVHUB — Plataforma de Streaming (VOD)
+// Prisma Schema · PostgreSQL
+// ==========================================================
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ==========================================================
+// 1. AUTENTICAÇÃO & USUÁRIOS
+// ==========================================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  SUSPENDED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String?
+  name          String?
+  image         String?
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ACTIVE)
+  emailVerified DateTime?
+
+  externalCustomerId String? @unique
+
+  blockedAt     DateTime?
+  blockedReason String?
+  lastLoginAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  profiles       Profile[]
+  subscription   Subscription?
+  payments       Payment[]
+  streamSessions StreamSession[]
+  auditLogs      AuditLog[]      @relation("AuditActor")
+  m3uPlaylist    M3uPlaylist?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Profile {
+  id     String @id @default(cuid())
+  userId String
+
+  name         String
+  avatarUrl    String?
+  isKids       Boolean   @default(false)
+  maxAgeRating AgeRating @default(EIGHTEEN)
+  pinHash      String?
+  sortOrder    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchlist      WatchlistItem[]
+  watchProgress  WatchProgress[]
+  streamSessions StreamSession[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==========================================================
+// 2. PLANOS & ASSINATURAS
+// ==========================================================
+
+enum PlanInterval {
+  MONTH
+  YEAR
+}
+
+enum VideoQuality {
+  SD
+  HD
+  FULL_HD
+  UHD_4K
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+}
+
+model Plan {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+
+  priceCents          Int
+  currency            String       @default("BRL")
+  interval            PlanInterval
+  compareAtPriceCents Int?
+
+  deviceLimit Int          @default(2)
+  maxProfiles Int          @default(4)
+  maxQuality  VideoQuality @default(FULL_HD)
+  trialDays   Int          @default(0)
+
+  externalProductId String?
+  externalPriceId   String? @unique
+
+  features  String[]
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @unique
+  planId String
+
+  status SubscriptionStatus @default(INCOMPLETE)
+
+  externalSubscriptionId String? @unique
+  externalCustomerId     String?
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  trialEndsAt        DateTime?
+  nextChargeAt       DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+  canceledAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@index([nextChargeAt])
+}
+
+// ==========================================================
+// 3. PAGAMENTOS
+// ==========================================================
+
+enum PaymentGateway {
+  PIX_PROVIDER
+  MERCADO_PAGO
+  ASAAS
+  STRIPE
+  OTHER
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  BOLETO
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+  REFUNDED
+  CHARGEBACK
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  userId String
+
+  gateway     PaymentGateway @default(PIX_PROVIDER)
+  method      PaymentMethod  @default(PIX)
+  amountCents Int
+  currency    String         @default("BRL")
+  status      PaymentStatus  @default(PENDING)
+
+  externalId   String?   @unique
+  pixTxId      String?
+  pixQrCodeUrl String?   @db.Text
+  pixCopyPaste String?   @db.Text
+  pixExpiresAt DateTime?
+
+  invoiceUrl  String?
+  description String?
+  failureCode String?
+  metadata    Json?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([pixTxId])
+}
+
+model WebhookEvent {
+  id          String         @id @default(cuid())
+  gateway     PaymentGateway
+  externalId  String
+  type        String
+  payload     Json
+  processedAt DateTime?
+  error       String?        @db.Text
+  createdAt   DateTime       @default(now())
+
+  @@unique([gateway, externalId])
+}
+
+// ==========================================================
+// 4. CATÁLOGO
+// ==========================================================
+
+enum ContentType {
+  MOVIE
+  SERIES
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AgeRating {
+  L
+  TEN
+  TWELVE
+  FOURTEEN
+  SIXTEEN
+  EIGHTEEN
+}
+
+enum VideoProvider {
+  BUNNY
+  MUX
+  EXTERNAL
+}
+
+enum VideoStatus {
+  PENDING
+  PROCESSING
+  READY
+  ERROR
+}
+
+model Genre {
+  id    String @id @default(cuid())
+  name  String @unique
+  slug  String @unique
+  order Int    @default(0)
+
+  titles Title[]
+}
+
+model Title {
+  id       String        @id @default(cuid())
+  slug     String        @unique
+  name     String
+  synopsis String        @db.Text
+  type     ContentType   @default(MOVIE)
+  status   ContentStatus @default(DRAFT)
+
+  posterUrl   String?
+  backdropUrl String?
+  logoUrl     String?
+  trailerUrl  String?
+
+  videoProvider   VideoProvider @default(BUNNY)
+  videoProviderId String?
+  videoUrl        String?
+  videoStatus     VideoStatus   @default(PENDING)
+  durationSeconds Int?
+
+  releaseYear Int?
+  ageRating   AgeRating @default(L)
+  director    String?
+  cast        String[]
+  tags        String[]
+  country     String?
+
+  tmdbId       Int?    @unique
+  tmdbRating   Float?
+  originalName String?
+
+  isFeatured  Boolean   @default(false)
+  popularity  Int       @default(0)
+  viewCount   Int       @default(0)
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  genres          Genre[]
+  episodes        Episode[]
+  watchlist       WatchlistItem[]
+  watchProgress   WatchProgress[]
+  collectionItems CollectionItem[]
+  streamSessions  StreamSession[]
+
+  @@index([status, publishedAt])
+  @@index([status, popularity])
+  @@index([status, isFeatured])
+  @@index([status, ageRating])
+  @@index([type])
+  @@index([name])
+}
+
+model Episode {
+  id      String @id @default(cuid())
+  titleId String
+  season  Int
+  number  Int
+  name    String
+
+  synopsis     String? @db.Text
+  thumbnailUrl String?
+
+  videoProvider   VideoProvider @default(BUNNY)
+  videoProviderId String?
+  videoUrl        String?
+  videoStatus     VideoStatus   @default(PENDING)
+  durationSeconds Int?
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  title          Title           @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  watchProgress  WatchProgress[]
+  streamSessions StreamSession[]
+
+  @@unique([titleId, season, number])
+  @@index([titleId])
+}
+
+model Collection {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CollectionItem[]
+
+  @@index([isActive, sortOrder])
+}
+
+model CollectionItem {
+  id           String @id @default(cuid())
+  collectionId String
+  titleId      String
+  sortOrder    Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  title      Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, titleId])
+  @@index([titleId])
+}
+
+// ==========================================================
+// 5. ENGAJAMENTO (POR PERFIL)
+// ==========================================================
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  profileId String
+  titleId   String
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title   Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, titleId])
+  @@index([titleId])
+}
+
+model WatchProgress {
+  id        String  @id @default(cuid())
+  profileId String
+  titleId   String?
+  channelId String?
+  episodeId String?
+  itemKey   String
+
+  positionSeconds Int     @default(0)
+  durationSeconds Int     @default(0)
+  completed       Boolean @default(false)
+  watchCount      Int     @default(1)
+
+  createdAt   DateTime @default(now())
+  lastWatched DateTime @default(now())
+
+  profile Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title   Title?      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  channel M3uChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  episode Episode?    @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, itemKey])
+  @@index([profileId, lastWatched])
+  @@index([titleId])
+  @@index([channelId])
+  @@index([episodeId])
+}
+
+// ==========================================================
+// 6. CONTROLE DE TELAS SIMULTÂNEAS
+// ==========================================================
+
+enum StreamEndReason {
+  STOPPED
+  HEARTBEAT_TIMEOUT
+  REVOKED_BY_USER
+  LIMIT_EXCEEDED
+  ADMIN_REVOKED
+}
+
+model StreamSession {
+  id     String @id @default(cuid())
+  userId String
+
+  sessionId String @unique
+
+  profileId String?
+  titleId   String?
+  episodeId String?
+
+  deviceId    String?
+  deviceLabel String?
+  ipAddress   String?
+  userAgent   String? @db.Text
+
+  isActive   Boolean          @default(true)
+  startedAt  DateTime         @default(now())
+  lastSeenAt DateTime         @default(now())
+  endedAt    DateTime?
+  endReason  StreamEndReason?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  title   Title?   @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isActive])
+  @@index([lastSeenAt])
+  @@index([profileId])
+  @@index([titleId])
+  @@index([episodeId])
+}
+
+// ==========================================================
+// 7. AUDITORIA (PAINEL ADMIN)
+// ==========================================================
+
+model AuditLog {
+  id      String  @id @default(cuid())
+  actorId String?
+
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  ipAddress  String?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// ==========================================================
+// 8. IPTV / M3U
+// ==========================================================
+
+enum M3uSourceType {
+  URL
+  XTREAM
+  RAW_TEXT
+}
+
+enum M3uSyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  ERROR
+}
+
+model M3uPlaylist {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  label       String
+  sourceType  M3uSourceType   @default(URL)
+  
+  sourceUrl      String?
+  rawContent     String?         @db.Text
+  
+  xtreamServer   String?
+  xtreamUsername  String?
+  xtreamPassword String?
+
+  // --- LISTA DE BACKUP / FAILOVER ---
+  backupSourceUrl      String?
+  backupXtreamServer   String?
+  backupXtreamUsername  String?
+  backupXtreamPassword String?
+
+  /// URL do XMLTV (EPG) desta lista. O casamento com os canais é pelo tvg-id.
+  epgUrl String?
+
+  syncStatus     M3uSyncStatus @default(PENDING)
+  lastSyncAt     DateTime?
+  lastSyncError  String?
+  autoSyncHours  Int           @default(0)
+  nextSyncAt     DateTime?
+  
+  totalChannels  Int           @default(0)
+  totalGroups    Int           @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channels M3uChannel[]
+  groups   M3uGroup[]
+
+  @@index([syncStatus])
+  @@index([nextSyncAt])
+}
+
+model M3uGroup {
+  id         String @id @default(cuid())
+  playlistId String
+  
+  name       String
+  slug       String
+  iconUrl    String?
+  sortOrder  Int        @default(0)
+  isHidden   Boolean    @default(false)
+  
+  category   String?
+
+  playlist   M3uPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  channels   M3uChannel[]
+
+  @@unique([playlistId, name])
+  @@index([playlistId, sortOrder])
+}
+
+model M3uChannel {
+  id         String @id @default(cuid())
+  playlistId String
+  groupId    String?
+
+  name       String
+  streamUrl  String     @db.Text
+  
+  /// URL de transmissão da lista secundária (Backup Failover).
+  /// Se o servidor primário cair, o player tenta esta URL automaticamente.
+  backupStreamUrl String? @db.Text
+
+  logoUrl    String?
+  tvgId      String?
+  tvgName    String?
+
+  /// Nome normalizado (normalizeTitleKey). É a chave que casa o MESMO conteúdo
+  /// entre a lista principal e a secundária — tanto para o failover quanto para
+  /// trazer o que só existe na segunda lista. Gravada porque a normalização
+  /// depende de cleanMediaTitle, que não dá para reproduzir em SQL sem divergir.
+  nameKey    String?
+
+  /// Veio da lista secundária (não existe na principal). Precisa ser marcado
+  /// porque a sincronização apaga o que não está na lista principal — sem esta
+  /// marca, todo conteúdo exclusivo da segunda M3U seria apagado e recriado a
+  /// cada sincronização, perdendo favoritos e progresso junto com o ID.
+  fromBackup Boolean @default(false)
+  
+  quality    String?
+  language   String?
+  country    String?
+  
+  isActive   Boolean    @default(true)
+  isFavorite Boolean    @default(false)
+  sortOrder  Int        @default(0)
+  
+  relevanceScore Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  playlist M3uPlaylist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  group    M3uGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  progress WatchProgress[]
+
+  @@index([playlistId, groupId])
+  @@index([playlistId, isFavorite])
+  @@index([playlistId, relevanceScore])
+  @@index([playlistId, nameKey])
+  @@index([name])
+}

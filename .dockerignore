@@ -1,0 +1,35 @@
+# Tudo o que não precisa entrar no contexto de build.
+# Sem isto, o Docker envia node_modules (~1 GB) e o grafo do graphify
+# (~1,5 MB) para o daemon a cada build — no CI isso é minuto perdido em
+# todo push, e no caminho de emergência é upload da máquina do dev.
+
+node_modules
+.next
+out
+build
+
+.git
+.github
+.gitignore
+
+.env
+.env.local
+.env.*.local
+
+graphify-out
+scratch
+docs
+
+npm-debug.log*
+yarn-error.log*
+*.log
+*.tsbuildinfo
+
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+Dockerfile
+.dockerignore
+docker-compose.yml

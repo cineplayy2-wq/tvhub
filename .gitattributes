@@ -1,0 +1,31 @@
+# Fim de linha normalizado. Não é detalhe estético.
+#
+# O time trabalha em Windows, mas o app roda em Linux dentro de um container.
+# Um arquivo commitado com CRLF que vira script no Linux falha com
+# `\r: command not found` — erro que não diz nada sobre a causa e que só
+# aparece em produção, porque na máquina de quem commitou funcionava.
+#
+# `text=auto eol=lf`: o Git guarda tudo com LF no repositório. Cada máquina
+# pode ter o que quiser no disco; o que viaja é sempre LF.
+* text=auto eol=lf
+
+# Exceção: PowerShell roda no Windows e alguns hosts ainda engasgam com LF.
+*.ps1 text eol=crlf
+
+# Binários — o Git não deve tentar converter nada aqui.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+*.mp4  binary
+*.pdf  binary
+
+# Arquivos gerados: some do diff da revisão, mas continua versionado.
+# Quem revisa um PR não precisa rolar 200 mil linhas de lockfile ou de grafo.
+package-lock.json      linguist-generated=true
+graphify-out/graph.json linguist-generated=true
+graphify-out/graph.html linguist-generated=true

@@ -1,0 +1,259 @@
+# Build da imagem e deploy para a VPS.
+#
+# COMO FUNCIONA
+#   merge na main  →  job `imagem` (compila e publica no GHCR, automático)
+#                  →  job `producao` (PARADO, esperando alguém aprovar)
+#
+# A pausa não é burocracia: o /api/iptv/stream faz proxy do vídeo pelo próprio
+# Node, então toda troca de versão mexe com quem está assistindo naquele
+# instante. Quem aprova escolhe a hora.
+#
+# O build NUNCA roda na VPS. Ela tem ~830 MB livres e hospeda um Odoo em
+# produção — o `next build` lá aciona o OOM killer, que escolhe a vítima pelo
+# consumo de memória, e a vítima provável é o ERP.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      imagem:
+        description: "Tag já publicada no GHCR (ex: sha-a1b2c3d). Vazio = compila o commit atual."
+        required: false
+        type: string
+
+# Dois deploys ao mesmo tempo na mesma VPS deixam o Swarm num estado que
+# ninguém consegue explicar depois. Um de cada vez, e sem cancelar o que já
+# está no meio de uma troca de container.
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1. Compila e publica a imagem. Não toca na VPS.
+  # ------------------------------------------------------------------
+  imagem:
+    name: Compilar e publicar no GHCR
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.imagem == '' }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      referencia: ${{ steps.meta.outputs.referencia }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir a tag da imagem
+        id: meta
+        run: |
+          TAG="sha-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          # Minúsculas: o GHCR rejeita maiúsculas no caminho do pacote, e nome
+          # de organização com maiúscula é comum.
+          REPO_LC=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+          echo "tag=${TAG}"                                >> "$GITHUB_OUTPUT"
+          echo "referencia=${REGISTRY}/${REPO_LC}:${TAG}"  >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.referencia }}
+          # Cache entre execuções: sem isto, todo deploy reinstala o
+          # node_modules inteiro e o build passa de 10 minutos.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  # ------------------------------------------------------------------
+  # 2. Deploy na VPS. Só roda depois que alguém aprova.
+  # ------------------------------------------------------------------
+  producao:
+    name: Publicar em produção
+    runs-on: ubuntu-latest
+    needs: [imagem]
+    # Sempre roda: com `workflow_dispatch` + tag informada, o job `imagem` é
+    # pulado e `needs` sozinho bloquearia este aqui.
+    if: ${{ always() && (needs.imagem.result == 'success' || github.event.inputs.imagem != '') }}
+
+    # É este `environment` que cria o portão de aprovação. Configure em
+    # Settings → Environments → production → Required reviewers.
+    # Sem reviewers configurados, o deploy passa direto — veja docs/DEPLOY.md.
+    environment:
+      name: production
+      url: ${{ vars.TVHUB_PUBLIC_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolver qual imagem publicar
+        id: alvo
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.imagem }}" ]; then
+            REPO_LC=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+            REF="${REGISTRY}/${REPO_LC}:${{ github.event.inputs.imagem }}"
+          else
+            REF="${{ needs.imagem.outputs.referencia }}"
+          fi
+          echo "referencia=${REF}" >> "$GITHUB_OUTPUT"
+          echo "Publicando: ${REF}"
+
+      - name: Preparar o SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "${{ secrets.VPS_KNOWN_HOSTS }}" ]; then
+            printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          else
+            # Sem a chave fixada, a primeira conexão confia em quem responder.
+            # Gere o valor com `ssh-keyscan -H <ip>` e salve em VPS_KNOWN_HOSTS.
+            echo "::warning::VPS_KNOWN_HOSTS não configurado — conexão sujeita a MITM"
+            ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 600 ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host vps
+            HostName ${{ secrets.VPS_HOST }}
+            User ${{ secrets.VPS_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            ServerAliveInterval 30
+          EOF
+
+      - name: Enviar a definição da stack
+        run: scp deploy/tvhub-stack.yml vps:/opt/tvhub/tvhub-stack.yml
+
+      # ---------------------------------------------------------------
+      # Pré-download da imagem.
+      #
+      # Precisa ser um passo separado, ANTES do rolling update. Se a VPS só
+      # fosse baixar a imagem na hora da troca, o download (minutos, em link
+      # ruim) aconteceria com o Swarm já no meio da substituição — e o
+      # `monitor: 90s` do update_config poderia estourar e disparar rollback
+      # de uma versão que nem chegou a subir.
+      # ---------------------------------------------------------------
+      - name: Baixar a imagem na VPS
+        run: |
+          ssh vps bash -euo pipefail <<EOS
+          echo '${{ secrets.GHCR_PULL_TOKEN }}' | docker login ${{ env.REGISTRY }} -u '${{ secrets.GHCR_USER }}' --password-stdin
+          docker pull '${{ steps.alvo.outputs.referencia }}'
+          EOS
+
+      # ---------------------------------------------------------------
+      # Migrations ANTES do app novo subir.
+      #
+      # Durante o rolling update as duas versões do código ficam no ar ao
+      # mesmo tempo, então o banco precisa servir as duas. Por isso a regra
+      # de expand/contract em docs/REGRAS.md: só adiciona, nunca remove nem
+      # renomeia no mesmo release. Uma coluna removida aqui derruba a versão
+      # antiga que ainda está drenando o vídeo de alguém.
+      # ---------------------------------------------------------------
+      - name: Aplicar migrations
+        run: |
+          ssh vps bash -euo pipefail <<EOS
+          cd /opt/tvhub
+          set -a; . ./.env; set +a
+          DB="postgresql://tvhub:\${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
+          docker run --rm --network tvhub_tvhub-internal \
+            -e DATABASE_URL="\${DB}" \
+            -e DIRECT_DATABASE_URL="\${DB}" \
+            '${{ steps.alvo.outputs.referencia }}' \
+            node node_modules/prisma/build/index.js migrate deploy
+          EOS
+
+      # ---------------------------------------------------------------
+      # A troca em si. `order: start-first` no tvhub-stack.yml faz o container
+      # novo subir e passar no healthcheck ANTES de o antigo receber SIGTERM.
+      # ---------------------------------------------------------------
+      - name: Rolling update
+        run: |
+          ssh vps bash -euo pipefail <<EOS
+          cd /opt/tvhub
+          # TVHUB_IMAGE é o único ponto do sistema que diz qual código está em
+          # produção. Fica no .env da VPS, que não está no Git.
+          if grep -q '^TVHUB_IMAGE=' .env; then
+            sed -i "s|^TVHUB_IMAGE=.*|TVHUB_IMAGE=${{ steps.alvo.outputs.referencia }}|" .env
+          else
+            echo 'TVHUB_IMAGE=${{ steps.alvo.outputs.referencia }}' >> .env
+          fi
+          set -a; . ./.env; set +a
+          # --with-registry-auth: sem isto o Swarm não guarda a credencial do
+          # GHCR na spec do serviço, e o próximo restart da task falha ao puxar
+          # a imagem — o site cai horas depois do deploy, sem ninguém entender.
+          docker stack deploy -c tvhub-stack.yml tvhub --with-registry-auth --detach=true
+          EOS
+
+      - name: Aguardar convergência
+        id: convergir
+        run: |
+          set -uo pipefail
+          for i in \$(seq 1 40); do
+            ESTADO=\$(ssh vps "docker service ls --filter name=tvhub_app --format '{{.Replicas}}'" | tr -d '\r')
+            ATUALIZACAO=\$(ssh vps "docker service inspect tvhub_app --format '{{.UpdateStatus.State}}'" | tr -d '\r')
+            echo "  tentativa \$i · replicas=\${ESTADO} · update=\${ATUALIZACAO}"
+            case "\$ATUALIZACAO" in
+              completed) echo "ok=true" >> "\$GITHUB_OUTPUT"; exit 0 ;;
+              rollback_completed|paused|rollback_started)
+                echo "::error::O Swarm reverteu o deploy — a versão nova não ficou saudável."
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::O serviço não convergiu em ~7 minutos."
+          exit 1
+        shell: bash
+
+      # Prova externa: o Swarm dizer "completed" significa que o container está
+      # de pé, não que o site responde. Isto passa pelo Traefik, pelo TLS e
+      # pelo Next, do jeito que um cliente passaria.
+      - name: Conferir pela internet
+        run: |
+          set -euo pipefail
+          URL=$(ssh vps "grep '^TVHUB_PUBLIC_URL=' /opt/tvhub/.env | cut -d= -f2-" | tr -d '\r"')
+          echo "Conferindo ${URL}"
+          for i in $(seq 1 10); do
+            CODIGO=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${URL}/api/ready" || echo 000)
+            echo "  ${URL}/api/ready → ${CODIGO}"
+            [ "$CODIGO" = "200" ] && exit 0
+            sleep 6
+          done
+          echo "::error::O site não respondeu 200 em /api/ready. Rollback: veja docs/DEPLOY.md"
+          exit 1
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "### Deploy"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Imagem | \`${{ steps.alvo.outputs.referencia }}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Resultado | ${{ job.status }} |"
+            echo ""
+            echo "Voltar para a versão anterior: \`ssh <vps> docker service rollback tvhub_app\`"
+          } >> "$GITHUB_STEP_SUMMARY"
