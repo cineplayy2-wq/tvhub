@@ -156,8 +156,12 @@ jobs:
       # de uma versão que nem chegou a subir.
       # ---------------------------------------------------------------
       - name: Baixar a imagem na VPS
+        # Heredoc com o delimitador entre aspas (<<'EOS'): nada é expandido pelo
+        # shell do runner, só o que o Actions substitui antes (${{ }}). Sem as
+        # aspas seria preciso escapar cada $ do script remoto à mão — e um
+        # escape esquecido só aparece na hora do deploy.
         run: |
-          ssh vps bash -euo pipefail <<EOS
+          ssh vps bash -euo pipefail <<'EOS'
           echo '${{ secrets.GHCR_PULL_TOKEN }}' | docker login ${{ env.REGISTRY }} -u '${{ secrets.GHCR_USER }}' --password-stdin
           docker pull '${{ steps.alvo.outputs.referencia }}'
           EOS
@@ -173,13 +177,13 @@ jobs:
       # ---------------------------------------------------------------
       - name: Aplicar migrations
         run: |
-          ssh vps bash -euo pipefail <<EOS
+          ssh vps bash -euo pipefail <<'EOS'
           cd /opt/tvhub
           set -a; . ./.env; set +a
-          DB="postgresql://tvhub:\${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
+          DB="postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
           docker run --rm --network tvhub_tvhub-internal \
-            -e DATABASE_URL="\${DB}" \
-            -e DIRECT_DATABASE_URL="\${DB}" \
+            -e DATABASE_URL="${DB}" \
+            -e DIRECT_DATABASE_URL="${DB}" \
             '${{ steps.alvo.outputs.referencia }}' \
             node node_modules/prisma/build/index.js migrate deploy
           EOS
@@ -190,7 +194,7 @@ jobs:
       # ---------------------------------------------------------------
       - name: Rolling update
         run: |
-          ssh vps bash -euo pipefail <<EOS
+          ssh vps bash -euo pipefail <<'EOS'
           cd /opt/tvhub
           # TVHUB_IMAGE é o único ponto do sistema que diz qual código está em
           # produção. Fica no .env da VPS, que não está no Git.
@@ -208,14 +212,15 @@ jobs:
 
       - name: Aguardar convergência
         id: convergir
+        shell: bash
         run: |
           set -uo pipefail
-          for i in \$(seq 1 40); do
-            ESTADO=\$(ssh vps "docker service ls --filter name=tvhub_app --format '{{.Replicas}}'" | tr -d '\r')
-            ATUALIZACAO=\$(ssh vps "docker service inspect tvhub_app --format '{{.UpdateStatus.State}}'" | tr -d '\r')
-            echo "  tentativa \$i · replicas=\${ESTADO} · update=\${ATUALIZACAO}"
-            case "\$ATUALIZACAO" in
-              completed) echo "ok=true" >> "\$GITHUB_OUTPUT"; exit 0 ;;
+          for i in $(seq 1 40); do
+            ESTADO=$(ssh vps "docker service ls --filter name=tvhub_app --format '{{.Replicas}}'" | tr -d '\r')
+            ATUALIZACAO=$(ssh vps "docker service inspect tvhub_app --format '{{.UpdateStatus.State}}'" | tr -d '\r')
+            echo "  tentativa $i · replicas=${ESTADO} · update=${ATUALIZACAO}"
+            case "$ATUALIZACAO" in
+              completed) exit 0 ;;
               rollback_completed|paused|rollback_started)
                 echo "::error::O Swarm reverteu o deploy — a versão nova não ficou saudável."
                 exit 1 ;;
@@ -224,7 +229,6 @@ jobs:
           done
           echo "::error::O serviço não convergiu em ~7 minutos."
           exit 1
-        shell: bash
 
       # Prova externa: o Swarm dizer "completed" significa que o container está
       # de pé, não que o site responde. Isto passa pelo Traefik, pelo TLS e
