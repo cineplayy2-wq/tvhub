@@ -3,7 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { cached, TTL } from "@/lib/cache";
-import { dedupeChannels, cleanSeriesTitle } from "@/lib/utils";
+import { dedupeChannels } from "@/lib/utils";
 
 
 const PAGE_SIZE = 20;
@@ -526,19 +526,33 @@ export async function toggleCategoryLock(playlistId: string, category: string, i
   return true;
 }
 
+/**
+ * Episódios de uma série.
+ *
+ * `seriesName` vem do card, que por sua vez veio do RECORTE_EPISODIO aplicado
+ * no Postgres — ou seja, é literalmente um PREFIXO do nome de cada episódio.
+ * Por isso a busca é `startsWith`: casa exato, usa índice e não inventa.
+ *
+ * A versão anterior quebrava as palavras do título, descartava as de até dois
+ * caracteres e recolava o resto com espaço. Isso produzia uma string que não
+ * existia em canal nenhum: "O Cravo e a Rosa" virava "Cravo Rosa" e a página
+ * respondia "série não encontrada". Como títulos em português são cheios de
+ * artigo e preposição curta, isso derrubava boa parte do acervo.
+ */
 export async function getSeriesEpisodes(playlistId: string, seriesName: string) {
-  const cleanStem = cleanSeriesTitle(seriesName);
-  const words = cleanStem.split(/\s+/).filter((w) => w.length > 2);
-  const searchStem = words.slice(0, 3).join(" ");
+  const alvo = seriesName.trim();
+  if (!alvo) return [];
 
-  return prisma.m3uChannel.findMany({
+  const candidatos = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
       isActive: true,
-      name: { contains: searchStem || cleanStem || seriesName, mode: "insensitive" },
+      name: { startsWith: alvo, mode: "insensitive" },
     },
     orderBy: { name: "asc" },
-    take: 300,
+    // Novela diária passa de 200 capítulos; o teto antigo de 300 cortava as
+    // maiores no meio, e ainda por ordem alfabética.
+    take: 1500,
     select: {
       id: true,
       name: true,
@@ -549,6 +563,13 @@ export async function getSeriesEpisodes(playlistId: string, seriesName: string) 
       relevanceScore: true,
       group: { select: { name: true, slug: true, category: true } },
     },
+  });
+
+  // Prefixo sozinho arrastaria "The Office US" para dentro de "The Office".
+  // Só vale quando o que sobra depois do nome é a marcação de episódio.
+  return candidatos.filter((canal) => {
+    const resto = canal.name.slice(alvo.length).trim();
+    return resto === "" || /^[-–:|]?\s*(?:[sStT]\s*\d|\d+\s*[xX]\s*\d)/.test(resto);
   });
 }
 
@@ -583,9 +604,22 @@ const RECORTE_EPISODIO =
  * trazer tudo para a memória para agrupar aqui é o mesmo erro que já derrubou
  * o contêiner antes. O banco devolve só as séries, já contadas.
  */
-export async function getSeriesList(playlistId: string, limitArg?: number | string): Promise<SeriesListItem[]> {
-  const limit = typeof limitArg === "number" ? limitArg : Number(limitArg) || 4000;
-  const teto = Math.min(limit, 5000);
+/**
+ * O segundo parâmetro é o GRUPO, não um limite.
+ *
+ * Ele já era chamado assim pelos dois lugares que usam esta função, mas a
+ * assinatura antiga dizia `limitArg?: number | string` e fazia `Number(cuid)`,
+ * que dá NaN e caía no padrão de 4000. Resultado: escolher um subgrupo de
+ * séries devolvia o acervo inteiro da playlist, como se o filtro não existisse
+ * — e não existia mesmo, porque a consulta nunca teve cláusula por grupo.
+ */
+export async function getSeriesList(
+  playlistId: string,
+  groupId?: string | null,
+  limite = 4000,
+): Promise<SeriesListItem[]> {
+  const teto = Math.min(limite, 5000);
+  const filtroGrupo = groupId ? Prisma.sql`AND c."groupId" = ${groupId}` : Prisma.empty;
 
   const linhas = await prisma.$queryRaw<
     Array<{
@@ -608,6 +642,7 @@ export async function getSeriesList(playlistId: string, limitArg?: number | stri
       LEFT JOIN "M3uGroup" g ON g.id = c."groupId"
       WHERE c."playlistId" = ${playlistId}
         AND c."isActive" = true
+        ${filtroGrupo}
         AND (
           c."streamUrl" LIKE '%/series/%'
           OR (g.category = 'series' AND g."isHidden" = false)

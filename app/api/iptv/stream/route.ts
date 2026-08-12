@@ -129,16 +129,29 @@ function ehFalhaPassageira(erro: unknown) {
   );
 }
 
+/**
+ * Resposta do provedor junto da URL que REALMENTE a serviu.
+ *
+ * `urlFinal` é o que sobra depois de seguir os redirecionamentos, e não é
+ * detalhe: os painéis de IPTV mandam o manifesto para outro host ("balanceador"
+ * com token), e as linhas de segmento dentro dele são relativas à RAIZ
+ * (`/hls/989_3900.ts`). Resolver esses caminhos contra a URL pedida aponta para
+ * o host antigo, que responde 404 em todos os segmentos — o manifesto carrega,
+ * nenhum pedaço de vídeo carrega, e o canal fica preto. Vídeo sob demanda não
+ * passa por aqui porque `.mp4` não tem manifesto: por isso só os canais caíram.
+ */
+type RespostaUpstream = { res: http.IncomingMessage; urlFinal: string };
+
 function fetchUpstream(
   currentUrl: string,
   rangeHeader: string | null,
   redirectCount = 0
-): Promise<http.IncomingMessage> {
+): Promise<RespostaUpstream> {
   if (redirectCount > 8) {
     return Promise.reject(new Error("Muitos redirecionamentos no upstream"));
   }
 
-  return new Promise<http.IncomingMessage>((resolve, reject) => {
+  return new Promise<RespostaUpstream>((resolve, reject) => {
     try {
       const parsedUrl = new URL(currentUrl);
       const isHttps = parsedUrl.protocol === "https:";
@@ -180,7 +193,7 @@ function fetchUpstream(
               .catch(reject);
             return;
           }
-          resolve(res);
+          resolve({ res, urlFinal: currentUrl });
         }
       );
 
@@ -293,12 +306,12 @@ export async function GET(request: NextRequest) {
   try {
     const rangeHeader = request.headers.get("range");
 
-    let upstreamResponse: http.IncomingMessage | null = null;
+    let upstream: RespostaUpstream | null = null;
     let ultimoErro: unknown = null;
 
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       try {
-        upstreamResponse = await fetchUpstream(targetUrl, rangeHeader);
+        upstream = await fetchUpstream(targetUrl, rangeHeader);
         break;
       } catch (erro) {
         ultimoErro = erro;
@@ -310,17 +323,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!upstreamResponse) throw ultimoErro ?? new Error("Falha ao conectar no upstream");
+    if (!upstream) throw ultimoErro ?? new Error("Falha ao conectar no upstream");
 
+    let upstreamResponse = upstream.res;
+    /** Base para resolver segmentos e adivinhar o tipo: o que serviu, não o que pedimos. */
+    let urlEfetiva = upstream.urlFinal;
     let statusCode = upstreamResponse.statusCode ?? 502;
 
     if (statusCode === 404 && targetUrl.endsWith(".m3u8") && !forceRaw) {
       const tsTarget = targetUrl.replace(/\.m3u8$/i, ".ts");
       try {
-        const tsResponse = await fetchUpstream(tsTarget, rangeHeader);
-        if (tsResponse.statusCode && tsResponse.statusCode < 400) {
-          upstreamResponse = tsResponse;
-          statusCode = tsResponse.statusCode;
+        const tsUpstream = await fetchUpstream(tsTarget, rangeHeader);
+        if (tsUpstream.res.statusCode && tsUpstream.res.statusCode < 400) {
+          upstreamResponse = tsUpstream.res;
+          // Sem isto o TS recuperado continuava sendo anunciado como manifesto.
+          urlEfetiva = tsUpstream.urlFinal;
+          statusCode = tsUpstream.res.statusCode;
         }
       } catch {}
     }
@@ -344,6 +362,7 @@ export async function GET(request: NextRequest) {
       (rawContentType.includes("mpegurl") ||
         rawContentType.includes("m3u8") ||
         targetUrl.includes(".m3u8") ||
+        urlEfetiva.includes(".m3u8") ||
         targetUrl.endsWith(".m3u"));
 
     let peekResult: { isM3u8: boolean; manifestText?: string; peekBuffer?: Buffer } = { isM3u8: false };
@@ -351,7 +370,7 @@ export async function GET(request: NextRequest) {
     if (isM3u8Requested) {
       peekResult = await peekUpstream(upstreamResponse);
       if (peekResult.isM3u8 && peekResult.manifestText) {
-        const baseUrl = new URL(targetUrl);
+        const baseUrl = new URL(urlEfetiva);
         const lines = peekResult.manifestText.split("\n");
 
         const rewrittenLines = lines.map((line) => {
@@ -376,11 +395,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const semQuery = urlEfetiva.split("?")[0];
     const contentType =
       rawContentType ||
-      (targetUrl.endsWith(".ts")
+      (semQuery.endsWith(".ts")
         ? "video/mp2t"
-        : targetUrl.endsWith(".m3u8")
+        : semQuery.endsWith(".m3u8")
         ? "application/vnd.apple.mpegurl"
         : "video/mp4");
 

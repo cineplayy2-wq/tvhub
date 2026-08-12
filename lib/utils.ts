@@ -107,11 +107,20 @@ export function cleanMediaTitle(rawName: string): string {
   return cleaned || rawName.trim();
 }
 
-/** Limpa títulos de séries removendo marcações de Temporada/Episódio (S01E01, T1 E2, 1x01, EP12) */
+/**
+ * Limpa títulos de séries removendo marcações de Temporada/Episódio
+ * (S01E01, T1 E2, 1x01, EP12).
+ *
+ * O `\b` na frente do grupo não é enfeite. Sem ele, a alternativa `EP?…\d+`
+ * casava com o "e" de qualquer palavra seguida de número, e o `.*` do fim
+ * comia o resto do título: "The 100" virava "Th", "Rebelde 2022" virava
+ * "Rebeld". Como esta função também alimenta a deduplicação, o nome truncado
+ * ia parar na tela e ainda fundia séries diferentes que colidissem no toco.
+ */
 export function cleanSeriesTitle(rawName: string): string {
   let cleaned = cleanMediaTitle(rawName);
 
-  const seasonEpRegex = /\s*[-:_]?\s*(?:S\d+\s*E\d+|T\d+\s*E\d+|S\d+|T\d+|\d+x\d+|EP?\s*\.?\s*\d+|Temporada\s*\d+|Temp\s*\d+).*/i;
+  const seasonEpRegex = /\s*[-:_]?\s*\b(?:S\d+\s*E\d+|T\d+\s*E\d+|S\d+|T\d+|\d+x\d+|EP?\s*\.?\s*\d+|Temporada\s*\d+|Temp\s*\d+)\b.*/i;
   if (seasonEpRegex.test(cleaned)) {
     cleaned = cleaned.replace(seasonEpRegex, "").trim();
   }

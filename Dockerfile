@@ -98,6 +98,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_m
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
+# sharp, pelo mesmo motivo do Prisma: o otimizador de imagem do Next o carrega
+# por require dinâmico, então o tracer do standalone não o enxerga. Sem ele o
+# servidor sobe e serve as páginas, mas toda capa e todo avatar saem no tamanho
+# original — o aviso "sharp is required in standalone mode" no build era isso.
+# O binário nativo vem em @img/sharp-linux-x64, que precisa vir junto.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@img
+
 # O cache do Next precisa ser gravável pelo usuário não-root
 RUN mkdir -p ./.next/cache && chown -R nextjs:nodejs ./.next
 
