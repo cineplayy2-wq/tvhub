@@ -1,3 +1,14 @@
+/**
+ * Mesmos termos de `isAdultContent`, em expressão regular do Postgres.
+ *
+ * Existe porque a união com a lista secundária classifica os grupos dentro do
+ * banco, onde não dá para chamar a função em JS. Manter os dois lados alinhados
+ * é obrigatório: foi a divergência entre eles que deixou 3.317 canais adultos
+ * visíveis no catálogo, inclusive para perfil infantil.
+ */
+export const PADRAO_ADULTO =
+  "(adult|\\+ ?18|18 ?\\+|xxx|onlyfans|privacy|bella da semana|playboy|venus|sexy|eroti|hentai|brazzers|hustler|fap tv|penthouse|redlight|exxxotica|kinoxxx|porn)";
+
 /** Detecta se um canal ou grupo contém conteúdo adulto (+18) por palavras-chave */
 export function isAdultContent(channelName: string, groupName: string = ""): boolean {
   const combined = `${channelName} ${groupName}`

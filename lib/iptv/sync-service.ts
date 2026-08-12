@@ -4,7 +4,7 @@ import { invalidatePlaylistCache } from "@/lib/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeTitleKey, slugify } from "@/lib/utils";
-import { detectCategory } from "./category-detector";
+import { PADRAO_ADULTO, detectCategory } from "./category-detector";
 import {
   parseM3u,
   parseM3uStream,
@@ -159,7 +159,7 @@ async function unirConteudoDaSecundaria(
 
   if (disponiveis === 0) return { adicionados: 0, disponiveis: 0 };
 
-  // Cria os grupos que ainda não existem, com categoria deduzida da URL.
+  // Cria os grupos que ainda não existem.
   await prisma.$executeRaw`
     INSERT INTO "M3uGroup" ("id", "playlistId", "name", "slug", "category", "sortOrder", "isHidden")
     SELECT
@@ -169,7 +169,8 @@ async function unirConteudoDaSecundaria(
       lower(regexp_replace(g.grupo, '[^a-zA-Z0-9]+', '-', 'g')),
       g.categoria,
       9000,
-      false
+      -- Adulto nasce OCULTO. Liberar é ato explícito no painel, nunca padrão.
+      g.categoria = 'adult'
     FROM (
       -- Uma linha por grupo, com a categoria PREDOMINANTE dele.
       --
@@ -180,13 +181,22 @@ async function unirConteudoDaSecundaria(
       -- que mais aparece, que tambem e a classificacao mais fiel do grupo.
       SELECT
         s."grupo" AS grupo,
-        mode() WITHIN GROUP (ORDER BY
-          CASE
-            WHEN s."url" LIKE '%/movie/%'  THEN 'movies'
-            WHEN s."url" LIKE '%/series/%' THEN 'series'
-            ELSE 'live'
-          END
-        ) AS categoria
+        -- Adulto ganha precedência sobre o formato da URL.
+        --
+        -- Classificar só por /movie/ e /series/ deixou "XXX ADULTOS +18" entrar
+        -- como filme comum e VISÍVEL: 3.317 canais adultos expostos, inclusive
+        -- para perfil infantil. O nome do grupo é o sinal que importa aqui, não
+        -- o container do arquivo.
+        CASE
+          WHEN s."grupo" ~* ${PADRAO_ADULTO} THEN 'adult'
+          ELSE mode() WITHIN GROUP (ORDER BY
+            CASE
+              WHEN s."url" LIKE '%/movie/%'  THEN 'movies'
+              WHEN s."url" LIKE '%/series/%' THEN 'series'
+              ELSE 'live'
+            END
+          )
+        END AS categoria
       FROM "M3uBackupStage" s
       WHERE s."playlistId" = ${playlist.id} AND s."grupo" IS NOT NULL
       GROUP BY s."grupo"
@@ -353,12 +363,27 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
         slug: slugify(groupName) || `grupo-${index}`,
         category: finalCategory,
         sortOrder: index,
+        // Adulto nasce OCULTO. Liberar é ato explícito no painel, nunca padrão.
+        isHidden: finalCategory === "adult",
       };
     });
 
     await prisma.m3uGroup.createMany({
       data: groupDataList,
       skipDuplicates: true,
+    });
+
+    /**
+     * Rede de segurança: adulto sempre oculto.
+     *
+     * `skipDuplicates` não atualiza grupo que já existe, então um grupo adulto
+     * criado antes desta regra continuaria visível para sempre. E como a lista
+     * do provedor muda de nome e de categoria sem avisar, o certo é reafirmar a
+     * trava a cada sincronização em vez de confiar no estado anterior.
+     */
+    await prisma.m3uGroup.updateMany({
+      where: { playlistId: playlist.id, category: "adult", isHidden: false },
+      data: { isHidden: true },
     });
 
     const createdGroups = await prisma.m3uGroup.findMany({
