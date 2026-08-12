@@ -2,7 +2,9 @@ import Link from "next/link";
 import { CategoryLockControls } from "@/components/admin/iptv/category-lock-controls";
 import { M3uForm } from "@/components/admin/iptv/m3u-form";
 import { M3uSyncStatusBadge } from "@/components/admin/iptv/m3u-sync-status";
+import { ModuloAdulto } from "@/components/admin/iptv/modulo-adulto";
 import { RelinkBackupButton } from "@/components/admin/iptv/relink-backup-button";
+import { prisma } from "@/lib/prisma";
 import { SyncButton } from "@/components/admin/iptv/sync-button";
 import { getCustomer } from "@/lib/queries/admin";
 import { getUserPlaylist } from "@/lib/queries/iptv";
@@ -44,6 +46,12 @@ export default async function IptvUserPage({
     }
 
     const playlist = await getUserPlaylist(params.userId);
+
+    const canaisAdultos = playlist
+      ? await prisma.m3uChannel.count({
+          where: { playlistId: playlist.id, group: { category: "adult" } },
+        })
+      : 0;
 
     return (
       <div className="px-8 py-10">
@@ -101,6 +109,14 @@ export default async function IptvUserPage({
                 )}
                 <SyncButton userId={params.userId} />
               </div>
+            </div>
+
+            <div className="mt-6">
+              <ModuloAdulto
+                userId={params.userId}
+                liberado={playlist.adultUnlocked}
+                canaisAdultos={canaisAdultos}
+              />
             </div>
 
             {/* Lock Controls */}

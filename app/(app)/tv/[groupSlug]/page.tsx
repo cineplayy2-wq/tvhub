@@ -85,6 +85,7 @@ export default async function GroupPage({
       search: searchParams.q,
       page,
       pageSize: 42,
+      adultUnlocked: playlist.adultUnlocked,
     });
     items = result.items;
     total = result.total;

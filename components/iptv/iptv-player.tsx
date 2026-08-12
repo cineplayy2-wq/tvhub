@@ -51,11 +51,21 @@ const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
   poor: 35000,
 };
 
-/** Buffer inicial do MPEG-TS. Quanto pior a conexão, mais fôlego antes de tocar. */
+/**
+ * Buffer acumulado ANTES do primeiro quadro, no MPEG-TS.
+ *
+ * Cada byte aqui é espera de tela preta: o player só entrega imagem depois de
+ * encher isto. Os valores são propositalmente pequenos — começar rápido e
+ * deixar o buffer crescer durante a reprodução dá uma experiência muito melhor
+ * do que segurar meio megabyte antes de mostrar qualquer coisa.
+ *
+ * A folga para conexão ruim continua existindo, mas no que corre DEPOIS de
+ * abrir (ver `liveBufferLatencyChasing`), não no que trava a abertura.
+ */
 const BUFFER_INICIAL: Record<ConnectionProfile, number> = {
-  good: 128 * 1024,
-  fair: 256 * 1024,
-  poor: 512 * 1024,
+  good: 32 * 1024,
+  fair: 64 * 1024,
+  poor: 128 * 1024,
 };
 
 /** Gera todas as variantes possíveis de stream para reprodução (HLS .m3u8 em 1º lugar para canais ao vivo) */
@@ -340,6 +350,14 @@ export function IptvPlayer({
             fragLoadingTimeOut: 15000,
             fragLoadingMaxRetry: 3,
             startLevel: -1,
+            // Começa a buscar o primeiro pedaço junto com o manifesto, em vez
+            // de esperar um terminar para pedir o outro.
+            startFragPrefetch: true,
+            // Entra perto da borda da transmissão: com 3 segmentos de folga o
+            // vídeo aparece bem antes do que com a folga padrão do hls.js.
+            liveSyncDurationCount: 3,
+            // Sem isto o player espera o vídeo "assentar" antes de tocar.
+            autoStartLoad: true,
           });
 
           hls.loadSource(playableUrl);

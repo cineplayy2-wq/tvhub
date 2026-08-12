@@ -47,6 +47,31 @@ const MAX_CANAIS_POR_LISTA = 60000;
 const MAX_EXTRAS_DA_SECUNDARIA = 40000;
 
 /**
+ * Apelido canônico de um grupo da M3U.
+ *
+ * A lista traz o mesmo grupo escrito de várias formas — "SBT", "▶️ SBT",
+ * "✔️ SBT" —, e como o emoji faz parte do nome eles viravam grupos distintos:
+ * 378 grupos para 312 assuntos reais, com três chips "SBT" lado a lado na tela.
+ *
+ * Tira o enfeite do começo e ignora a caixa, mas PRESERVA o "+": "SBT" e
+ * "SBT+" são serviços diferentes e juntá-los misturaria conteúdo que não se
+ * mistura. O `memo` guarda a primeira grafia vista, que vira a exibida.
+ */
+function apelidoDeGrupo(bruto: string, memo: Map<string, string>): string {
+  const limpo =
+    bruto
+      .replace(/^[^\p{L}\p{N}+]+/u, "")
+      .replace(/\s+/g, " ")
+      .trim() || bruto;
+
+  const chave = limpo.toLowerCase();
+  const jaVisto = memo.get(chave);
+  if (jaVisto) return jaVisto;
+  memo.set(chave, limpo);
+  return limpo;
+}
+
+/**
  * Vincula as URLs da lista de backup aos canais já importados.
  * Processamento fracionado em lotes leves para evitar picos de memória e CPU.
  */
@@ -201,6 +226,12 @@ async function unirConteudoDaSecundaria(
       WHERE s."playlistId" = ${playlist.id} AND s."grupo" IS NOT NULL
       GROUP BY s."grupo"
     ) AS g
+    WHERE NOT EXISTS (
+      -- Comparação sem caixa: a secundária escreve "Religiosos" onde a
+      -- principal escreveu "RELIGIOSOS", e sem isto viraria grupo duplicado.
+      SELECT 1 FROM "M3uGroup" x
+      WHERE x."playlistId" = ${playlist.id} AND lower(x."name") = lower(g.grupo)
+    )
     ON CONFLICT ("playlistId", "name") DO NOTHING
   `;
 
@@ -225,7 +256,7 @@ async function unirConteudoDaSecundaria(
       ORDER BY "chave", "nome"
     ) AS s
     LEFT JOIN "M3uGroup" grp
-      ON grp."playlistId" = ${playlist.id} AND grp."name" = s."grupo"
+      ON grp."playlistId" = ${playlist.id} AND lower(grp."name") = lower(s."grupo")
     WHERE NOT EXISTS (
       SELECT 1 FROM "M3uChannel" c
       WHERE c."playlistId" = ${playlist.id} AND c."nameKey" = s."chave"
@@ -319,30 +350,78 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
     void enrichChannelsWithTmdb(incomingChannels).catch(() => {});
 
     // 2. Mapeia os canais existentes no banco para PRESERVAR OS IDS (Evita erros 404 e links quebrados!)
-    const existingChannels = await prisma.m3uChannel.findMany({
-      where: { playlistId: playlist.id },
-      select: { id: true, streamUrl: true, name: true, fromBackup: true },
-    });
-
+    /**
+     * Índice dos canais existentes, lido em páginas.
+     *
+     * A versão anterior fazia um `findMany` sem limite e guardava o array
+     * inteiro. Com 180 mil canais o processo chegou a 316 MiB dos 320 MiB do
+     * contêiner — a uma sincronização de estourar. E o array nem era usado
+     * depois: só alimentava dois mapas e a lista de obsoletos.
+     *
+     * Aqui cada página vira entrada nos mapas e é descartada. O que fica é só
+     * o índice, e não os registros.
+     */
     const existingByUrl = new Map<string, string>();
     const existingByName = new Map<string, string>();
     const usedExistingIds = new Set<string>();
+    /** id -> veio da lista secundária (não pode ser varrido como obsoleto). */
+    const idsExistentes = new Map<string, boolean>();
 
-    for (const ch of existingChannels) {
-      if (ch.streamUrl) existingByUrl.set(ch.streamUrl, ch.id);
-      const nameKey = normalizeTitleKey(ch.name);
-      if (nameKey) existingByName.set(nameKey, ch.id);
-    }
+    {
+      const PAGINA = 5000;
+      let cursor: string | undefined;
+      for (;;) {
+        const pagina = await prisma.m3uChannel.findMany({
+          where: { playlistId: playlist.id },
+          select: { id: true, streamUrl: true, name: true, fromBackup: true },
+          orderBy: { id: "asc" },
+          take: PAGINA,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
 
-    // 3. Criar / Atualizar Grupos
-    const sampleChannelPerGroup = new Map<string, { name: string; streamUrl: string }>();
-    for (const ch of incomingChannels) {
-      if (!sampleChannelPerGroup.has(ch.groupTitle)) {
-        sampleChannelPerGroup.set(ch.groupTitle, { name: ch.name, streamUrl: ch.streamUrl });
+        if (pagina.length === 0) break;
+        cursor = pagina[pagina.length - 1].id;
+
+        for (const ch of pagina) {
+          idsExistentes.set(ch.id, ch.fromBackup);
+          if (ch.streamUrl) existingByUrl.set(ch.streamUrl, ch.id);
+          const nameKey = normalizeTitleKey(ch.name);
+          if (nameKey) existingByName.set(nameKey, ch.id);
+        }
+
+        if (pagina.length < PAGINA) break;
+        await yieldToEventLoop(10);
       }
     }
 
-    const groupsForAi = parsed.groups.map((groupName) => ({
+    /**
+     * 3. Criar / Atualizar Grupos — unificando os que são a mesma coisa.
+     *
+     * A lista chega com o mesmo grupo escrito de várias formas: "SBT",
+     * "▶️ SBT", "✔️ SBT". Como o emoji faz parte do nome, viravam grupos
+     * distintos: 378 grupos para 312 assuntos reais, e o assinante encontrava
+     * três chips "SBT" lado a lado — foi isso que deixou a navegação bagunçada.
+     *
+     * O apelido canônico tira o enfeite do começo e ignora a caixa, mas
+     * PRESERVA o "+": "SBT" e "SBT+" são serviços diferentes, e juntá-los
+     * misturaria conteúdo que não se mistura.
+     */
+    const memoGrupos = new Map<string, string>();
+    const canonizarGrupo = (bruto: string) => apelidoDeGrupo(bruto, memoGrupos);
+
+    const sampleChannelPerGroup = new Map<string, { name: string; streamUrl: string }>();
+    for (const ch of incomingChannels) {
+      const grupo = canonizarGrupo(ch.groupTitle);
+      if (!sampleChannelPerGroup.has(grupo)) {
+        sampleChannelPerGroup.set(grupo, { name: ch.name, streamUrl: ch.streamUrl });
+      }
+    }
+
+    const gruposCanonicos = Array.from(
+      new Set(parsed.groups.map((g) => canonizarGrupo(g))),
+    );
+
+    const groupsForAi = gruposCanonicos.map((groupName) => ({
       name: groupName,
       sampleChannel: sampleChannelPerGroup.get(groupName)?.name || "",
     }));
@@ -352,7 +431,7 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
       aiCategories = await categorizeGroupsWithAi(groupsForAi.slice(0, 60));
     } catch {}
 
-    const groupDataList = parsed.groups.map((groupName, index) => {
+    const groupDataList = gruposCanonicos.map((groupName, index) => {
       const sample = sampleChannelPerGroup.get(groupName);
       const baseCategory = detectCategory(groupName, sample?.name || "", sample?.streamUrl || "");
       const finalCategory = aiCategories[groupName] || baseCategory;
@@ -427,7 +506,9 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
       } else {
         newChannelsToInsert.push({
           playlistId: playlist.id,
-          groupId: groupMap.get(ch.groupTitle) ?? null,
+          // Mesmo apelido canônico usado para criar os grupos — sem isso o
+          // canal procuraria "▶️ SBT", que não existe mais, e ficaria órfão.
+          groupId: groupMap.get(canonizarGrupo(ch.groupTitle)) ?? null,
           name: ch.name,
           nameKey,
           streamUrl: ch.streamUrl,
@@ -477,9 +558,10 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
      * O que veio da lista secundária é preservado: não estar na principal é
      * justamente a razão de existir desse conteúdo.
      */
-    const obsoleteIds = existingChannels
-      .filter((c) => !usedExistingIds.has(c.id) && !c.fromBackup)
-      .map((c) => c.id);
+    const obsoleteIds: string[] = [];
+    for (const [id, veioDoBackup] of idsExistentes) {
+      if (!usedExistingIds.has(id) && !veioDoBackup) obsoleteIds.push(id);
+    }
 
     if (obsoleteIds.length > 0) {
       const DELETE_BATCH = 4000;
@@ -497,6 +579,21 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
       await vincularBackup(playlist, { unir: true });
     } catch (backupErr) {
       console.warn("[m3u] falha ao sincronizar lista de backup:", backupErr);
+    }
+
+    /**
+     * 7. Varrer grupos que ficaram sem nenhum canal.
+     *
+     * A unificação de nomes esvazia os grupos antigos ("▶️ SBT" perde os canais
+     * para "SBT"), e a lista do provedor também some com categorias de uma
+     * semana para outra. Sem esta varredura eles continuariam ocupando espaço
+     * nos filtros e nas abas, apontando para o nada.
+     */
+    const vazios = await prisma.m3uGroup.deleteMany({
+      where: { playlistId: playlist.id, channels: { none: {} } },
+    });
+    if (vazios.count > 0) {
+      console.log(`[m3u] ${vazios.count} grupos vazios removidos`);
     }
 
     const nextSync =
@@ -582,10 +679,15 @@ async function estagiarBackup(playlist: M3uPlaylist): Promise<number> {
 
   await limparEstagioDeBackup(playlist.id);
 
+  // Mesmo apelido canônico da lista principal: sem isto a segunda lista
+  // recriaria "▶️ SBT" ao lado do "SBT" já unificado.
+  const memoGrupos = new Map<string, string>();
+
   const gravarLote = async (lote: ItemDeBackup[]) => {
     const values = Prisma.join(
       lote.map(
-        (i) => Prisma.sql`(${playlist.id}, ${i.chave}, ${i.url}, ${i.nome}, ${i.grupo})`,
+        (i) =>
+          Prisma.sql`(${playlist.id}, ${i.chave}, ${i.url}, ${i.nome}, ${apelidoDeGrupo(i.grupo, memoGrupos)})`,
       ),
     );
     await prisma.$executeRaw`

@@ -593,6 +593,14 @@ model M3uPlaylist {
   /// URL do XMLTV (EPG) desta lista. O casamento com os canais é pelo tvg-id.
   epgUrl String?
 
+  /// Módulo adulto (+18) contratado à parte por este cliente.
+  ///
+  /// O padrão é FALSO e assim permanece: conteúdo adulto fica bloqueado para
+  /// todo mundo, e liberar é ato explícito do painel para quem paga o adicional.
+  /// Mesmo liberado, o conteúdo só aparece na seção dedicada — nunca se mistura
+  /// às trilhas de destaque, busca ou perfil infantil.
+  adultUnlocked Boolean @default(false)
+
   syncStatus     M3uSyncStatus @default(PENDING)
   lastSyncAt     DateTime?
   lastSyncError  String?

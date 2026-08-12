@@ -190,6 +190,41 @@ export async function revincularBackupAction(userId: string) {
   }
 }
 
+/**
+ * Liga/desliga o módulo adulto (+18) deste cliente.
+ *
+ * É o único caminho que libera o +18. Sem ele, a categoria adulta não retorna
+ * nada — nem pela navegação, nem por quem digitar a URL direto.
+ */
+export async function alternarModuloAdultoAction(userId: string) {
+  const admin = await requireAdmin();
+
+  const playlist = await prisma.m3uPlaylist.findUnique({
+    where: { userId },
+    select: { id: true, adultUnlocked: true },
+  });
+  if (!playlist) return { erro: "Lista M3U não encontrada" };
+
+  const liberado = !playlist.adultUnlocked;
+
+  await prisma.m3uPlaylist.update({
+    where: { userId },
+    data: { adultUnlocked: liberado },
+  });
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: liberado ? "adult.unlock" : "adult.lock",
+    targetType: "M3uPlaylist",
+    targetId: playlist.id,
+    metadata: { userId },
+  });
+
+  revalidatePath(`/admin/iptv/${userId}`);
+  revalidatePath("/tv");
+  return { liberado };
+}
+
 export async function deleteM3uPlaylistAction(userId: string) {
   const admin = await requireAdmin();
 

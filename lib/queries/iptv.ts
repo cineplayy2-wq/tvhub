@@ -113,6 +113,7 @@ export async function getPlaylistChannels({
   favoritesOnly,
   page = 1,
   pageSize = PAGE_SIZE,
+  adultUnlocked = false,
 }: {
   playlistId: string;
   groupId?: string;
@@ -121,6 +122,8 @@ export async function getPlaylistChannels({
   favoritesOnly?: boolean;
   page?: number;
   pageSize?: number;
+  /** Módulo +18 contratado. Sem ele a categoria adulta não retorna nada. */
+  adultUnlocked?: boolean;
 }) {
   const where: Prisma.M3uChannelWhereInput = {
     playlistId,
@@ -172,9 +175,19 @@ export async function getPlaylistChannels({
       group: { category: "kids", isHidden: false },
     });
   } else if (category === "adult") {
-    extraWhere.push({
-      group: { category: "adult" },
-    });
+    /**
+     * Adulto exige o módulo contratado. Sem ele, some.
+     *
+     * Antes esta ramificação era a única que NÃO aplicava `isHidden`: ocultar
+     * os grupos no painel não bloqueava nada aqui, e bastava digitar
+     * `/tv/adult` para ver tudo. O bloqueio precisa valer na consulta, não só
+     * na navegação.
+     */
+    if (!adultUnlocked) {
+      extraWhere.push({ id: "__bloqueado__" });
+    } else {
+      extraWhere.push({ group: { category: "adult" } });
+    }
   }
 
   if (category !== "adult") {
