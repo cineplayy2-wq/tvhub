@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { BackButton } from "@/components/iptv/back-button";
 import { IptvPlayer } from "@/components/iptv/iptv-player";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
-import { getChannelById } from "@/lib/queries/iptv";
+import { getChannelById, getQualityVariants } from "@/lib/queries/iptv";
 import { prisma } from "@/lib/prisma";
 import { cleanMediaTitle, slugify } from "@/lib/utils";
 
@@ -85,6 +85,11 @@ export default async function WatchChannelPage({
     channel.streamUrl.includes("/movie/") ||
     channel.streamUrl.includes("/series/");
 
+  // Só canal ao vivo vem repetido por qualidade; filme e episódio são únicos.
+  const qualidades = isVod
+    ? []
+    : await getQualityVariants(channel.playlist.id, channel.name).catch(() => []);
+
   return (
     <div className="min-h-screen bg-black text-foreground">
       <div className="absolute left-4 top-4 z-40">
@@ -100,6 +105,7 @@ export default async function WatchChannelPage({
           channelId={channel.id}
           isLive={!isVod}
           alternativeStreams={channel.backupStreamUrl ? [channel.backupStreamUrl] : []}
+          qualidades={qualidades}
           initialPosition={initialPosition}
         />
       </div>

@@ -46,40 +46,65 @@ export function detectConnectionProfile(): ConnectionProfile {
 export type BufferPlan = {
   /** Bytes acumulados antes de entregar o primeiro quadro. */
   stashInitialSize: number;
-  /** Persegue a borda da transmissão (menos atraso, mais risco de travar). */
-  chaseLatency: boolean;
+  /**
+   * Segundos de vídeo mantidos à frente como folga contra oscilação da rede.
+   * É este colchão que decide se uma engasgada vira travada na tela ou passa
+   * despercebida.
+   */
+  colchaoSegundos: number;
+  /**
+   * Atraso máximo tolerado antes de o player pular para frente — e, quando
+   * pula, ele para em `colchaoSegundos`, nunca no zero.
+   *
+   * O par (máximo 3s, sobra 0,5s) que estava no player era a origem das
+   * travadinhas: bastava a folga passar de 3 segundos para ele saltar e deixar
+   * meio segundo de reserva. Meio segundo não sobrevive a nenhuma variação de
+   * rede, então travava, recarregava e repetia. Com uma faixa larga, o salto
+   * só acontece quando o atraso é realmente grande, e sempre sobra colchão.
+   */
+  latenciaMaximaSegundos: number;
   /** Segundos de vídeo mantidos à frente no VOD. */
   vodBufferSeconds: number;
   label: string;
 };
 
 /**
- * Quanto acumular antes de começar.
+ * Quanto acumular antes de começar e quanta folga manter durante a exibição.
  *
  * Os valores crescem a cada travada (ver `escalate`): a primeira tentativa é
  * otimista, e cada falha compra mais folga em troca de atraso. É o oposto de
  * insistir no mesmo buffer e travar em loop.
+ *
+ * O `stashInitialSize` é deliberadamente contido, porque ele é pago em tempo
+ * de abertura: a uns 4 Mbps, 384 KB levam menos de um segundo para encher e
+ * 4 MB levariam oito. Quem protege da engasgada é o colchão, que se forma
+ * enquanto assiste e não custa espera nenhuma no início.
  */
 export function bufferPlanFor(profile: ConnectionProfile): BufferPlan {
   switch (profile) {
     case "poor":
       return {
-        stashInitialSize: 4 * 1024 * 1024,
-        chaseLatency: false,
+        stashInitialSize: 1536 * 1024,
+        colchaoSegundos: 10,
+        latenciaMaximaSegundos: 20,
         vodBufferSeconds: 60,
         label: "Conexão lenta — acumulando mais vídeo para não travar",
       };
     case "fair":
       return {
-        stashInitialSize: 1024 * 1024,
-        chaseLatency: false,
+        stashInitialSize: 768 * 1024,
+        colchaoSegundos: 8,
+        latenciaMaximaSegundos: 16,
         vodBufferSeconds: 30,
         label: "Ajustando à sua conexão",
       };
     default:
       return {
-        stashInitialSize: 256 * 1024,
-        chaseLatency: true,
+        // 384 KB é o padrão da própria mpegts.js, calibrado pelo autor da
+        // biblioteca. O player usava 16 KB, vinte e quatro vezes menos.
+        stashInitialSize: 384 * 1024,
+        colchaoSegundos: 6,
+        latenciaMaximaSegundos: 12,
         vodBufferSeconds: 20,
         label: "Carregando",
       };

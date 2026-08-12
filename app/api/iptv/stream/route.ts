@@ -344,10 +344,27 @@ export async function GET(request: NextRequest) {
     }
 
     if (statusCode >= 400) {
+      upstreamResponse.destroy();
       return new NextResponse(`Erro upstream: ${statusCode}`, {
         status: statusCode,
       });
     }
+
+    /**
+     * Desliga do provedor assim que o espectador desiste.
+     *
+     * Transmissão ao vivo não termina sozinha: se ninguém cortar, este proxy
+     * fica puxando vídeo do provedor até o teto de uma hora do `maxDuration`,
+     * mesmo com a aba já fechada. E como o player troca de fonte e remonta o
+     * motor algumas vezes até engatar, sobravam várias dessas conexões
+     * penduradas por espectador. Painel de IPTV limita conexões simultâneas
+     * por conta — passado o limite, o provedor recusa as próximas, e o sintoma
+     * que chega ao usuário é canal que demora a abrir e trava.
+     */
+    const encerrarUpstream = () => {
+      if (!upstreamResponse.destroyed) upstreamResponse.destroy();
+    };
+    request.signal.addEventListener("abort", encerrarUpstream, { once: true });
 
     const rawContentType = upstreamResponse.headers["content-type"] || "";
     const responseHeaders = new Headers();
@@ -387,6 +404,10 @@ export async function GET(request: NextRequest) {
         const rewrittenManifest = rewrittenLines.join("\n");
         responseHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
         responseHeaders.set("Content-Length", Buffer.byteLength(rewrittenManifest).toString());
+
+        // O manifesto já foi lido por inteiro; segurar o socket aberto só
+        // consome uma das poucas conexões que o provedor concede por conta.
+        encerrarUpstream();
 
         return new NextResponse(rewrittenManifest, {
           status: statusCode,

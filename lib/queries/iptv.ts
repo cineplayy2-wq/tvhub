@@ -4,6 +4,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { cached, TTL } from "@/lib/cache";
 import { dedupeChannels } from "@/lib/utils";
+import {
+  mesmaBase,
+  nivelDe,
+  nomeBaseDoCanal,
+  umaPorNivel,
+  type VarianteQualidade,
+} from "@/lib/iptv/quality";
 
 
 const PAGE_SIZE = 20;
@@ -571,6 +578,47 @@ export async function getSeriesEpisodes(playlistId: string, seriesName: string) 
     const resto = canal.name.slice(alvo.length).trim();
     return resto === "" || /^[-–:|]?\s*(?:[sStT]\s*\d|\d+\s*[xX]\s*\d)/.test(resto);
   });
+}
+
+/**
+ * As outras qualidades do mesmo canal.
+ *
+ * A busca é por prefixo porque o marcador de qualidade fica sempre no fim do
+ * nome, então o nome base é literalmente o começo do nome de cada irmã. O
+ * `startsWith` no banco só desbasta; quem decide de fato é a comparação do
+ * nome base em JS, que ignora caixa e espaço repetido — sem ela, "GLOBO SP"
+ * arrastaria "GLOBO SP RECORD" e afins.
+ */
+export async function getQualityVariants(
+  playlistId: string,
+  channelName: string,
+): Promise<VarianteQualidade[]> {
+  const base = nomeBaseDoCanal(channelName);
+  if (!base) return [];
+
+  const candidatos = await prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      name: { startsWith: base, mode: "insensitive" },
+    },
+    select: { id: true, name: true, quality: true, streamUrl: true },
+    orderBy: [{ relevanceScore: "desc" }, { sortOrder: "asc" }],
+    take: 40,
+  });
+
+  const irmas = candidatos
+    .filter((c) => mesmaBase(nomeBaseDoCanal(c.name), base))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      streamUrl: c.streamUrl,
+      nivel: nivelDe(c.quality, c.name),
+    }));
+
+  // Uma sozinha não é escolha: o seletor só faz sentido com alternativa real.
+  const porNivel = umaPorNivel(irmas);
+  return porNivel.length > 1 ? porNivel : [];
 }
 
 export type SeriesListItem = {

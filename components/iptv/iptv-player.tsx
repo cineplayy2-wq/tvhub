@@ -17,6 +17,11 @@ import {
 
 import { ReportModal } from "@/components/iptv/report-modal";
 import {
+  qualidadeIdealPara,
+  type VarianteQualidade,
+} from "@/lib/iptv/quality";
+import {
+  bufferPlanFor,
   detectConnectionProfile,
   escalate,
   type ConnectionProfile,
@@ -53,14 +58,6 @@ const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
   poor: 18000,
 };
 
-/**
- * Buffer acumulado ANTES do primeiro quadro, no MPEG-TS.
- */
-const BUFFER_INICIAL: Record<ConnectionProfile, number> = {
-  good: 16 * 1024,
-  fair: 32 * 1024,
-  poor: 64 * 1024,
-};
 
 /** Gera todas as variantes possíveis de stream para reprodução (URL original sempre em 1º lugar para zero delay) */
 function buildStreamVariants(rawUrl: string, isLive = true): string[] {
@@ -91,6 +88,7 @@ export function IptvPlayer({
   channelId,
   isLive = true,
   alternativeStreams = [],
+  qualidades = [],
   initialPosition = 0,
 }: {
   streamUrl: string;
@@ -98,6 +96,8 @@ export function IptvPlayer({
   channelId?: string;
   isLive?: boolean;
   alternativeStreams?: string[];
+  /** Mesmo canal em outras resoluções; vazio quando não há alternativa. */
+  qualidades?: VarianteQualidade[];
   initialPosition?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,21 +108,54 @@ export function IptvPlayer({
   const networkRetryCount = useRef<number>(0);
   const hasResumedRef = useRef<boolean>(false);
 
+  const [state, setState] = useState<PlayerState>("loading");
+  const [showDebouncedSpinner, setShowDebouncedSpinner] = useState(false);
+  /**
+   * Detectado já no primeiro render, não num efeito.
+   *
+   * Como efeito, o motor montava com o palpite "fair", o estado mudava logo em
+   * seguida e o efeito de inicialização — que tem `profile` nas dependências —
+   * derrubava tudo e remontava. Ou seja: toda abertura de canal montava o
+   * player duas vezes e abria duas conexões com o provedor, sendo que a
+   * primeira ficava órfã. Painel de IPTV limita conexões por conta, então a
+   * conexão abandonada ainda atrapalhava a que valia.
+   *
+   * Ler `navigator` aqui é seguro: no servidor a função devolve "fair", e o
+   * perfil não aparece em nada renderizado, então não há divergência de
+   * hidratação possível.
+   */
+  const [profile, setProfile] = useState<ConnectionProfile>(detectConnectionProfile);
+
+  /**
+   * Qualidade em uso, escolhida só pelo player — não há troca manual.
+   *
+   * A lista vem ordenada da mais leve para a mais pesada. Começa na melhor que
+   * a conexão detectada comporta, desce um degrau a cada travada e, depois de
+   * um tempo tocando limpo, volta a tentar o degrau de cima. Deixar isso na mão
+   * do espectador só serviria para ele escolher uma resolução que a linha dele
+   * não sustenta e culpar o player pela travada.
+   */
+  const temEscolhaDeQualidade = qualidades.length > 1;
+  const [nivelQualidade, setNivelQualidade] = useState(() =>
+    temEscolhaDeQualidade ? qualidadeIdealPara(detectConnectionProfile(), qualidades) : -1,
+  );
+
+  const urlBase =
+    temEscolhaDeQualidade && qualidades[nivelQualidade]
+      ? qualidades[nivelQualidade].streamUrl
+      : streamUrl;
+
   // Gera todas as variantes de stream síncronamente na renderização (evita array vazio inicial!)
-  const mainVariants = buildStreamVariants(streamUrl, isLive);
+  const mainVariants = buildStreamVariants(urlBase, isLive);
   const altVariants = alternativeStreams.flatMap((u) => (u ? buildStreamVariants(u, isLive) : []));
   const allStreams = Array.from(new Set([...mainVariants, ...altVariants]));
 
   const [currentStreamIndex, setCurrentStreamIndex] = useState(0);
 
-  const activeStreamUrl = allStreams[currentStreamIndex] || streamUrl;
+  const activeStreamUrl = allStreams[currentStreamIndex] || urlBase;
   const isProgressive = /\.(mp4|mkv|avi|webm)/i.test(activeStreamUrl);
   /** MPEG-TS cru (sem manifesto HLS): exige mpegts.js, ninguém mais lê isso. */
   const isRawTs = /\.ts(\?|$)/i.test(activeStreamUrl);
-
-  const [state, setState] = useState<PlayerState>("loading");
-  const [showDebouncedSpinner, setShowDebouncedSpinner] = useState(false);
-  const [profile, setProfile] = useState<ConnectionProfile>("fair");
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -135,6 +168,17 @@ export function IptvPlayer({
   const [reportOpen, setReportOpen] = useState(false);
   const [autoMutedHint, setAutoMutedHint] = useState(false);
 
+  /**
+   * Quanto esperar tocando limpo antes de tentar subir a qualidade de novo.
+   *
+   * Dobra a cada tentativa frustrada, com teto de oito minutos. Sem esse
+   * recuo, uma conexão que não aguenta o degrau de cima ficaria num vaivém:
+   * sobe, trava, desce, espera o mesmo tanto, sobe de novo — e a pessoa
+   * assistiria a uma travada periódica pelo resto do jogo.
+   */
+  const esperaParaSubir = useRef(60_000);
+  const timerSubida = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   /** Contador de insistências na fonte atual (ver tryNextSourceOrFail). */
   const tentativasNaFonte = useRef(0);
   const recargaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -142,6 +186,48 @@ export function IptvPlayer({
   const failoverEmVoo = useRef(false);
   /** Muda para remontar o motor na MESMA URL — é o que materializa a repetição. */
   const [recarga, setRecarga] = useState(0);
+
+  /** Desce um degrau de resolução. Só age se houver degrau abaixo. */
+  const baixarQualidade = useCallback(() => {
+    if (!temEscolhaDeQualidade || nivelQualidade <= 0) return false;
+    setNivelQualidade(nivelQualidade - 1);
+    esperaParaSubir.current = Math.min(esperaParaSubir.current * 2, 8 * 60_000);
+    return true;
+  }, [temEscolhaDeQualidade, nivelQualidade]);
+
+  /**
+   * Volta a testar o degrau de cima depois de um tempo tocando limpo.
+   *
+   * O relógio zera a cada engasgo, porque o efeito depende de `state`: só
+   * chega ao fim quem ficou o período inteiro em reprodução contínua. É essa
+   * dependência que faz "tempo estável" significar estável de verdade.
+   */
+  useEffect(() => {
+    if (!temEscolhaDeQualidade) return;
+    if (state !== "playing") return;
+    if (nivelQualidade >= qualidades.length - 1) return;
+
+    timerSubida.current = setTimeout(() => {
+      setNivelQualidade((n) => Math.min(n + 1, qualidades.length - 1));
+    }, esperaParaSubir.current);
+
+    return () => {
+      if (timerSubida.current) clearTimeout(timerSubida.current);
+    };
+  }, [state, nivelQualidade, temEscolhaDeQualidade, qualidades.length]);
+
+  /**
+   * Trocar de resolução recomeça a escada de reservas do zero.
+   *
+   * Sem isto, o índice de failover herdado apontaria para uma variante da
+   * resolução anterior, e descer de HD para SD podia cair de volta no HD —
+   * justo a que estava travando.
+   */
+  useEffect(() => {
+    setCurrentStreamIndex(0);
+    tentativasNaFonte.current = 0;
+    failoverEmVoo.current = false;
+  }, [urlBase]);
 
   // URL final de mídia enviada ao player:
   // Em produção (HTTPS), a URL de stream IPTV deve SEMPRE passar pelo proxy
@@ -151,11 +237,6 @@ export function IptvPlayer({
     : activeStreamUrl.startsWith("/api/")
     ? activeStreamUrl
     : `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}`;
-
-  // Detect Connection Speed
-  useEffect(() => {
-    setProfile(detectConnectionProfile());
-  }, []);
 
   // Controls Hiding Timer — também no toque (celular não tem mousemove)
   const resetHideTimer = useCallback(() => {
@@ -229,6 +310,18 @@ export function IptvPlayer({
     tentativasNaFonte.current = 0;
   }, [currentStreamIndex]);
 
+  /**
+   * Trocar de qualidade recomeça a escada de reservas do zero.
+   *
+   * Sem isto, o índice de failover herdado apontaria para a variante da
+   * qualidade anterior, e mudar de HD para SD podia cair de volta no HD.
+   */
+  useEffect(() => {
+    setCurrentStreamIndex(0);
+    tentativasNaFonte.current = 0;
+    failoverEmVoo.current = false;
+  }, [urlBase]);
+
   useEffect(() => () => {
     if (recargaTimer.current) clearTimeout(recargaTimer.current);
   }, []);
@@ -291,15 +384,21 @@ export function IptvPlayer({
             return;
           }
 
+          const plano = bufferPlanFor(profile);
+
           const player = mpegts.createPlayer(
             { type: "mpegts", isLive, url: playableUrl },
             {
               enableWorker: true,
+              // Sem o stash, qualquer oscilação de rede vira travada: é ele
+              // que absorve a diferença entre o que chega e o que é exibido.
               enableStashBuffer: true,
-              stashInitialSize: BUFFER_INICIAL[profile],
-              liveBufferLatencyChasing: true,
-              liveBufferLatencyMaxLatency: 3,
-              liveBufferLatencyMinRemain: 0.5,
+              stashInitialSize: plano.stashInitialSize,
+              // Perseguir a borda continua ligado, mas com faixa larga: só
+              // corrige atraso grande, e ao corrigir mantém o colchão.
+              liveBufferLatencyChasing: isLive,
+              liveBufferLatencyMaxLatency: plano.latenciaMaximaSegundos,
+              liveBufferLatencyMinRemain: plano.colchaoSegundos,
               lazyLoad: false,
             },
           );
@@ -336,22 +435,37 @@ export function IptvPlayer({
             return;
           }
 
+          const plano = bufferPlanFor(profile);
+
           const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
-            maxBufferLength: 8,
-            maxMaxBufferLength: 16,
-            manifestLoadingTimeOut: 3500,
-            manifestLoadingMaxRetry: 2,
-            levelLoadingTimeOut: 3500,
-            fragLoadingTimeOut: 5000,
-            fragLoadingMaxRetry: 2,
+            /**
+             * Modo de baixa latência DESLIGADO de propósito.
+             *
+             * Ele encurta todos os prazos e faz o player correr atrás da
+             * borda da transmissão. Isso serve para leilão e videochamada,
+             * onde meio segundo importa; em canal de TV ninguém percebe dez
+             * segundos de atraso, mas todo mundo percebe a imagem travando.
+             */
+            lowLatencyMode: false,
+            maxBufferLength: plano.vodBufferSeconds,
+            maxMaxBufferLength: plano.vodBufferSeconds * 2,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            levelLoadingTimeOut: 10000,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 4,
             startLevel: -1,
             startFragPrefetch: true,
-            liveSyncDurationCount: 2,
-            liveMaxLatencyDurationCount: 4,
+            /**
+             * Começa a três segmentos da borda, não a dois. Com pedaços de
+             * cinco segundos — o que este provedor entrega —, são quinze
+             * segundos de folga em vez de dez, e sobra margem para um pedaço
+             * atrasar sem que a exibição pare.
+             */
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 10,
             autoStartLoad: true,
-            highBufferWatchdogPeriod: 2,
           });
 
           hls.loadSource(playableUrl);
@@ -496,6 +610,9 @@ export function IptvPlayer({
         stallDebounceTimer.current = setTimeout(() => {
           stallDebounceTimer.current = undefined;
           setShowDebouncedSpinner(true);
+          // Passou de um segundo e meio parado: é travada de verdade, não um
+          // engasgo. Cair de resolução aqui é o que impede a próxima.
+          baixarQualidade();
         }, 1500);
       }
 
@@ -538,7 +655,7 @@ export function IptvPlayer({
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("volumechange", onVolume);
     };
-  }, [tryNextSourceOrFail, initialPosition]);
+  }, [tryNextSourceOrFail, initialPosition, baixarQualidade]);
 
   // Periodic Watch Progress Heartbeat (every 8 seconds)
   useEffect(() => {
