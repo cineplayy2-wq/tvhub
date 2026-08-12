@@ -257,6 +257,35 @@ async function unirConteudoDaSecundaria(
     ON CONFLICT ("playlistId", "name") DO NOTHING
   `;
 
+  /**
+   * Atualiza o endereço do que já veio da secundária em cargas anteriores.
+   *
+   * Sem este passo a união só sabia inserir o que faltava, e o que já estava no
+   * catálogo ficava congelado com a URL do dia em que entrou. Como esse
+   * conteúdo também é poupado da varredura de obsoletos — não estar na lista
+   * principal é a razão de ele existir —, nada nunca o revisava.
+   *
+   * Foi exatamente assim que 160 mil itens pararam de tocar: o provedor mudou
+   * o servidor de entrega, a lista nova já vinha com o endereço certo, e o
+   * catálogo seguiu apontando para um nome que o DNS nem resolvia mais.
+   */
+  const atualizados = await prisma.$executeRaw`
+    UPDATE "M3uChannel" AS c
+       SET "streamUrl" = s.url
+      FROM (
+        SELECT DISTINCT ON ("chave") "chave", "url"
+        FROM "M3uBackupStage"
+        WHERE "playlistId" = ${playlist.id}
+      ) AS s
+     WHERE c."playlistId" = ${playlist.id}
+       AND c."fromBackup"
+       AND c."nameKey" = s."chave"
+       AND c."streamUrl" IS DISTINCT FROM s.url
+  `;
+  if (atualizados > 0) {
+    console.log(`[m3u] uniao: ${atualizados} enderecos da secundaria atualizados`);
+  }
+
   const adicionados = await prisma.$executeRaw`
     INSERT INTO "M3uChannel" (
       "id", "playlistId", "groupId", "name", "streamUrl", "nameKey", "fromBackup",
