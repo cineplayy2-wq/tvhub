@@ -57,6 +57,25 @@ ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
 RUN npx prisma generate
 RUN npm run build
 
+# ---------- 2b. sharp, em árvore própria ----------
+#
+# Estágio separado porque o sharp precisa ir INTEIRO para o runtime, com as
+# dependências dele (color, detect-libc, semver e o binário nativo em @img).
+# Copiar pasta por pasta do build já falhou uma vez: faltou uma, o require
+# quebrou dentro de um catch que lê `err.code` de um erro sem `code`, e o que
+# apareceu foi "Cannot read properties of undefined" — mensagem que não diz
+# nada sobre módulo ausente. Deixar o npm montar a árvore elimina o palpite.
+#
+# A VERSÃO É TRAVADA EM 0.33.5, e não é preciosismo: a partir da 0.34 os
+# binários de Linux x64 exigem microarquitetura x86-64-v2, e esta VPS roda um
+# "Common KVM processor" sem sse4_2, ssse3 nem popcnt. Lá o sharp detecta a
+# CPU, se recusa a usar o binário e se desliga em silêncio — o site continua
+# de pé servindo imagem sem otimizar, que é justamente o que se queria
+# corrigir. Antes de subir esta faixa, confira `grep flags /proc/cpuinfo`.
+FROM node:20-bookworm-slim AS sharp
+WORKDIR /sharp
+RUN npm install --no-audit --no-fund --omit=dev sharp@0.33.5
+
 # ---------- 3. Runtime ----------
 FROM node:20-bookworm-slim AS runner
 
@@ -102,9 +121,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 # por require dinâmico, então o tracer do standalone não o enxerga. Sem ele o
 # servidor sobe e serve as páginas, mas toda capa e todo avatar saem no tamanho
 # original — o aviso "sharp is required in standalone mode" no build era isso.
-# O binário nativo vem em @img/sharp-linux-x64, que precisa vir junto.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@img
+COPY --from=sharp --chown=nextjs:nodejs /sharp/node_modules ./node_modules
 
 # O cache do Next precisa ser gravável pelo usuário não-root
 RUN mkdir -p ./.next/cache && chown -R nextjs:nodejs ./.next
