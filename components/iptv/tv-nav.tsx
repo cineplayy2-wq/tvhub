@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertCircle, Cast, Heart, Search, Sparkles } from "lucide-react";
+import { Cast, Heart, Search, Sparkles } from "lucide-react";
 
 import { LogoHMark } from "@/components/shared/logo";
 import { UserProfileMenu } from "@/components/profile/user-profile-menu";
 import { CastModal } from "./cast-modal";
-import { ReportModal } from "./report-modal";
 import type { ProfileSummary } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +51,6 @@ export function TvNav({
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [castOpen, setCastOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
 
   const isKidsProfile = Boolean(activeProfile?.isKids);
   const navLinks = isKidsProfile ? KIDS_LINKS : STANDARD_LINKS;
@@ -131,17 +129,6 @@ export function TvNav({
               <Cast className="h-4 w-4" />
             </button>
 
-            {/* Relatar Problema */}
-            <button
-              type="button"
-              onClick={() => setReportOpen(true)}
-              aria-label="Reportar problema"
-              title="Reportar travamento ou problema"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-surface/80 text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-rose-400"
-            >
-              <AlertCircle className="h-4 w-4" />
-            </button>
-
             {/* Minha Lista */}
             <Link
               href="/minha-lista"
@@ -170,7 +157,6 @@ export function TvNav({
 
       {/* Modais de Suporte */}
       <CastModal open={castOpen} onClose={() => setCastOpen(false)} />
-      <ReportModal open={reportOpen} onClose={() => setReportOpen(false)} />
     </>
   );
 }

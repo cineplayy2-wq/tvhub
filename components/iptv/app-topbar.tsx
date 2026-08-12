@@ -4,19 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { UserProfileMenu } from "@/components/profile/user-profile-menu";
+import { LogoHMark } from "@/components/shared/logo";
+import type { ProfileSummary } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
  * Barra superior, conforme o protótipo.
  *
- * Estrutura fixa: marca (só o "H", 34px) + NOME DA CATEGORIA + ícones de ação
- * + busca em círculo destacado. O nome da aba fica no cabeçalho, não em um
- * título dentro da página — foi o que o protótipo definiu e é o que evita
- * repetir a mesma palavra duas vezes na tela.
- *
- * Transparente no topo e opaca ao rolar: sobre o hero a arte precisa aparecer
- * inteira; assim que o conteúdo sobe, a barra ganha fundo para o texto não
- * disputar contraste com o pôster que passa por baixo.
+ * Estrutura: marca + título da categoria à esquerda; coração, lupa e avatar do
+ * perfil à direita. Transparente no topo e opaca ao rolar.
  */
 
 /** Título por rota — precisa casar com as abas da barra inferior. */
@@ -50,24 +47,16 @@ function titleFor(pathname: string) {
   return best;
 }
 
-/** Marca do app ("H"), 34×34. Maior que o rótulo da categoria de propósito. */
-function Mark() {
-  return (
-    <span className="mr-1.5 grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-gradient-to-br from-[#8A2BE2] to-[#4A0FB0]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/mark.png" alt="HUBFLIX" className="h-full w-full object-cover" />
-    </span>
-  );
-}
-
 function IconButton({
   href,
   label,
   children,
+  className,
 }: {
   href: string;
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <Link
@@ -78,6 +67,7 @@ function IconButton({
         "transition-opacity hover:opacity-100 active:scale-95",
         "[&_svg]:h-[19px] [&_svg]:w-[19px] [&_svg]:fill-none [&_svg]:stroke-current",
         "[&_svg]:stroke-[1.7] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]",
+        className,
       )}
     >
       {children}
@@ -85,7 +75,15 @@ function IconButton({
   );
 }
 
-export function AppTopbar() {
+export function AppTopbar({
+  user,
+  profiles = [],
+  activeProfile = null,
+}: {
+  user?: { email?: string | null; name?: string | null; role?: string } | null;
+  profiles?: ProfileSummary[];
+  activeProfile?: ProfileSummary | null;
+}) {
   const pathname = usePathname();
   const [stuck, setStuck] = useState(false);
 
@@ -115,49 +113,47 @@ export function AppTopbar() {
       />
 
       <div className="flex h-11 items-center gap-[7px]">
-        <Link href="/tv" aria-label="HUBFLIX — início" className="flex items-center">
-          <Mark />
+        {/* Marca à esquerda, com o título da categoria ao lado */}
+        <Link href="/tv" aria-label="HUBFLIX — início" className="shrink-0">
+          <LogoHMark />
         </Link>
 
         <h1 className="min-w-0 flex-1 truncate text-[16px] font-bold tracking-[-0.028em] text-foreground">
           {titleFor(pathname)}
         </h1>
 
-        <IconButton href="/tv/dispositivos" label="Transmitir">
-          <svg viewBox="0 0 24 24">
-            <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
-          </svg>
-        </IconButton>
-
+        {/* Coração — Minha lista / favoritos IPTV */}
         <IconButton href="/tv/busca?favoritos=true" label="Minha lista">
-          <svg viewBox="0 0 24 24">
-            <path d="M6 3.8h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.8a1 1 0 0 1 1-1z" />
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <path d="M12 20.4 4.6 13A4.9 4.9 0 0 1 12 5.7 4.9 4.9 0 0 1 19.4 13z" />
           </svg>
         </IconButton>
 
-        <IconButton href="/tv/reportar" label="Reportar problema">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 4.2 21.2 20H2.8z" />
-            <path d="M12 10v4M12 17.2v.1" />
-          </svg>
-        </IconButton>
-
+        {/* Lupa colada no perfil, os dois na ponta direita */}
         <Link
           href="/tv/busca"
           aria-label="Buscar"
           className={cn(
-            "ml-0.5 grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full",
+            "grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full",
             "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,.22)]",
             "transition-transform active:scale-[0.92]",
             "[&_svg]:h-[19px] [&_svg]:w-[19px] [&_svg]:fill-none [&_svg]:stroke-current",
             "[&_svg]:stroke-[2.1] [&_svg]:[stroke-linecap:round]",
           )}
         >
-          <svg viewBox="0 0 24 24">
+          <svg viewBox="0 0 24 24" aria-hidden>
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.8-3.8" />
           </svg>
         </Link>
+
+        <div className="shrink-0">
+          <UserProfileMenu
+            user={user}
+            profiles={profiles}
+            activeProfile={activeProfile}
+          />
+        </div>
       </div>
     </header>
   );

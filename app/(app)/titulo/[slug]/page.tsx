@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Play } from "lucide-react";
 
 import { AppHeader } from "@/components/catalog/app-header";
+import { BackButton } from "@/components/iptv/back-button";
 import { AgeBadge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { WatchlistButton } from "@/components/catalog/watchlist-button";
@@ -46,6 +47,10 @@ export default async function TitleDetailPage({
   return (
     <div className="min-h-screen pb-20">
       <AppHeader profile={profile} isAdmin={user.role === "ADMIN"} />
+
+      <div className="absolute left-5 top-24 z-30 sm:left-10">
+        <BackButton fallbackHref="/inicio" />
+      </div>
 
       <div className="relative h-[52vh] min-h-[20rem] w-full">
         {title.backdropUrl ? (

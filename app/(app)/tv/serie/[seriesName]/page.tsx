@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Play, Star } from "lucide-react";
 
 import { Artwork } from "@/components/iptv/artwork";
+import { BackButton } from "@/components/iptv/back-button";
 import { GUTTER } from "@/components/iptv/section";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
 import { requireUser } from "@/lib/auth/session";
@@ -103,6 +104,12 @@ export default async function SeriesPage({
 
     return (
       <div className="min-h-screen pb-24">
+        <div className="absolute left-4 top-[calc(env(safe-area-inset-top)+72px)] z-40 md:left-[88px]">
+          <BackButton
+            fallbackHref="/tv/series"
+            className="bg-black/70 text-white/90"
+          />
+        </div>
         <div className="relative isolate h-[62vh] min-h-[420px] w-full overflow-hidden">
           <Artwork src={backdropUrl} alt={cleanName} seed={seriesName} role="backdrop" eager />
           <div className="scrim-hero absolute inset-0" />

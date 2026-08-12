@@ -70,6 +70,7 @@ export function ProfileGrid({
                 id={profile.id}
                 name={profile.name}
                 isKids={profile.isKids}
+                avatarUrl={profile.avatarUrl}
                 size="lg"
                 className={cn(
                   "ring-2 ring-transparent transition-all duration-300 ease-smooth",

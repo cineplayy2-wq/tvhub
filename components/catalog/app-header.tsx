@@ -135,7 +135,7 @@ export function AppHeader({
                   </form>
 
                   <Link
-                    href="/conta"
+                    href="/perfis"
                     role="menuitem"
                     className="block px-4 py-2.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                   >

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Loader2,
   Maximize,
   Minimize,
@@ -14,6 +15,7 @@ import {
   VolumeX,
 } from "lucide-react";
 
+import { ReportModal } from "@/components/iptv/report-modal";
 import {
   detectConnectionProfile,
   escalate,
@@ -31,7 +33,7 @@ const MAX_RETRIES = 3;
  * O provedor devolve 404 esporádico em URL boa: 1 em 20 requisições, medido.
  * Duas repetições levam a chance de falsa falha de 5% para menos de 0,02%.
  */
-const MAX_TENTATIVAS_MESMA_FONTE = 1;
+const MAX_TENTATIVAS_MESMA_FONTE = 2;
 
 /**
  * Prazo para o primeiro quadro, por perfil de conexão.
@@ -46,9 +48,9 @@ const MAX_TENTATIVAS_MESMA_FONTE = 1;
  * abandonar um stream que ia funcionar.
  */
 const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
-  good: 4500,
-  fair: 7000,
-  poor: 12000,
+  good: 8000,
+  fair: 12000,
+  poor: 18000,
 };
 
 /**
@@ -138,11 +140,14 @@ export function IptvPlayer({
   const [showControls, setShowControls] = useState(true);
 
   const [attempt, setAttempt] = useState(1);
-  const [failoverCount, setFailoverCount] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [autoMutedHint, setAutoMutedHint] = useState(false);
 
   /** Contador de insistências na fonte atual (ver tryNextSourceOrFail). */
   const tentativasNaFonte = useRef(0);
   const recargaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Evita duas falhas simultâneas pularem duas fontes de uma vez. */
+  const failoverEmVoo = useRef(false);
   /** Muda para remontar o motor na MESMA URL — é o que materializa a repetição. */
   const [recarga, setRecarga] = useState(0);
 
@@ -160,7 +165,7 @@ export function IptvPlayer({
     setProfile(detectConnectionProfile());
   }, []);
 
-  // Controls Hiding Timer
+  // Controls Hiding Timer — também no toque (celular não tem mousemove)
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
@@ -171,8 +176,15 @@ export function IptvPlayer({
     }, 4000);
   }, [state]);
 
+  // Ao começar a tocar, arma o auto-hide mesmo sem mouse/toque.
+  useEffect(() => {
+    if (state === "playing") resetHideTimer();
+  }, [state, resetHideTimer]);
+
   // Failover para próxima fonte (Proxy <-> Direto <-> Variantes .m3u8/.ts <-> Lista Secundária)
   const tryNextSourceOrFail = useCallback(() => {
+    if (failoverEmVoo.current) return;
+    failoverEmVoo.current = true;
     networkRetryCount.current = 0;
 
     /**
@@ -193,7 +205,10 @@ export function IptvPlayer({
       setState("loading");
       if (recargaTimer.current) clearTimeout(recargaTimer.current);
       // Um respiro antes de repetir: bater na hora costuma pegar o mesmo erro.
-      recargaTimer.current = setTimeout(() => setRecarga((n) => n + 1), 200);
+      recargaTimer.current = setTimeout(() => {
+        failoverEmVoo.current = false;
+        setRecarga((n) => n + 1);
+      }, 200);
       return;
     }
 
@@ -203,6 +218,9 @@ export function IptvPlayer({
     if (!useProxyUrl && activeStreamUrl.startsWith("http:")) {
       setUseProxyUrl(true);
       setState("loading");
+      setTimeout(() => {
+        failoverEmVoo.current = false;
+      }, 50);
       return;
     }
 
@@ -219,7 +237,9 @@ export function IptvPlayer({
     } else {
       setState("error");
     }
-    setFailoverCount((c) => c + 1);
+    setTimeout(() => {
+      failoverEmVoo.current = false;
+    }, 50);
   }, [currentStreamIndex, attempt, useProxyUrl, activeStreamUrl, allStreams.length]);
 
   // Trocar de fonte zera a insistência: a contagem é por fonte, não global.
@@ -248,6 +268,7 @@ export function IptvPlayer({
         if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
           video.muted = true;
           setIsMuted(true);
+          setAutoMutedHint(true);
           video.play().catch(() => {
             setState("paused");
           });
@@ -427,7 +448,10 @@ export function IptvPlayer({
    * cobre justamente a janela entre "mandei tocar" e "tocou".
    */
   useEffect(() => {
-    if (state === "playing" || state === "paused" || state === "error") return;
+    // Não abandonar durante buffering: canal lento ainda está carregando.
+    if (state === "playing" || state === "paused" || state === "error" || state === "stalled") {
+      return;
+    }
 
     const vigia = setTimeout(() => {
       const video = videoRef.current;
@@ -447,15 +471,26 @@ export function IptvPlayer({
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
 
     const clearStall = () => {
-      if (stallTimer) clearTimeout(stallTimer);
-      if (stallDebounceTimer.current) clearTimeout(stallDebounceTimer.current);
+      if (stallTimer) {
+        clearTimeout(stallTimer);
+        stallTimer = undefined;
+      }
       setShowDebouncedSpinner(false);
+    };
+
+    const clearStallDebounce = () => {
+      if (stallDebounceTimer.current) {
+        clearTimeout(stallDebounceTimer.current);
+        stallDebounceTimer.current = undefined;
+      }
     };
 
     const onPlaying = () => {
       clearStall();
+      clearStallDebounce();
       // Tocou: o crédito de insistência volta cheio para o próximo soluço.
       tentativasNaFonte.current = 0;
+      failoverEmVoo.current = false;
       setState("playing");
 
       if (initialPosition > 10 && !hasResumedRef.current) {
@@ -473,18 +508,22 @@ export function IptvPlayer({
     const onWaiting = () => {
       setState((s) => (s === "error" ? s : "stalled"));
 
+      // Debounce do spinner: não cancela o timer recém-criado (bug antigo
+      // limpava o debounce no clearStall e o spinner nunca aparecia).
       if (!stallDebounceTimer.current) {
         stallDebounceTimer.current = setTimeout(() => {
+          stallDebounceTimer.current = undefined;
           setShowDebouncedSpinner(true);
         }, 1500);
       }
 
-      clearStall();
+      if (stallTimer) clearTimeout(stallTimer);
       stallTimer = setTimeout(() => tryNextSourceOrFail(), 12000);
     };
 
     const onError = () => {
       clearStall();
+      clearStallDebounce();
       tryNextSourceOrFail();
     };
 
@@ -508,6 +547,7 @@ export function IptvPlayer({
 
     return () => {
       clearStall();
+      clearStallDebounce();
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
@@ -557,6 +597,7 @@ export function IptvPlayer({
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
+    if (!video.muted) setAutoMutedHint(false);
   };
 
   // Seek relative
@@ -590,6 +631,7 @@ export function IptvPlayer({
     <div
       ref={containerRef}
       onMouseMove={resetHideTimer}
+      onTouchStart={resetHideTimer}
       onClick={togglePlay}
       className={cn(
         "group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black select-none",
@@ -629,6 +671,25 @@ export function IptvPlayer({
         </div>
       )}
 
+      {/* Aviso de autoplay mudo */}
+      {autoMutedHint && state === "playing" && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const video = videoRef.current;
+            if (video) {
+              video.muted = false;
+              setIsMuted(false);
+              setAutoMutedHint(false);
+            }
+          }}
+          className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md"
+        >
+          Som desligado — toque para ativar
+        </button>
+      )}
+
       {/* Player Overlays & Controls */}
       <div
         className={cn(
@@ -640,7 +701,7 @@ export function IptvPlayer({
         {/* Top Bar */}
         <div className="flex items-center justify-between text-white">
           <div className="flex items-center gap-3">
-            <span className="text-sm md:text-base font-extrabold drop-shadow-md truncate max-w-[280px] md:max-w-[500px]">
+            <span className="text-sm md:text-base font-extrabold drop-shadow-md truncate max-w-[200px] md:max-w-[500px]">
               {channelName}
             </span>
             {isLive ? (
@@ -654,6 +715,16 @@ export function IptvPlayer({
               </span>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            aria-label="Reportar problema"
+            className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 transition-colors hover:bg-white/20"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Reportar</span>
+          </button>
         </div>
 
         {/* Center Big Play Button when Paused */}
@@ -748,6 +819,7 @@ export function IptvPlayer({
                     const v = Number(e.target.value);
                     setVolume(v);
                     setIsMuted(v === 0);
+                    if (v > 0) setAutoMutedHint(false);
                     if (videoRef.current) {
                       videoRef.current.volume = v;
                       videoRef.current.muted = v === 0;
@@ -770,6 +842,13 @@ export function IptvPlayer({
           </div>
         </div>
       </div>
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        channelId={channelId}
+        channelName={channelName}
+      />
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
+import { BackButton } from "@/components/iptv/back-button";
 import { IptvPlayer } from "@/components/iptv/iptv-player";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { getChannelById } from "@/lib/queries/iptv";
@@ -89,13 +88,9 @@ export default async function WatchChannelPage({
   return (
     <div className="min-h-screen bg-black text-foreground">
       <div className="absolute left-4 top-4 z-40">
-        <Link
-          href={channel.group ? `/tv/${channel.group.slug}` : "/tv"}
-          className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white/90 shadow-lg backdrop-blur-md transition-colors hover:bg-black/90 hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </Link>
+        <BackButton
+          fallbackHref={channel.group ? `/tv/${channel.group.slug}` : "/tv"}
+        />
       </div>
 
       <div className="relative aspect-video w-full bg-black shadow-2xl">

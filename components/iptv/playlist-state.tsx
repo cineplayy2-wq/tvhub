@@ -41,7 +41,7 @@ export function EmptyPlaylist({ status }: { status?: string }) {
       <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{message}</p>
 
       <Link
-        href="/inicio"
+        href="/tv"
         className="mt-6 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
       >
         Voltar ao catálogo

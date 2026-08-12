@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useFormState } from "react-dom";
 import { ArrowLeft, KeyRound, Mail, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -212,12 +211,9 @@ export function LoginForm({ next }: { next?: string }) {
           icon={<KeyRound className="h-4 w-4 text-primary/70" />}
         />
         <div className="mt-2 text-right">
-          <Link
-            href="/recuperar-senha"
-            className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-          >
-            Esqueceu a senha?
-          </Link>
+          <span className="text-xs font-medium text-muted-foreground/70">
+            Esqueceu a senha? Fale com o suporte.
+          </span>
         </div>
       </div>
 

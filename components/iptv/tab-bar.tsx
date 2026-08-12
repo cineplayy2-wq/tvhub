@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -83,7 +83,37 @@ const TABS: Tab[] = [
   },
 ];
 
+/** Slugs de categoria conhecidos — /tv/[groupSlug] fora disso acende Canais. */
+const FILMES_SERIES_SLUGS = new Set(["movies", "series", "kids"]);
+const ESPORTES_SLUGS = new Set(["sports"]);
+const NOVELAS_SLUGS = new Set(["novelas"]);
+
 function activeIndex(pathname: string) {
+  // Pastas dinâmicas /tv/{slug}: decide pela taxonomia do slug
+  const groupMatch = pathname.match(/^\/tv\/([^/]+)\/?$/);
+  if (groupMatch) {
+    const slug = groupMatch[1];
+    const reserved = new Set([
+      "live",
+      "movies",
+      "series",
+      "serie",
+      "kids",
+      "sports",
+      "novelas",
+      "dicas",
+      "busca",
+      "assistir",
+    ]);
+    if (!reserved.has(slug)) {
+      if (FILMES_SERIES_SLUGS.has(slug)) return 0;
+      if (ESPORTES_SLUGS.has(slug)) return 2;
+      if (NOVELAS_SLUGS.has(slug)) return 3;
+      // Grupo genérico (terror, notícias, etc.): trata como Canais
+      return 1;
+    }
+  }
+
   // O mais específico ganha: /tv/live não pode acender a aba /tv
   let best = 0;
   let bestLength = -1;
@@ -103,12 +133,19 @@ function activeIndex(pathname: string) {
 
 export function TabBar() {
   const pathname = usePathname();
-  const active = activeIndex(pathname);
+
+  // Cálculo direto no render: o useEffect antigo escondia a barra por um
+  // frame a cada saída do player, e o usuário via a navegação "sumir".
+  const hidden =
+    pathname.includes("/assistir/") || pathname.startsWith("/perfis");
+
+  const active = hidden ? 0 : activeIndex(pathname);
 
   const listRef = useRef<HTMLDivElement>(null);
   const [blob, setBlob] = useState<{ left: number; width: number } | null>(null);
 
   useLayoutEffect(() => {
+    if (hidden) return;
     const list = listRef.current;
     if (!list) return;
 
@@ -120,11 +157,8 @@ export function TabBar() {
 
     move();
     return observeResize(list, move);
-  }, [active]);
+  }, [active, hidden]);
 
-  // No player a barra sai de cena: o vídeo ocupa a tela inteira
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => setHidden(pathname.includes("/assistir/")), [pathname]);
   if (hidden) return null;
 
   return (

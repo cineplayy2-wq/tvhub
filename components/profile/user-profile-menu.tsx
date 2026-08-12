@@ -66,6 +66,7 @@ export function UserProfileMenu({
               id={current.id}
               name={current.name}
               isKids={current.isKids}
+              avatarUrl={current.avatarUrl}
               size="sm"
               className="h-7 w-7 rounded-full ring-1 ring-primary/40"
             />
@@ -148,6 +149,7 @@ export function UserProfileMenu({
                             id={profile.id}
                             name={profile.name}
                             isKids={profile.isKids}
+                            avatarUrl={profile.avatarUrl}
                             size="sm"
                             className="h-7 w-7 rounded-lg"
                           />

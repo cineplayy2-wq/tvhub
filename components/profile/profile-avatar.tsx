@@ -23,12 +23,14 @@ export function ProfileAvatar({
   id,
   name,
   isKids,
+  avatarUrl,
   size = "md",
   className,
 }: {
   id: string;
   name: string;
   isKids?: boolean;
+  avatarUrl?: string | null;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
@@ -37,6 +39,26 @@ export function ProfileAvatar({
     md: "h-16 w-16 text-xl rounded-lg",
     lg: "h-28 w-28 text-4xl rounded-xl",
   };
+
+  if (avatarUrl) {
+    return (
+      <span
+        className={cn(
+          "relative block overflow-hidden",
+          sizes[size],
+          className,
+        )}
+        aria-hidden
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={avatarUrl}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </span>
+    );
+  }
 
   return (
     <span

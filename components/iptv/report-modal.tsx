@@ -1,44 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { AlertCircle, CheckCircle2, Send } from "lucide-react";
+
+import { reportChannelIssueAction } from "@/app/actions/report";
 import { Modal } from "@/components/ui/modal";
+
+const OPTIONS = [
+  "Sinal fora do ar / Tela preta",
+  "Áudio travando ou sem som",
+  "Imagem com travamentos constantes",
+  "Legenda ou idioma incorreto",
+  "Conteúdo trocado / Nome errado",
+] as const;
 
 export function ReportModal({
   open,
   onClose,
+  channelId,
   channelName,
 }: {
   open: boolean;
   onClose: () => void;
+  channelId?: string;
   channelName?: string;
 }) {
   const [reason, setReason] = useState("");
-  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-
-  const options = [
-    "Sinal fora do ar / Tela preta",
-    "Áudio travando ou sem som",
-    "Imagem com travamentos constantes",
-    "Legenda ou idioma incorreto",
-    "Conteúdo trocado / Nome errado",
-  ];
+  const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason) return;
 
-    setSending(true);
-    setTimeout(() => {
-      setSending(false);
+    setError(null);
+    startTransition(async () => {
+      const result = await reportChannelIssueAction({
+        channelId,
+        channelName,
+        reason,
+      });
+
+      if (!result.ok) {
+        setError(result.error ?? "Não foi possível enviar.");
+        return;
+      }
+
       setSent(true);
       setTimeout(() => {
         setSent(false);
         setReason("");
         onClose();
       }, 1800);
-    }, 1000);
+    });
   };
 
   return (
@@ -67,7 +82,7 @@ export function ReportModal({
               Qual o problema encontrado?
             </label>
             <div className="space-y-2">
-              {options.map((opt) => (
+              {OPTIONS.map((opt) => (
                 <label
                   key={opt}
                   className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-xs font-medium transition-colors ${
@@ -90,12 +105,19 @@ export function ReportModal({
             </div>
           </div>
 
+          {error && (
+            <p className="flex items-center gap-2 text-xs text-rose-400">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {error}
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={!reason || sending}
+            disabled={!reason || isPending}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary-hover disabled:opacity-50"
           >
-            {sending ? (
+            {isPending ? (
               <span>Enviando reporte…</span>
             ) : (
               <>

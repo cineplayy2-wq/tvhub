@@ -48,6 +48,7 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [autoMutedHint, setAutoMutedHint] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -157,10 +158,38 @@ export function VideoPlayer({
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) void video.play();
-    else video.pause();
+    if (video.paused) {
+      void video.play().then(() => {
+        if (video.muted) setAutoMutedHint(true);
+      }).catch((err: Error) => {
+        if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
+          video.muted = true;
+          setMuted(true);
+          setAutoMutedHint(true);
+          void video.play().catch(() => {});
+        }
+      });
+    } else {
+      video.pause();
+    }
     nudgeControls();
   }, [nudgeControls]);
+
+  // Autoplay com fallback de mudo (política do Chrome/Safari)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !ready) return;
+    if (!video.paused) return;
+
+    void video.play().catch((err: Error) => {
+      if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
+        video.muted = true;
+        setMuted(true);
+        setAutoMutedHint(true);
+        void video.play().catch(() => {});
+      }
+    });
+  }, [ready, src]);
 
   const seekBy = useCallback(
     (delta: number) => {
@@ -281,6 +310,34 @@ export function VideoPlayer({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
         </div>
+      )}
+
+      {ready && !playing && !error && (
+        <button
+          type="button"
+          onClick={togglePlay}
+          aria-label="Reproduzir"
+          className="absolute left-1/2 top-1/2 z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary/90 text-white shadow-lg"
+        >
+          <Play className="ml-1 h-8 w-8" fill="currentColor" />
+        </button>
+      )}
+
+      {autoMutedHint && playing && (
+        <button
+          type="button"
+          onClick={() => {
+            const video = videoRef.current;
+            if (video) {
+              video.muted = false;
+              setMuted(false);
+              setAutoMutedHint(false);
+            }
+          }}
+          className="absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white"
+        >
+          Som desligado — toque para ativar
+        </button>
       )}
 
       {error && (

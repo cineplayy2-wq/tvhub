@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Plus } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { toggleWatchlistAction } from "@/app/actions/watchlist";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function WatchlistButton({
   titleId,
@@ -35,11 +36,11 @@ export function WatchlistButton({
       }}
       aria-pressed={inList}
     >
-      {inList ? (
-        <Check className="h-4 w-4" aria-hidden />
-      ) : (
-        <Plus className="h-4 w-4" aria-hidden />
-      )}
+      <Heart
+        className={cn("h-4 w-4", inList && "fill-current text-rose-500")}
+        strokeWidth={1.75}
+        aria-hidden
+      />
       {inList ? "Na minha lista" : "Minha lista"}
     </Button>
   );

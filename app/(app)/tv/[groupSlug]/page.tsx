@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Search } from "lucide-react";
 
+import { BackButton } from "@/components/iptv/back-button";
 import { cleanGroupLabel, FilterChips } from "@/components/iptv/filter-chips";
 import { PosterCard } from "@/components/iptv/poster-card";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
@@ -122,6 +123,12 @@ export default async function GroupPage({
 
   return (
     <div className={`${GUTTER} min-h-screen pb-24 pt-24`}>
+      <div className="mb-4">
+        <BackButton
+          fallbackHref="/tv"
+          className="bg-white/5 text-foreground hover:bg-white/10"
+        />
+      </div>
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
