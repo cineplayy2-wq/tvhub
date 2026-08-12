@@ -181,7 +181,8 @@ export async function getCustomer(id: string) {
           currentPeriodEnd: true,
           cancelAtPeriodEnd: true,
           nextChargeAt: true,
-          plan: { select: { name: true, priceCents: true, deviceLimit: true } },
+          // O `id` alimenta o seletor de plano na ficha do cliente.
+          plan: { select: { id: true, name: true, priceCents: true, deviceLimit: true } },
         },
       },
       m3uPlaylist: {

@@ -59,4 +59,6 @@ export const redisKeys = {
   rateLimit: (scope: string, id: string) => `rl:${scope}:${id}`,
   /** Cache de respostas do TMDB. Nunca inclua a api_key na chave. */
   tmdb: (path: string) => `cache:tmdb:${path}`,
+  /** Cache de recomendações personalizadas por perfil. */
+  personalizedRecs: (profileId: string, playlistId: string) => `cache:recs:${profileId}:${playlistId}`,
 } as const;

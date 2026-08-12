@@ -42,9 +42,9 @@ export function TitleCard({
     <Link
       href={`/titulo/${item.slug}`}
       className={cn(
-        "group relative block shrink-0 overflow-hidden rounded-lg border border-border bg-surface",
-        "transition-all duration-300 ease-smooth hover:border-primary/60 hover:shadow-glow",
-        "focus-visible:border-primary",
+        "group relative block shrink-0 overflow-hidden rounded-[14px] border border-border/80 bg-surface",
+        "transition-all duration-300 ease-smooth hover:border-primary/60 hover:shadow-[0_0_24px_rgba(177,92,255,0.25)]",
+        "focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         className,
       )}
     >

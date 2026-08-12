@@ -1,4 +1,5 @@
-import { Check, CreditCard, Layers, ShieldCheck, Sparkles, Tv, Users } from "lucide-react";
+import { Check, CreditCard, ShieldCheck, Sparkles, Tv, Users } from "lucide-react";
+import { PlanoForm } from "@/components/admin/plano-form";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 
@@ -26,6 +27,21 @@ export default async function AdminPlanosPage() {
           <span>Sistema de Pagamento PIX Pré-configurado (Modo Manual Ativo)</span>
         </div>
       </div>
+
+      <PlanoForm
+        planos={plans.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          priceCents: p.priceCents,
+          interval: p.interval,
+          deviceLimit: p.deviceLimit,
+          maxProfiles: p.maxProfiles,
+          trialDays: p.trialDays,
+          features: p.features,
+          isActive: p.isActive,
+        }))}
+      />
 
       {/* Grid de Planos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">

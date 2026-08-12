@@ -34,13 +34,39 @@ export default async function HomePage() {
   }
 
   // Em paralelo: sequencial somaria três round-trips antes do primeiro byte
-  const [hero, continueWatching, rows] = await Promise.all([
+  const [hero, continueWatching, rows, personalizedRecs] = await Promise.all([
     getHeroTitle(profile.maxAgeRating),
     getContinueWatching(profile.id, profile.maxAgeRating),
     getCatalogRows(profile.id, profile.maxAgeRating),
+    userPlaylist
+      ? import("@/lib/iptv/recommendations-service").then((m) =>
+          m.getProfilePersonalizedRecommendations(userPlaylist.id, profile.id)
+        )
+      : Promise.resolve([]),
   ]);
 
-  const isEmpty = !hero && rows.every((row) => row.items.length === 0);
+  // Intercala as fileiras de recomendação personalizada entre as fileiras de gênero
+  const finalRows = [...rows];
+  if (personalizedRecs.length > 0) {
+    personalizedRecs.forEach((rec, idx) => {
+      const insertIndex = Math.min(finalRows.length, (idx + 1) * 2);
+      finalRows.splice(insertIndex, 0, {
+        key: rec.id,
+        title: rec.title,
+        items: rec.items.map((it) => ({
+          id: it.id,
+          titleName: it.name,
+          posterUrl: it.posterUrl || it.logoUrl || null,
+          backdropUrl: it.backdropUrl || null,
+          tmdbRating: it.tmdbRating || 0,
+          releaseYear: it.year || null,
+          synopsis: it.overview || "",
+        })),
+      } as any);
+    });
+  }
+
+  const isEmpty = !hero && finalRows.every((row) => row.items.length === 0);
 
   if (isEmpty) {
     redirect("/tv");
@@ -88,7 +114,7 @@ export default async function HomePage() {
             <CatalogRow title="Continuar assistindo" items={continueWatching} />
           )}
 
-          {rows.map((row) => (
+          {finalRows.map((row) => (
             <CatalogRow key={row.key} title={row.title} items={row.items} />
           ))}
         </div>

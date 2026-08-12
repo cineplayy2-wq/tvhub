@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { titleName, channelId, positionSeconds, durationSeconds } = body;
+    const { titleName, channelId, tmdbId, tmdbMediaType, positionSeconds, durationSeconds } = body;
 
     if (!titleName || typeof positionSeconds !== "number") {
       return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
       profileId: activeProfile.id,
       titleName,
       channelId: channelId || "",
+      tmdbId: typeof tmdbId === "number" ? tmdbId : undefined,
+      tmdbMediaType: typeof tmdbMediaType === "string" ? tmdbMediaType : undefined,
       positionSeconds,
       durationSeconds: typeof durationSeconds === "number" ? durationSeconds : 0,
     });

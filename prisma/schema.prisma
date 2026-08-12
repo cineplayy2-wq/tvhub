@@ -65,12 +65,13 @@ model Profile {
   id     String @id @default(cuid())
   userId String
 
-  name         String
-  avatarUrl    String?
-  isKids       Boolean   @default(false)
-  maxAgeRating AgeRating @default(EIGHTEEN)
-  pinHash      String?
-  sortOrder    Int       @default(0)
+  name          String
+  avatarUrl     String?
+  birthDate     DateTime?
+  isKids        Boolean   @default(false)
+  maxAgeRating  AgeRating @default(EIGHTEEN)
+  pinHash       String?
+  sortOrder     Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -461,6 +462,8 @@ model WatchProgress {
   channelId String?
   episodeId String?
   itemKey   String
+  tmdbId    Int?
+  tmdbMediaType String?
 
   positionSeconds Int     @default(0)
   durationSeconds Int     @default(0)
@@ -477,6 +480,7 @@ model WatchProgress {
 
   @@unique([profileId, itemKey])
   @@index([profileId, lastWatched])
+  @@index([profileId, tmdbId])
   @@index([titleId])
   @@index([channelId])
   @@index([episodeId])

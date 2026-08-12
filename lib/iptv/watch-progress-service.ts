@@ -29,12 +29,16 @@ export async function saveWatchProgress({
   profileId,
   titleName,
   channelId,
+  tmdbId,
+  tmdbMediaType,
   positionSeconds,
   durationSeconds,
 }: {
   profileId: string;
   titleName: string;
   channelId?: string;
+  tmdbId?: number;
+  tmdbMediaType?: string;
   positionSeconds: number;
   durationSeconds: number;
 }) {
@@ -71,7 +75,7 @@ export async function saveWatchProgress({
   try {
     const existing = await prisma.watchProgress.findUnique({
       where: { profileId_itemKey: { profileId, itemKey } },
-      select: { id: true, completed: true, watchCount: true, durationSeconds: true },
+      select: { id: true, completed: true, watchCount: true, durationSeconds: true, tmdbId: true },
     });
 
     if (!existing) {
@@ -80,6 +84,8 @@ export async function saveWatchProgress({
           profileId,
           channelId: targetChannelId,
           itemKey,
+          tmdbId: typeof tmdbId === "number" ? tmdbId : undefined,
+          tmdbMediaType: tmdbMediaType || undefined,
           positionSeconds,
           durationSeconds,
           completed,
@@ -98,6 +104,8 @@ export async function saveWatchProgress({
         durationSeconds: durationSeconds > 0 ? durationSeconds : existing.durationSeconds,
         completed,
         channelId: targetChannelId || undefined,
+        tmdbId: typeof tmdbId === "number" ? tmdbId : existing.tmdbId,
+        tmdbMediaType: tmdbMediaType || undefined,
         watchCount: finishedNow ? existing.watchCount + 1 : existing.watchCount,
         lastWatched: new Date(),
       },

@@ -7,7 +7,9 @@ import {
   SubscriptionPill,
   UserStatusPill,
 } from "@/components/admin/status-pill";
+import { PlanoDoCliente } from "@/components/admin/plano-do-cliente";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
+import { prisma } from "@/lib/prisma";
 import { getCustomer } from "@/lib/queries/admin";
 import { formatDate, formatPrice, parseDeviceLabel } from "@/lib/utils";
 import { CheckCircle, AlertTriangle, RefreshCw, Database, Film, Tv, Radio } from "lucide-react";
@@ -21,6 +23,12 @@ export default async function CustomerDetailPage({
 }) {
   const customer = await getCustomer(params.id);
   if (!customer) notFound();
+
+  const planosAtivos = await prisma.plan.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true, priceCents: true, interval: true, deviceLimit: true },
+  });
 
   return (
     <div className="px-8 py-10 space-y-8">
@@ -106,6 +114,18 @@ export default async function CustomerDetailPage({
               Este cliente não possui assinatura ativa.
             </p>
           )}
+
+          <div className="mt-5 border-t border-border/60 pt-5">
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {customer.subscription ? "Trocar plano" : "Atribuir plano"}
+            </p>
+            <PlanoDoCliente
+              userId={customer.id}
+              planos={planosAtivos}
+              planoAtualId={customer.subscription?.plan.id}
+              temAssinatura={Boolean(customer.subscription)}
+            />
+          </div>
         </section>
 
         {/* ---------- Conta & Perfis ---------- */}
