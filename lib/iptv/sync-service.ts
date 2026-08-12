@@ -105,7 +105,29 @@ export async function vincularBackup(
       WHERE c."playlistId" = ${playlist.id}
         AND c."nameKey" = s."chave"
         AND c."backupStreamUrl" IS DISTINCT FROM s.url
+        AND c."streamUrl" IS DISTINCT FROM s.url
     `;
+
+    /**
+     * Reserva que repete a fonte principal é pior que reserva nenhuma.
+     *
+     * Acontece com o conteúdo que a união trouxe da secundária: o canal nasce
+     * com a URL dela e, logo em seguida, o casamento por nome grava essa mesma
+     * URL como reserva. Quando a fonte cai, o player espera o dobro para tentar
+     * de novo exatamente o endereço que acabou de falhar.
+     *
+     * A linha acima impede que isso volte a ser gravado; esta limpa o que ficou
+     * de sincronizações anteriores.
+     */
+    const repetidas = await prisma.$executeRaw`
+      UPDATE "M3uChannel"
+         SET "backupStreamUrl" = NULL
+       WHERE "playlistId" = ${playlist.id}
+         AND "backupStreamUrl" = "streamUrl"
+    `;
+    if (repetidas > 0) {
+      console.log(`[m3u] ${repetidas} reservas que repetiam a fonte principal foram descartadas`);
+    }
 
     const analisados = await prisma.m3uChannel.count({
       where: { playlistId: playlist.id },
