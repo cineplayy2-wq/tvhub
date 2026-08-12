@@ -344,7 +344,7 @@ export async function GET(request: NextRequest) {
       (rawContentType.includes("mpegurl") ||
         rawContentType.includes("m3u8") ||
         targetUrl.includes(".m3u8") ||
-        targetUrl.includes(".m3u"));
+        targetUrl.endsWith(".m3u"));
 
     let peekResult: { isM3u8: boolean; manifestText?: string; peekBuffer?: Buffer } = { isM3u8: false };
 
@@ -374,24 +374,6 @@ export async function GET(request: NextRequest) {
           headers: responseHeaders,
         });
       }
-
-      const virtualTsUrl = `/api/iptv/stream?url=${encodeURIComponent(targetUrl)}&raw=1`;
-      const virtualManifest = `#EXTM3U
-#EXT-X-VERSION:3
-#EXT-X-TARGETDURATION:10
-#EXT-X-MEDIA-SEQUENCE:0
-#EXTINF:10.0,
-${virtualTsUrl}
-`;
-      upstreamResponse.destroy();
-
-      responseHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
-      responseHeaders.set("Content-Length", Buffer.byteLength(virtualManifest).toString());
-
-      return new NextResponse(virtualManifest, {
-        status: 200,
-        headers: responseHeaders,
-      });
     }
 
     const contentType =
