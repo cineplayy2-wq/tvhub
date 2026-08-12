@@ -155,16 +155,24 @@ jobs:
       # `monitor: 90s` do update_config poderia estourar e disparar rollback
       # de uma versão que nem chegou a subir.
       # ---------------------------------------------------------------
+      # O login é condicional porque o pacote no GHCR é público: o pull anônimo
+      # funciona e o passo incondicional só quebrava o deploy quando os secrets
+      # não existiam. Se um dia o pacote virar privado, preencha GHCR_USER e
+      # GHCR_PULL_TOKEN com um token de longa duração — e não com o GITHUB_TOKEN
+      # do job, porque o `--with-registry-auth` do rolling update grava a
+      # credencial na spec do serviço e uma que expira derruba o próximo
+      # restart da task, horas depois, sem relação aparente com o deploy.
+      #
+      # O token entra por stdin do ssh, não como argumento: argumento apareceria
+      # na lista de processos da VPS para qualquer um com shell na máquina.
       - name: Baixar a imagem na VPS
-        # Heredoc com o delimitador entre aspas (<<'EOS'): nada é expandido pelo
-        # shell do runner, só o que o Actions substitui antes (${{ }}). Sem as
-        # aspas seria preciso escapar cada $ do script remoto à mão — e um
-        # escape esquecido só aparece na hora do deploy.
         run: |
-          ssh vps bash -euo pipefail <<'EOS'
-          echo '${{ secrets.GHCR_PULL_TOKEN }}' | docker login ${{ env.REGISTRY }} -u '${{ secrets.GHCR_USER }}' --password-stdin
-          docker pull '${{ steps.alvo.outputs.referencia }}'
-          EOS
+          set -euo pipefail
+          if [ -n '${{ secrets.GHCR_PULL_TOKEN }}' ]; then
+            echo '${{ secrets.GHCR_PULL_TOKEN }}' \
+              | ssh vps "docker login ${{ env.REGISTRY }} -u '${{ secrets.GHCR_USER }}' --password-stdin"
+          fi
+          ssh vps "docker pull '${{ steps.alvo.outputs.referencia }}'"
 
       # ---------------------------------------------------------------
       # Migrations ANTES do app novo subir.
