@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git fetch:*)",
+      "PowerShell(git pull:*)"
+    ]
+  }
+}

@@ -2,7 +2,9 @@ import { redis } from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
 import { cleanMediaTitle, dedupeChannels } from "@/lib/utils";
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "sk-0613a39080294b46bef589aba9effab8";
+// Sem valor padrão — ver a mesma nota em lib/ai/client.ts. A chave vem só do
+// ambiente; a chamada abaixo é pulada quando ela não existe.
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/v1";
 
 const AI_CACHE_TTL = 86400; // 24 Hours in seconds to preserve API credits!
@@ -80,7 +82,12 @@ Responda APENAS JSON válido no formato:
   ]
 }`;
 
-    const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+    // Sem chave, nem chama. Antes havia uma chave embutida no código, então a
+    // requisição sempre saía autenticada. Agora que ela vem só do ambiente,
+    // um pedido sem Authorization voltaria 401 a cada carregamento da home.
+    // Deixar `res` nulo faz o fluxo cair no fallback "Seleção Especial" mais
+    // abaixo — o mesmo caminho de quando a IA está fora do ar.
+    const res = !DEEPSEEK_API_KEY ? null : await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -95,7 +102,7 @@ Responda APENAS JSON válido no formato:
       }),
     });
 
-    if (res.ok) {
+    if (res?.ok) {
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content;
       if (content) {

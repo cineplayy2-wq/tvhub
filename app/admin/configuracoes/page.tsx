@@ -24,7 +24,14 @@ export default async function AdminConfiguracoesPage() {
 
   const smtpUser = process.env.SMTP_USER || "cineplayy7@gmail.com";
   const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-  const tmdbKey = process.env.TMDB_API_KEY || "45ae8f447f288ac95304e25ca1f4686f";
+  // Sem valor padrão: a chave ficava aqui em texto puro, num arquivo
+  // versionado. Ela vem só do ambiente (/opt/tvhub/.env na VPS).
+  const tmdbKey = process.env.TMDB_API_KEY ?? "";
+  // Mostra as pontas, nunca o miolo — o suficiente para conferir se a chave
+  // certa está no ar sem expor o valor na tela de quem tem acesso ao admin.
+  const tmdbKeyMascarada = tmdbKey
+    ? `${tmdbKey.slice(0, 8)}...${tmdbKey.slice(-4)}`
+    : "não configurada";
 
   return (
     <div className="px-8 py-10">
@@ -101,7 +108,7 @@ export default async function AdminConfiguracoesPage() {
           <div className="space-y-3 text-xs">
             <div className="flex justify-between py-1.5 border-b border-white/[0.04]">
               <span className="text-muted-foreground">API Key TMDB:</span>
-              <span className="font-mono text-foreground">{tmdbKey.slice(0, 8)}...{tmdbKey.slice(-4)}</span>
+              <span className="font-mono text-foreground">{tmdbKeyMascarada}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-white/[0.04]">
               <span className="text-muted-foreground">Busca de Capas e Banners:</span>

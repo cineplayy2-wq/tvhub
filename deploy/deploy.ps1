@@ -134,10 +134,13 @@ Write-Host "==> Aguardando a troca terminar..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes(7)
 do {
   Start-Sleep -Seconds 10
-  $rawEstado = (Invoke-Remote 'docker service inspect tvhub_app --format "{{.UpdateStatus.State}}"' -split "`n")[-1]
-  $estado = ("$rawEstado").Trim()
-  $rawReplicas = (Invoke-Remote 'docker service ls --filter name=tvhub_app --format "{{.Replicas}}"' -split "`n")[-1]
-  $replicas = ("$rawReplicas").Trim()
+  # O @(...) e obrigatorio. Com saida de UMA linha - que e o caso destes dois
+  # comandos - o `-split` devolve uma String, nao um array, e o indice [-1]
+  # pega o ultimo CARACTERE: "completed" vira "d" e "1/1" vira "1". A espera
+  # entao nunca reconhece a convergencia e o deploy morre em "nao convergiu"
+  # com o stack ja trocado e o site no ar.
+  $estado = (@(Invoke-Remote 'docker service inspect tvhub_app --format "{{.UpdateStatus.State}}"' -split "`n"))[-1].ToString().Trim()
+  $replicas = (@(Invoke-Remote 'docker service ls --filter name=tvhub_app --format "{{.Replicas}}"' -split "`n"))[-1].ToString().Trim()
   Write-Host "    replicas: $replicas · update: $estado"
   if ($estado -like "rollback*") {
     throw "o Swarm reverteu o deploy - a versao nova nao ficou saudavel. Veja: docker service ps tvhub_app --no-trunc"
@@ -147,8 +150,7 @@ do {
 if ($replicas -notlike "*1/1*") { throw "nao convergiu - veja: docker service ps tvhub_app" }
 
 # ---------- 8. Conferir pela internet ----------
-$rawUrl = (Invoke-Remote 'grep "^TVHUB_PUBLIC_URL=" /opt/tvhub/.env | cut -d= -f2-' -split "`n")[-1]
-$url = ("$rawUrl").Trim().Trim('"')
+$url = (@(Invoke-Remote 'grep "^TVHUB_PUBLIC_URL=" /opt/tvhub/.env | cut -d= -f2-' -split "`n"))[-1].ToString().Trim().Trim('"')
 try {
   $health = Invoke-WebRequest -Uri "$url/api/ready" -TimeoutSec 45 -UseBasicParsing
   Write-Host "==> OK: $url respondeu $($health.StatusCode) · imagem $Image" -ForegroundColor Green

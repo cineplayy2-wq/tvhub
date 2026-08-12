@@ -3,7 +3,12 @@
  * Handles AI content auto-categorization and the CineAI Recommendation Assistant
  */
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "sk-0613a39080294b46bef589aba9effab8";
+// Sem valor padrão. A chave ficava aqui em texto puro como fallback, num
+// arquivo versionado — bastava o repositório ser público por um instante para
+// os bots de varredura a colherem. Ela agora vem só do ambiente
+// (/opt/tvhub/.env na VPS); sem ela, a categorização por IA simplesmente não
+// roda, que é o comportamento correto para uma funcionalidade opcional.
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/v1";
 
 export interface AiCategorizationResult {

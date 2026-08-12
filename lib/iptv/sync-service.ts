@@ -171,20 +171,27 @@ async function unirConteudoDaSecundaria(
       9000,
       false
     FROM (
-      SELECT DISTINCT
+      -- Uma linha por grupo, com a categoria PREDOMINANTE dele.
+      --
+      -- DISTINCT (grupo, categoria) parecia certo e nao era: um mesmo grupo
+      -- costuma misturar URLs de tipos diferentes -- o grupo "SBT" tem tanto
+      -- /movie/ quanto /series/ --, entao ele saia duas vezes e batia na
+      -- restricao unica (playlistId, name). O mode() resolve escolhendo o tipo
+      -- que mais aparece, que tambem e a classificacao mais fiel do grupo.
+      SELECT
         s."grupo" AS grupo,
-        CASE
-          WHEN s."url" LIKE '%/movie/%'  THEN 'movies'
-          WHEN s."url" LIKE '%/series/%' THEN 'series'
-          ELSE 'live'
-        END AS categoria
+        mode() WITHIN GROUP (ORDER BY
+          CASE
+            WHEN s."url" LIKE '%/movie/%'  THEN 'movies'
+            WHEN s."url" LIKE '%/series/%' THEN 'series'
+            ELSE 'live'
+          END
+        ) AS categoria
       FROM "M3uBackupStage" s
       WHERE s."playlistId" = ${playlist.id} AND s."grupo" IS NOT NULL
+      GROUP BY s."grupo"
     ) AS g
-    WHERE NOT EXISTS (
-      SELECT 1 FROM "M3uGroup" x
-      WHERE x."playlistId" = ${playlist.id} AND x."name" = g.grupo
-    )
+    ON CONFLICT ("playlistId", "name") DO NOTHING
   `;
 
   const adicionados = await prisma.$executeRaw`
@@ -385,7 +392,13 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
       if (existingId && !usedExistingIds.has(existingId)) {
         usedExistingIds.add(existingId);
         // Canal já existe: ID é preservado!
-        if (nameKey) chavesAtrasadas.push([existingId, nameKey]);
+        //
+        // Grava a chave mesmo quando ela sai vazia. Alguns nomes são só
+        // símbolos ou números e normalizam para nada; se esses ficassem em
+        // NULL, "ainda falta chavear" e "não dá para chavear" virariam a mesma
+        // coisa — e a trava da união, que olha justamente para o NULL, ficaria
+        // presa para sempre por causa de algumas dezenas de linhas.
+        chavesAtrasadas.push([existingId, nameKey ?? ""]);
       } else {
         newChannelsToInsert.push({
           playlistId: playlist.id,

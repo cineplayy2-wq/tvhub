@@ -125,9 +125,27 @@ services:
       IPTV_SYNC_API_KEY: ${TVHUB_SYNC_KEY}
       # URL do XMLTV da grade. Opcional; também configurável pelo admin.
       EPG_XMLTV_URL: ${TVHUB_EPG_URL:-}
-      TMDB_API_KEY: ${TMDB_API_KEY:-45ae8f447f288ac95304e25ca1f4686f}
-      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:-eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NWFlOGY0NDdmMjg4YWM5NTMwNGUyNWNhMWY0Njg2ZiIsIm5iZiI6MTc2MjA4OTUxNy41MzcsInN1YiI6IjY5MDc1YTJkM2EwMDgzM2Q2MjRjODUwNiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.dBQJLpOU_iDGFLl07WSS-WhO4b1W2fmtl4XGiFf0e54}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-0613a39080294b46bef589aba9effab8}
+
+      # ---------------------------------------------------------------
+      # Chaves de terceiros. NENHUMA tem valor padrão aqui, de propósito.
+      #
+      # Antes elas viviam neste arquivo como fallback (`${VAR:-valor_real}`),
+      # o que significava a chave em texto puro num arquivo versionado. Bastava
+      # o repositório virar público por um instante para os bots de varredura
+      # colherem as três — e privar depois não desfaz, porque a chave já foi
+      # lida e continua no histórico e em qualquer fork.
+      #
+      # A sintaxe `${VAR:?mensagem}` faz o `docker stack deploy` ABORTAR se a
+      # variável não existir, em vez de subir com string vazia. É a escolha
+      # deliberada: um deploy que falha na hora é barato; uma chave vazia vira
+      # capa de filme que não carrega e recomendação que não responde, sem erro
+      # em log nenhum, e alguém descobre dias depois.
+      #
+      # Os valores moram em /opt/tvhub/.env na VPS, fora do Git.
+      # ---------------------------------------------------------------
+      TMDB_API_KEY: ${TMDB_API_KEY:?defina TMDB_API_KEY em /opt/tvhub/.env}
+      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:?defina TMDB_READ_TOKEN em /opt/tvhub/.env}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?defina DEEPSEEK_API_KEY em /opt/tvhub/.env}
       DEEPSEEK_API_URL: ${DEEPSEEK_API_URL:-https://api.deepseek.com/v1}
 
     networks:
