@@ -13,7 +13,13 @@ const globalForRedis = globalThis as unknown as {
 };
 
 function createRedisClient() {
-  const url = process.env.REDIS_URL || "redis://localhost:6379";
+  const url = process.env.REDIS_URL;
+
+  if (!url) {
+    throw new Error(
+      "REDIS_URL não configurada. O controle de telas simultâneas depende dela.",
+    );
+  }
 
   const client = new Redis(url, {
     maxRetriesPerRequest: 3,

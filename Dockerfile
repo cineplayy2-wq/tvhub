@@ -22,8 +22,17 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-# `npm ci` respeita o lockfile à risca; fallback para `npm install` se houver divergência de dependências nativas de SO (ex: Windows -> Linux).
-RUN npm ci || npm install
+# `npm ci` (não `npm install`): respeita o lockfile à risca. Sem isso, dois
+# desenvolvedores em máquinas diferentes podem gerar árvores de dependência
+# distintas e o bug só aparece em produção.
+#
+# Sem `|| npm install` de propósito. O fallback existia para contornar um
+# lockfile fora de sincronia (faltavam @emnapi/core e @emnapi/runtime), mas
+# tratava o sintoma: com ele, a imagem passava a ser construída com versões
+# resolvidas na hora em vez das travadas — silenciosamente, sem avisar
+# ninguém. O lockfile foi corrigido de verdade neste commit; se ele
+# dessincronizar de novo, o certo é o build falhar aqui e alto.
+RUN npm ci
 
 # ---------- 2. Build ----------
 FROM node:20-bookworm-slim AS builder

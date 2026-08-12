@@ -48,6 +48,17 @@ jobs:
       AUTH_SECRET: placeholder-de-ci-nao-usado-em-runtime
       AUTH_TRUST_HOST: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      # Ninguém conecta no Redis durante o CI — mas o `next build` PRECISA da
+      # variável. O lib/redis.ts lança na importação do módulo quando ela
+      # falta, e o Next avalia o módulo de cada rota no passo "Collecting page
+      # data": a /api/iptv/sync alcança o redis pelo sync-service.
+      #
+      # É esta linha que permite ao lib/redis.ts continuar exigindo a variável
+      # em vez de assumir localhost por padrão. O padrão silencioso fazia o
+      # build passar, mas ao custo de um erro de configuração em produção virar
+      # conexão para um Redis que não existe — e a trava de 2 telas falhando
+      # sem que nada apareça em log.
+      REDIS_URL: redis://localhost:6379
 
     steps:
       - uses: actions/checkout@v4
