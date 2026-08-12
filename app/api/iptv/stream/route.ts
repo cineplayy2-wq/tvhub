@@ -390,12 +390,38 @@ export async function GET(request: NextRequest) {
         const baseUrl = new URL(urlEfetiva);
         const lines = peekResult.manifestText.split("\n");
 
+        const peloProxy = (endereco: string) => {
+          const absoluta = new URL(endereco, baseUrl).toString();
+          return `/api/iptv/stream?url=${encodeURIComponent(absoluta)}`;
+        };
+
         const rewrittenLines = lines.map((line) => {
           const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) return line;
+          if (!trimmed) return line;
+
+          /**
+           * Linhas de tag também carregam endereço, dentro de URI="...".
+           *
+           * São a chave de criptografia (#EXT-X-KEY), o cabeçalho de
+           * inicialização do fMP4 (#EXT-X-MAP) e as faixas alternativas de
+           * áudio e legenda (#EXT-X-MEDIA) — esta última é corriqueira em
+           * canal ao vivo com áudio original e dublado. Deixá-las passar
+           * intactas devolve um endereço http:// para uma página https://, que
+           * o navegador bloqueia por conteúdo misto. O canal até começa e
+           * morre no primeiro trecho criptografado, ou fica mudo.
+           */
+          if (trimmed.startsWith("#")) {
+            return line.replace(/URI="([^"]+)"/gi, (inteiro, endereco: string) => {
+              try {
+                return `URI="${peloProxy(endereco)}"`;
+              } catch {
+                return inteiro;
+              }
+            });
+          }
+
           try {
-            const absoluteSegmentUrl = new URL(trimmed, baseUrl).toString();
-            return `/api/iptv/stream?url=${encodeURIComponent(absoluteSegmentUrl)}`;
+            return peloProxy(trimmed);
           } catch {
             return line;
           }
