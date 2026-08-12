@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dns from "node:dns";
 import http from "node:http";
 import https from "node:https";
-import { Readable } from "node:stream";
+import { Readable, PassThrough } from "node:stream";
 
 import { auth } from "@/auth";
 import { reconcileContentRange } from "@/lib/iptv/range";
@@ -85,18 +85,18 @@ const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
  */
 const agenteHttp = new http.Agent({
   keepAlive: true,
-  keepAliveMsecs: 30_000,
-  maxSockets: 128,
-  maxFreeSockets: 32,
-  timeout: 60_000,
+  keepAliveMsecs: 60_000,
+  maxSockets: 256,
+  maxFreeSockets: 64,
+  timeout: 30_000,
 });
 
 const agenteHttps = new https.Agent({
   keepAlive: true,
-  keepAliveMsecs: 30_000,
-  maxSockets: 128,
-  maxFreeSockets: 32,
-  timeout: 60_000,
+  keepAliveMsecs: 60_000,
+  maxSockets: 256,
+  maxFreeSockets: 64,
+  timeout: 30_000,
 });
 
 /** Falha temporária de DNS ou de rede: insistir resolve, desistir não. */
@@ -135,7 +135,7 @@ function fetchUpstream(
             Connection: "keep-alive",
             ...(rangeHeader ? { Range: rangeHeader } : {}),
           },
-          timeout: 45000,
+          timeout: 15000,
           lookup: lookupComCache,
           agent: isHttps ? agenteHttps : agenteHttp,
         },
@@ -177,12 +177,69 @@ function fetchUpstream(
   });
 }
 
-async function streamToBuffer(stream: http.IncomingMessage): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+/**
+ * Inspeciona os primeiros bytes do stream para identificar se é um manifesto M3U8 (#EXTM3U)
+ * sem travar a conexão em transmissões de vídeo ao vivo (MPEG-TS/MP4).
+ */
+async function peekUpstream(
+  stream: http.IncomingMessage,
+): Promise<{ isM3u8: boolean; manifestText?: string; peekBuffer?: Buffer }> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let totalRead = 0;
+    let resolved = false;
+
+    function cleanup() {
+      stream.removeListener("data", onData);
+      stream.removeListener("end", onEnd);
+      stream.removeListener("error", onError);
+    }
+
+    function finish(isM3u8: boolean, manifestText?: string, peekBuffer?: Buffer) {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({ isM3u8, manifestText, peekBuffer });
+    }
+
+    function onData(chunk: Buffer) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      chunks.push(buf);
+      totalRead += buf.length;
+
+      const currentBuffer = Buffer.concat(chunks);
+      const textSample = currentBuffer.toString("utf-8", 0, Math.min(currentBuffer.length, 512));
+
+      if (textSample.trim().startsWith("#EXTM3U")) {
+        if (totalRead < 262144 && !stream.complete) {
+          return;
+        }
+        finish(true, currentBuffer.toString("utf-8"));
+        return;
+      }
+
+      stream.pause();
+      finish(false, undefined, currentBuffer);
+    }
+
+    function onEnd() {
+      const finalBuffer = Buffer.concat(chunks);
+      const text = finalBuffer.toString("utf-8");
+      if (text.trim().startsWith("#EXTM3U")) {
+        finish(true, text);
+      } else {
+        finish(false, undefined, finalBuffer);
+      }
+    }
+
+    function onError() {
+      finish(false, undefined, Buffer.concat(chunks));
+    }
+
+    stream.on("data", onData);
+    stream.on("end", onEnd);
+    stream.on("error", onError);
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -218,14 +275,6 @@ export async function GET(request: NextRequest) {
   try {
     const rangeHeader = request.headers.get("range");
 
-    /**
-     * Insiste antes de devolver erro.
-     *
-     * DNS e conexão falham de forma passageira sob carga — o `EAI_AGAIN` que
-     * derrubava streams aqui é literalmente "tente de novo". Sem esta
-     * insistência, um soluço de rede de meio segundo vira 502 e o assinante vê
-     * o vídeo morrer, mesmo com o provedor inteiro funcionando.
-     */
     let upstreamResponse: http.IncomingMessage | null = null;
     let ultimoErro: unknown = null;
 
@@ -236,11 +285,10 @@ export async function GET(request: NextRequest) {
       } catch (erro) {
         ultimoErro = erro;
         if (!ehFalhaPassageira(erro)) throw erro;
-        // Nome pode ter mudado de endereço: descarta o cache antes de repetir.
         try {
           dnsCache.delete(new URL(targetUrl).hostname);
         } catch {}
-        await new Promise((r) => setTimeout(r, 250 * (tentativa + 1)));
+        await new Promise((r) => setTimeout(r, 200 * (tentativa + 1)));
       }
     }
 
@@ -248,7 +296,6 @@ export async function GET(request: NextRequest) {
 
     let statusCode = upstreamResponse.statusCode ?? 502;
 
-    // Se a extensão era .m3u8 e o servidor deu 404, tenta a versão .ts equivalente
     if (statusCode === 404 && targetUrl.endsWith(".m3u8") && !forceRaw) {
       const tsTarget = targetUrl.replace(/\.m3u8$/i, ".ts");
       try {
@@ -272,6 +319,7 @@ export async function GET(request: NextRequest) {
     responseHeaders.set("Access-Control-Allow-Methods", "GET, OPTIONS");
     responseHeaders.set("Access-Control-Allow-Headers", "*");
     responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    responseHeaders.set("X-Accel-Buffering", "no");
 
     const isM3u8Requested =
       !forceRaw &&
@@ -280,14 +328,13 @@ export async function GET(request: NextRequest) {
         targetUrl.includes(".m3u8") ||
         targetUrl.includes(".m3u"));
 
-    if (isM3u8Requested) {
-      const buffer = await streamToBuffer(upstreamResponse);
-      const manifestText = buffer.toString("utf-8");
+    let peekResult: { isM3u8: boolean; manifestText?: string; peekBuffer?: Buffer } = { isM3u8: false };
 
-      // Se o servidor retornou um arquivo M3U8 válido iniciando com #EXTM3U
-      if (manifestText.trim().startsWith("#EXTM3U")) {
+    if (isM3u8Requested) {
+      peekResult = await peekUpstream(upstreamResponse);
+      if (peekResult.isM3u8 && peekResult.manifestText) {
         const baseUrl = new URL(targetUrl);
-        const lines = manifestText.split("\n");
+        const lines = peekResult.manifestText.split("\n");
 
         const rewrittenLines = lines.map((line) => {
           const trimmed = line.trim();
@@ -310,8 +357,6 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Se o provedor IPTV retornou um stream binário MPEG-TS direto (em vez de um texto M3U8):
-      // Criamos um manifesto HLS virtual dinâmico para que o Hls.js decodifique o sinal sem erros!
       const virtualTsUrl = `/api/iptv/stream?url=${encodeURIComponent(targetUrl)}&raw=1`;
       const virtualManifest = `#EXTM3U
 #EXT-X-VERSION:3
@@ -320,6 +365,7 @@ export async function GET(request: NextRequest) {
 #EXTINF:10.0,
 ${virtualTsUrl}
 `;
+      upstreamResponse.destroy();
 
       responseHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
       responseHeaders.set("Content-Length", Buffer.byteLength(virtualManifest).toString());
@@ -359,7 +405,17 @@ ${virtualTsUrl}
       );
     }
 
-    const webStream = Readable.toWeb(upstreamResponse) as ReadableStream;
+    let finalNodeStream: http.IncomingMessage | PassThrough = upstreamResponse;
+
+    if (peekResult.peekBuffer && peekResult.peekBuffer.length > 0) {
+      const pass = new PassThrough();
+      pass.write(peekResult.peekBuffer);
+      upstreamResponse.resume();
+      upstreamResponse.pipe(pass);
+      finalNodeStream = pass;
+    }
+
+    const webStream = Readable.toWeb(finalNodeStream) as ReadableStream;
 
     return new NextResponse(webStream, {
       status: statusCode,

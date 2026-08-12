@@ -76,7 +76,15 @@ export function VideoPlayer({
         if (!destroyed) setError("Seu navegador não suporta este formato.");
         return;
       }
-      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      const hls = new Hls({
+        enableWorker: true,
+        manifestLoadingTimeOut: 4000,
+        levelLoadingTimeOut: 4000,
+        fragLoadingTimeOut: 6000,
+        startFragPrefetch: true,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+      });
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_evt, data) => {
