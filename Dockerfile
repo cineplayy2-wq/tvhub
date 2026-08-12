@@ -40,6 +40,7 @@ COPY . .
 # imagem final: o estágio `runner` recebe as variáveis reais do Swarm.
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
     DIRECT_DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
+    REDIS_URL="redis://localhost:6379" \
     AUTH_SECRET="build-time-placeholder-nao-usado-em-runtime" \
     AUTH_TRUST_HOST="true" \
     NEXT_TELEMETRY_DISABLED="1"
