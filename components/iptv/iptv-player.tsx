@@ -31,7 +31,7 @@ const MAX_RETRIES = 3;
  * O provedor devolve 404 esporádico em URL boa: 1 em 20 requisições, medido.
  * Duas repetições levam a chance de falsa falha de 5% para menos de 0,02%.
  */
-const MAX_TENTATIVAS_MESMA_FONTE = 2;
+const MAX_TENTATIVAS_MESMA_FONTE = 1;
 
 /**
  * Prazo para o primeiro quadro, por perfil de conexão.
@@ -189,7 +189,7 @@ export function IptvPlayer({
       setState("loading");
       if (recargaTimer.current) clearTimeout(recargaTimer.current);
       // Um respiro antes de repetir: bater na hora costuma pegar o mesmo erro.
-      recargaTimer.current = setTimeout(() => setRecarga((n) => n + 1), 1200);
+      recargaTimer.current = setTimeout(() => setRecarga((n) => n + 1), 200);
       return;
     }
 

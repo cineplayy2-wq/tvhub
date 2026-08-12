@@ -47,6 +47,11 @@ function responderLookup(
   else cb(erro, address, family);
 }
 
+const resolverCustom = new dns.Resolver();
+try {
+  resolverCustom.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch {}
+
 const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
   hostname,
   options,
@@ -63,11 +68,24 @@ const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
     return;
   }
 
-  dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-    if (!err && address) {
-      dnsCache.set(hostname, { address, family, ate: agora + CACHE_DNS_MS });
+  // Tenta resolver primeiro via DNS público direto (8.8.8.8/1.1.1.1) para ignorar gargalo de EAI_AGAIN do Docker
+  resolverCustom.resolve4(hostname, (errCustom, addresses) => {
+    if (!errCustom && addresses && addresses.length > 0) {
+      const address = addresses[0];
+      dnsCache.set(hostname, { address, family: 4, ate: agora + CACHE_DNS_MS });
+      responderLookup(callback, null, address, 4, querLista);
+      return;
     }
-    responderLookup(callback, err, address, family, querLista);
+
+    dns.lookup(hostname, { family: 4 }, (err, address, family) => {
+      if (!err && address) {
+        dnsCache.set(hostname, { address, family, ate: agora + CACHE_DNS_MS });
+      } else if (err) {
+        // Se deu erro temporário, guarda por 5s para evitar rajada de getaddrinfo que trava o libuv
+        dnsCache.set(hostname, { address: "", family: 4, ate: agora + 5000 });
+      }
+      responderLookup(callback, err, address, family, querLista);
+    });
   });
 };
 
