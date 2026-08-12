@@ -91,14 +91,57 @@ Opcional: em *Environment variables*, crie `TVHUB_PUBLIC_URL` com a URL do site
 
 ### 3. Na VPS, uma vez
 
+`TVHUB_IMAGE` é o único lugar do sistema que diz qual código está em produção.
+O pipeline reescreve essa linha a cada deploy.
+
 ```bash
 ssh root@<vps> 'grep -q "^TVHUB_IMAGE=" /opt/tvhub/.env || echo "TVHUB_IMAGE=tvhub-app:latest" >> /opt/tvhub/.env'
 ```
 
-`TVHUB_IMAGE` é o único lugar do sistema que diz qual código está em produção.
-O pipeline reescreve essa linha a cada deploy.
+**As chaves do TMDB precisam ser adicionadas.** Elas viviam como valor padrão
+dentro do `tvhub-stack.yml` e foram removidas de lá — sem estas duas linhas o
+próximo `docker stack deploy` **aborta** com a mensagem dizendo qual falta.
+(`DEEPSEEK_API_KEY` e `DEEPSEEK_API_URL` já estão no arquivo.)
 
-### 4. Proteja a `main`
+```bash
+ssh root@<vps> 'cd /opt/tvhub && cp .env .env.bak && grep -q "^TMDB_API_KEY=" .env || echo "TMDB_API_KEY=<a chave>" >> .env'
+```
+
+```bash
+ssh root@<vps> 'cd /opt/tvhub && grep -q "^TMDB_READ_TOKEN=" .env || echo "TMDB_READ_TOKEN=<o token>" >> .env; chmod 600 .env'
+```
+
+O modelo completo do arquivo, com todos os campos e valores mascarados, está em
+[deploy/env.vps.example](../deploy/env.vps.example).
+
+### 4. Antes do primeiro push: reescrever o histórico
+
+O commit inicial deste repositório carregava as chaves de TMDB e DeepSeek em
+texto puro. Elas foram removidas do código, mas **continuam no histórico** —
+`git log -p` mostra o valor, e apagar do arquivo não apaga do passado.
+
+Enquanto nada foi publicado, o conserto é trivial: um commit único a partir da
+árvore atual, que já está limpa.
+
+```bash
+cd C:\Users\felip\Desktop\tvhub\TVHUB && git checkout --orphan limpa && git add -A
+```
+
+```bash
+git commit -m "chore: repositorio, CI/CD e deploy sem queda" && git branch -D main && git branch -m main
+```
+
+Confira que ficou limpo antes de subir — o comando abaixo não deve devolver
+nada:
+
+```bash
+git log --all -p | grep -cE "sk-[0-9a-f]{32}|TMDB_READ_TOKEN=eyJ"
+```
+
+> Depois do push isso deixa de ser barato: reescrever histórico publicado exige
+> `--force` e quebra o clone de todo mundo. Faça agora.
+
+### 5. Proteja a `main`
 
 `Settings → Branches → Add rule` para `main`:
 
