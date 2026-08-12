@@ -7,7 +7,7 @@ import { Rail } from "@/components/iptv/rail";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { TileCard } from "@/components/iptv/tile-card";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { detectRegion, regionSearchTerms, STATE_NAMES } from "@/lib/geo";
 import { CATEGORY_LABELS } from "@/lib/iptv/category-detector";
 import {
@@ -38,12 +38,17 @@ export default async function LiveChannelsPage({
   searchParams: { cat?: string; q?: string; page?: string };
 }) {
   const user = await requireUser();
-  const playlist = await getViewablePlaylist(user.id);
+  const [playlist, profile] = await Promise.all([
+    getViewablePlaylist(user.id),
+    getActiveProfile(user.id),
+  ]);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
+  if (playlist.lockedCategories.includes("live")) notFound();
 
   const playlistId = playlist.id;
+  const profileId = profile?.id ?? null;
   const region = await detectRegion();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const isFiltered = Boolean(searchParams.cat || searchParams.q);
@@ -62,6 +67,8 @@ export default async function LiveChannelsPage({
         search: searchParams.q,
         page,
         pageSize: 42,
+        lockedCategories: playlist.lockedCategories,
+        profileId,
       })
     : null;
 

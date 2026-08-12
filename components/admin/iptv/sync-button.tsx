@@ -5,11 +5,17 @@ import { RefreshCw } from "lucide-react";
 import { syncM3uPlaylistAction } from "@/app/actions/iptv";
 import { cn } from "@/lib/utils";
 
+/**
+ * Dispara a sincronização do catálogo compartilhado.
+ *
+ * `userId` é opcional e ignorado — existe só para não quebrar chamadas
+ * antigas do painel por cliente.
+ */
 export function SyncButton({
-  userId,
+  userId: _userId,
   className,
 }: {
-  userId: string;
+  userId?: string;
   className?: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -20,7 +26,7 @@ export function SyncButton({
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
-          await syncM3uPlaylistAction(userId);
+          await syncM3uPlaylistAction();
         });
       }}
       className={cn(

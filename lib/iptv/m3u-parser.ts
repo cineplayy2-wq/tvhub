@@ -91,6 +91,12 @@ export type ItemDeBackup = {
   nome: string;
   url: string;
   grupo: string;
+  logoUrl?: string | null;
+  tvgId?: string | null;
+  tvgName?: string | null;
+  quality?: string | null;
+  language?: string | null;
+  country?: string | null;
 };
 
 export async function streamM3uUrlPairs(
@@ -137,13 +143,31 @@ export async function streamM3uUrlPairs(
         grupo = fallbackGroupFromUrl(line);
       }
 
+      const logoUrl = currentInfo ? extractAttr(currentInfo, TVG_LOGO_REGEX) : null;
+      const tvgId = currentInfo ? extractAttr(currentInfo, TVG_ID_REGEX) : null;
+      const tvgName = currentInfo ? extractAttr(currentInfo, TVG_NAME_REGEX) : null;
+      const quality = detectQuality(nome);
+      const language = detectLanguage(nome, grupo);
+      const country = detectCountry(nome, grupo);
+
       currentInfo = null;
       currentExtGrp = null;
 
       const chave = normalizar(nome);
       if (!chave) continue;
 
-      lote.push({ chave, nome, url: line, grupo });
+      lote.push({
+        chave,
+        nome,
+        url: line,
+        grupo,
+        logoUrl,
+        tvgId,
+        tvgName,
+        quality,
+        language,
+        country,
+      });
       total++;
 
       if (lote.length >= tamanhoLote) {

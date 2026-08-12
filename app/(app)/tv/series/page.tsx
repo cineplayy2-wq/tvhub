@@ -44,6 +44,7 @@ export default async function SeriesHubPage({
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
+  if (playlist.lockedCategories.includes("series")) notFound();
 
   const playlistId = playlist.id;
   const page = Math.max(1, Number(searchParams.page) || 1);

@@ -198,6 +198,7 @@ export async function getCustomer(id: string) {
           sourceUrl: true,
         },
       },
+      adultUnlocked: true,
       profiles: {
         orderBy: { sortOrder: "asc" },
         select: {

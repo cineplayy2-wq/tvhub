@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireAdmin, requireUser } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
 import { fieldErrorsFrom } from "@/lib/validations/auth";
 import { m3uPlaylistSchema } from "@/lib/validations/iptv";
@@ -13,9 +13,17 @@ import { falhaEpg, testarFonteEpg, type ResultadoEpg } from "@/lib/iptv/epg";
 import type { AdminFormState } from "./admin";
 
 // ==========================================================
-// ADMIN — GESTÃO DE M3U
+// ADMIN — GESTÃO DO CATÁLOGO COMPARTILHADO
 // ==========================================================
 
+/**
+ * Cria ou atualiza o catálogo do sistema.
+ *
+ * `userId` no formulário ainda existe por compatibilidade com o painel: ele
+ * aponta para quem cadastrou a lista, não para o dono exclusivo do conteúdo.
+ * Se já houver catálogo `isSystem`, atualiza aquele — nunca cria uma cópia
+ * por cliente.
+ */
 export async function upsertM3uPlaylistAction(
   _prevState: AdminFormState,
   formData: FormData,
@@ -43,25 +51,30 @@ export async function upsertM3uPlaylistAction(
     return { fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  const { userId, ...data } = parsed.data;
+  const { userId: userIdRaw, ...data } = parsed.data;
+  const userId =
+    userIdRaw === "system"
+      ? admin.id
+      : userIdRaw;
 
   try {
-    const existing = await prisma.m3uPlaylist.findUnique({
-      where: { userId },
-    });
+    const existing =
+      (await prisma.m3uPlaylist.findFirst({ where: { isSystem: true } })) ??
+      (await prisma.m3uPlaylist.findUnique({ where: { userId } }));
 
     let playlist;
     if (existing) {
       playlist = await prisma.m3uPlaylist.update({
-        where: { userId },
+        where: { id: existing.id },
         data: {
           ...data,
+          isSystem: true,
           syncStatus: "PENDING",
         },
       });
     } else {
       playlist = await prisma.m3uPlaylist.create({
-        data: { userId, ...data },
+        data: { userId, ...data, isSystem: true },
       });
     }
 
@@ -73,16 +86,15 @@ export async function upsertM3uPlaylistAction(
       actorId: admin.id,
       action: existing ? "m3u.update" : "m3u.create",
       targetType: "M3uPlaylist",
-      targetId: userId,
+      targetId: playlist.id,
       metadata: {
         label: data.label,
         sourceType: data.sourceType,
+        isSystem: true,
       },
     });
 
     revalidatePath("/admin/iptv");
-    revalidatePath(`/admin/iptv/${userId}`);
-    revalidatePath(`/admin/clientes/${userId}`);
     revalidatePath("/tv");
 
     return { success: true };
@@ -91,7 +103,7 @@ export async function upsertM3uPlaylistAction(
       error:
         error instanceof Error
           ? error.message
-          : "Erro ao salvar a lista M3U",
+          : "Erro ao salvar o catálogo M3U",
     };
   }
 }
@@ -99,12 +111,12 @@ export async function upsertM3uPlaylistAction(
 /**
  * Testa uma URL de EPG antes de salvar.
  *
- * Baixa só o cabeçalho de canais do XMLTV e diz quantos canais da lista do
- * cliente têm programação. Sem isso, configurar EPG é chute: a URL responde
- * 200, mas os tvg-id podem não bater com nada.
+ * Baixa só o cabeçalho de canais do XMLTV e diz quantos canais do catálogo
+ * têm programação. Sem isso, configurar EPG é chute: a URL responde 200, mas
+ * os tvg-id podem não bater com nada.
  */
 export async function testarEpgAction(
-  userId: string,
+  _userId: string,
   url: string,
 ): Promise<ResultadoEpg> {
   await requireAdmin();
@@ -115,26 +127,26 @@ export async function testarEpgAction(
     return falhaEpg("A URL precisa começar com http:// ou https://");
   }
 
-  const playlist = await prisma.m3uPlaylist.findUnique({
-    where: { userId },
+  const playlist = await prisma.m3uPlaylist.findFirst({
+    where: { isSystem: true },
     select: { id: true },
   });
 
   if (!playlist) {
-    return falhaEpg("Salve a lista M3U antes de testar o EPG");
+    return falhaEpg("Configure o catálogo compartilhado antes de testar o EPG");
   }
 
   return testarFonteEpg(endereco, playlist.id);
 }
 
-export async function syncM3uPlaylistAction(userId: string) {
+export async function syncM3uPlaylistAction(_userId?: string) {
   const admin = await requireAdmin();
 
-  const playlist = await prisma.m3uPlaylist.findUnique({
-    where: { userId },
+  const playlist = await prisma.m3uPlaylist.findFirst({
+    where: { isSystem: true },
   });
 
-  if (!playlist) return { error: "Lista M3U não encontrada" };
+  if (!playlist) return { error: "Catálogo compartilhado não encontrado" };
 
   void syncPlaylist(playlist).catch((err) => {
     console.error("Erro na sincronização manual:", err);
@@ -148,8 +160,7 @@ export async function syncM3uPlaylistAction(userId: string) {
   });
 
   revalidatePath("/admin/iptv");
-  revalidatePath(`/admin/iptv/${userId}`);
-  revalidatePath(`/admin/clientes/${userId}`);
+  revalidatePath("/tv");
 
   return { success: true };
 }
@@ -157,15 +168,14 @@ export async function syncM3uPlaylistAction(userId: string) {
 /**
  * Revincula as URLs de backup sem reimportar o catálogo.
  *
- * "Sincronizar Agora" apaga os canais antes de repovoar, e o assinante fica
- * sem catálogo durante o processo. Quando só o failover ficou para trás,
- * este caminho resolve sem janela de indisponibilidade.
+ * Quando só o failover ficou para trás, este caminho resolve sem janela de
+ * indisponibilidade.
  */
-export async function revincularBackupAction(userId: string) {
+export async function revincularBackupAction(_userId?: string) {
   const admin = await requireAdmin();
 
-  const playlist = await prisma.m3uPlaylist.findUnique({ where: { userId } });
-  if (!playlist) return { erro: "Lista M3U não encontrada" };
+  const playlist = await prisma.m3uPlaylist.findFirst({ where: { isSystem: true } });
+  if (!playlist) return { erro: "Catálogo compartilhado não encontrado" };
   if (!playlist.backupSourceUrl && !playlist.backupXtreamServer) {
     return { erro: "Nenhuma lista de backup configurada" };
   }
@@ -181,7 +191,7 @@ export async function revincularBackupAction(userId: string) {
       metadata: resultado,
     });
 
-    revalidatePath(`/admin/iptv/${userId}`);
+    revalidatePath("/admin/iptv");
     return resultado;
   } catch (erro) {
     return {
@@ -193,34 +203,35 @@ export async function revincularBackupAction(userId: string) {
 /**
  * Liga/desliga o módulo adulto (+18) deste cliente.
  *
- * É o único caminho que libera o +18. Sem ele, a categoria adulta não retorna
- * nada — nem pela navegação, nem por quem digitar a URL direto.
+ * Mora no User — o catálogo é compartilhado, então liberar um assinante não
+ * pode abrir o +18 para todo mundo.
  */
 export async function alternarModuloAdultoAction(userId: string) {
   const admin = await requireAdmin();
 
-  const playlist = await prisma.m3uPlaylist.findUnique({
-    where: { userId },
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
     select: { id: true, adultUnlocked: true },
   });
-  if (!playlist) return { erro: "Lista M3U não encontrada" };
+  if (!user) return { erro: "Cliente não encontrado" };
 
-  const liberado = !playlist.adultUnlocked;
+  const liberado = !user.adultUnlocked;
 
-  await prisma.m3uPlaylist.update({
-    where: { userId },
+  await prisma.user.update({
+    where: { id: userId },
     data: { adultUnlocked: liberado },
   });
 
   await writeAuditLog({
     actorId: admin.id,
     action: liberado ? "adult.unlock" : "adult.lock",
-    targetType: "M3uPlaylist",
-    targetId: playlist.id,
+    targetType: "User",
+    targetId: userId,
     metadata: { userId },
   });
 
   revalidatePath(`/admin/iptv/${userId}`);
+  revalidatePath(`/admin/clientes/${userId}`);
   revalidatePath("/tv");
   return { liberado };
 }
@@ -228,7 +239,13 @@ export async function alternarModuloAdultoAction(userId: string) {
 export async function deleteM3uPlaylistAction(userId: string) {
   const admin = await requireAdmin();
 
-  await prisma.m3uPlaylist.deleteMany({ where: { userId } });
+  // Não apaga o catálogo do sistema — isso tiraria a TV de todo mundo.
+  const playlist = await prisma.m3uPlaylist.findUnique({ where: { userId } });
+  if (playlist?.isSystem) {
+    return { error: "Não é possível apagar o catálogo compartilhado por aqui." };
+  }
+
+  await prisma.m3uPlaylist.deleteMany({ where: { userId, isSystem: false } });
 
   await writeAuditLog({
     actorId: admin.id,
@@ -262,62 +279,52 @@ export async function toggleGroupVisibilityAction(
   revalidatePath("/admin/iptv");
 }
 
+/**
+ * Trava/libera uma categoria PARA ESTE CLIENTE.
+ *
+ * Não mexe em M3uGroup.isHidden — o catálogo é compartilhado.
+ */
 export async function toggleCategoryLockAction(
-  playlistId: string,
+  _playlistId: string,
   category: string,
   isHidden: boolean,
   userId: string,
 ) {
   await requireAdmin();
 
-  if (category === "adult") {
-    await prisma.m3uGroup.updateMany({
-      where: {
-        playlistId,
-        OR: [
-          { category: "adult" },
-          { name: { contains: "adult", mode: "insensitive" } },
-          { name: { contains: "+18", mode: "insensitive" } },
-          { name: { contains: "18+", mode: "insensitive" } },
-          { name: { contains: "xxx", mode: "insensitive" } },
-          { name: { contains: "onlyfans", mode: "insensitive" } },
-          { name: { contains: "privacy", mode: "insensitive" } },
-          { name: { contains: "playboy", mode: "insensitive" } },
-          { name: { contains: "venus", mode: "insensitive" } },
-          { name: { contains: "sexy", mode: "insensitive" } },
-          { name: { contains: "brazzers", mode: "insensitive" } },
-          { name: { contains: "hustler", mode: "insensitive" } },
-          { name: { contains: "hentai", mode: "insensitive" } },
-        ],
-      },
-      data: { isHidden },
-    });
-  } else {
-    await prisma.m3uGroup.updateMany({
-      where: { playlistId, category },
-      data: { isHidden },
-    });
-  }
+  const { setUserCategoryLock } = await import("@/lib/queries/iptv");
+  await setUserCategoryLock(userId, category, isHidden);
 
   revalidatePath("/admin/iptv");
   revalidatePath(`/admin/iptv/${userId}`);
+  revalidatePath(`/admin/clientes/${userId}`);
   revalidatePath("/tv");
 }
 
 export async function toggleChannelFavoriteAction(channelId: string) {
   const user = await requireUser();
+  const profile = await getActiveProfile(user.id);
+  if (!profile) return;
 
   const channel = await prisma.m3uChannel.findUnique({
     where: { id: channelId },
-    include: { playlist: { select: { userId: true } } },
+    select: { id: true },
+  });
+  if (!channel) return;
+
+  const existente = await prisma.channelFavorite.findUnique({
+    where: {
+      profileId_channelId: { profileId: profile.id, channelId },
+    },
   });
 
-  if (!channel || channel.playlist.userId !== user.id) return;
-
-  await prisma.m3uChannel.update({
-    where: { id: channelId },
-    data: { isFavorite: !channel.isFavorite },
-  });
+  if (existente) {
+    await prisma.channelFavorite.delete({ where: { id: existente.id } });
+  } else {
+    await prisma.channelFavorite.create({
+      data: { profileId: profile.id, channelId },
+    });
+  }
 
   revalidatePath("/tv");
 }

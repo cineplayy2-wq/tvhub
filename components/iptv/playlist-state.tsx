@@ -2,7 +2,10 @@ import Link from "next/link";
 import { Loader2, Radio } from "lucide-react";
 
 /**
- * Aviso de sincronização oculto para o cliente conforme diretiva.
+ * Faixa discreta durante a sincronização do catálogo compartilhado.
+ *
+ * Não bloqueia nada: o assinante continua assistindo o que já está no ar.
+ * Abrir o app só lê o status — nunca dispara carga.
  */
 export function SyncBanner({
   isSyncing,
@@ -11,7 +14,29 @@ export function SyncBanner({
   isSyncing?: boolean;
   isStale?: boolean;
 }) {
-  return null;
+  if (!isSyncing) return null;
+
+  return (
+    <div
+      role="status"
+      className="mx-4 mt-3 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm text-foreground md:mx-8"
+    >
+      <div className="flex items-start gap-2.5">
+        <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+        <div>
+          <p className="font-medium">
+            {isStale
+              ? "A atualização está demorando — você pode continuar assistindo"
+              : "Atualizando o catálogo — o que você já tem continua no ar"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Conteúdo novo vai aparecendo aos poucos. Não é preciso sair desta
+            tela.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -20,10 +45,10 @@ export function SyncBanner({
 export function EmptyPlaylist({ status }: { status?: string }) {
   const message =
     status === "SYNCING"
-      ? "Estamos montando sua lista agora. Isso leva alguns minutos na primeira vez."
+      ? "Estamos montando o catálogo agora. Isso leva alguns minutos na primeira vez."
       : status === "ERROR"
-        ? "Houve um erro ao carregar sua lista. Entre em contato com o suporte."
-        : "Entre em contato com o administrador para configurar sua lista de canais.";
+        ? "Houve um erro ao carregar o catálogo. Entre em contato com o suporte."
+        : "Entre em contato com o administrador para configurar o catálogo de canais.";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">

@@ -9,7 +9,7 @@ import { TileCard } from "@/components/iptv/tile-card";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { prisma } from "@/lib/prisma";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { getPlaylistChannels, getViewablePlaylist } from "@/lib/queries/iptv";
 import { dedupeChannels } from "@/lib/utils";
 
@@ -66,12 +66,17 @@ export default async function SportsHubPage({
   searchParams: { q?: string; page?: string; sub?: string };
 }) {
   const user = await requireUser();
-  const playlist = await getViewablePlaylist(user.id);
+  const [playlist, profile] = await Promise.all([
+    getViewablePlaylist(user.id),
+    getActiveProfile(user.id),
+  ]);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
+  if (playlist.lockedCategories.includes("sports")) notFound();
 
   const playlistId = playlist.id;
+  const profileId = profile?.id ?? null;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const isBrowsing = !searchParams.q && !searchParams.sub && page === 1;
 
@@ -89,6 +94,8 @@ export default async function SportsHubPage({
       search: searchParams.q,
       page,
       pageSize: 42,
+      lockedCategories: playlist.lockedCategories,
+      profileId,
     }),
     isBrowsing
       ? Promise.all(

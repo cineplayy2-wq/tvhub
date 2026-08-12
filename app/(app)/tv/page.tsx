@@ -21,6 +21,7 @@ import {
   type ShowcaseItem,
 } from "@/lib/queries/discover";
 import {
+  annotateFavorites,
   getChannelsByCategory,
   getPlaylistChannels,
   getViewablePlaylist,
@@ -45,6 +46,7 @@ export default async function TvPage() {
     if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
 
     const playlistId = playlist.id;
+    const profileId = activeProfile?.id ?? null;
     const filterCounts = await getFilterCounts(playlistId, "movies");
 
     return (
@@ -64,7 +66,7 @@ export default async function TvPage() {
         </div>
 
         <Suspense fallback={<HeroSkeleton />}>
-          <HeroSection playlistId={playlistId} />
+          <HeroSection playlistId={playlistId} profileId={profileId} />
         </Suspense>
 
         {/* CONTINUAR ASSISTINDO (PROGRESSO % E CONTAGEM DE VEZES ASSISTIDO) */}
@@ -76,7 +78,7 @@ export default async function TvPage() {
 
         <div className="space-y-12 md:space-y-14">
           <Suspense fallback={null}>
-            <FavoritesRail playlistId={playlistId} />
+            <FavoritesRail playlistId={playlistId} profileId={profileId} />
           </Suspense>
 
           <Suspense fallback={<RailSkeleton />}>
@@ -131,7 +133,13 @@ async function ContinueWatchingSection({
   }
 }
 
-async function HeroSection({ playlistId }: { playlistId: string }) {
+async function HeroSection({
+  playlistId,
+  profileId,
+}: {
+  playlistId: string;
+  profileId: string | null;
+}) {
   const [trending, releases] = await Promise.all([
     trendingRow(playlistId),
     releasesRow(playlistId),
@@ -140,19 +148,23 @@ async function HeroSection({ playlistId }: { playlistId: string }) {
   const slides = buildHeroSlides({ trending, releases });
   if (slides.length > 0) return <ShowcaseHero slides={slides} />;
 
-  const fallback = await heroFallback(playlistId);
+  const fallback = await heroFallback(playlistId, profileId);
   if (fallback.length === 0) return <div className="h-16" />;
 
   return <ShowcaseHero slides={fallback} />;
 }
 
-async function heroFallback(playlistId: string): Promise<HeroSlide[]> {
+async function heroFallback(
+  playlistId: string,
+  profileId: string | null,
+): Promise<HeroSlide[]> {
   const movies = await getChannelsByCategory(playlistId, "movies", 8);
   if (movies.length === 0) return [];
 
   const enriched = await enrichChannelsWithTmdb(movies, 5);
+  const comFavorito = await annotateFavorites(enriched.slice(0, 4), profileId);
 
-  return enriched.slice(0, 4).map((item) => ({
+  return comFavorito.map((item) => ({
     id: item.id,
     name: item.name,
     href: `/tv/assistir/${item.id}`,
@@ -168,12 +180,19 @@ async function heroFallback(playlistId: string): Promise<HeroSlide[]> {
   }));
 }
 
-async function FavoritesRail({ playlistId }: { playlistId: string }) {
+async function FavoritesRail({
+  playlistId,
+  profileId,
+}: {
+  playlistId: string;
+  profileId: string | null;
+}) {
   const favorites = await getPlaylistChannels({
     playlistId,
     favoritesOnly: true,
     page: 1,
     pageSize: 18,
+    profileId,
   });
 
   if (favorites.items.length === 0) return null;

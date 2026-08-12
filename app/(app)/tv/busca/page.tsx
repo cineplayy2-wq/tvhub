@@ -4,7 +4,7 @@ import { Heart, Search } from "lucide-react";
 import { BackButton } from "@/components/iptv/back-button";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { TileCard } from "@/components/iptv/tile-card";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { getPlaylistChannels, getViewablePlaylist } from "@/lib/queries/iptv";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,10 @@ export default async function TvSearchPage({
   searchParams: { q?: string; favoritos?: string; page?: string };
 }) {
   const user = await requireUser();
-  const playlist = await getViewablePlaylist(user.id);
+  const [playlist, profile] = await Promise.all([
+    getViewablePlaylist(user.id),
+    getActiveProfile(user.id),
+  ]);
 
   const isFavoritesMode = searchParams.favoritos === "true";
   const page = Math.max(1, Number(searchParams.page) || 1);
@@ -28,6 +31,9 @@ export default async function TvSearchPage({
           favoritesOnly: isFavoritesMode,
           page,
           pageSize: 42,
+          adultUnlocked: playlist.adultUnlocked,
+          lockedCategories: playlist.lockedCategories,
+          profileId: profile?.id,
         })
       : null;
 

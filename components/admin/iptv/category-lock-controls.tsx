@@ -12,23 +12,25 @@ const CATEGORY_CONFIG: Array<{ key: string; label: string; icon: any }> = [
   { key: "adult", label: "Conteúdo Adulto (+18)", icon: ShieldAlert },
 ];
 
+/**
+ * Trava de categoria POR CLIENTE no catálogo compartilhado.
+ *
+ * `lockedCategories` vem de `UserCategoryLock` — não de `M3uGroup.isHidden`.
+ */
 export function CategoryLockControls({
   playlistId,
   userId,
-  groups,
+  lockedCategories = [],
 }: {
   playlistId: string;
   userId: string;
-  groups: Array<{ category: string | null; isHidden: boolean }>;
+  /** Categorias já travadas para este assinante. */
+  lockedCategories?: string[];
+  /** @deprecated Mantido só para não quebrar callers antigos. */
+  groups?: Array<{ category: string | null; isHidden: boolean }>;
 }) {
   const [isPending, startTransition] = useTransition();
-
-  // Check if all groups in a category are hidden
-  const isCategoryLocked = (catKey: string) => {
-    const catGroups = groups.filter((g) => g.category === catKey);
-    if (catGroups.length === 0) return false;
-    return catGroups.every((g) => g.isHidden);
-  };
+  const locked = new Set(lockedCategories);
 
   const handleToggle = (categoryKey: string, currentLocked: boolean) => {
     startTransition(async () => {
@@ -39,22 +41,23 @@ export function CategoryLockControls({
   return (
     <div className="rounded-xl border border-border/60 bg-surface/40 p-5 mb-8">
       <h3 className="text-sm font-bold uppercase tracking-wider text-foreground mb-1">
-        🔒 Bloqueio de Conteúdo e Categorias por Cliente
+        Bloqueio de Conteúdo e Categorias por Cliente
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Bloqueie categorias inteiras (ex: ocultar Canais ao Vivo ou Adultos) para este cliente específico.
+        Oculta categorias deste assinante no catálogo compartilhado. Não afeta
+        os outros clientes.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CATEGORY_CONFIG.map((cat) => {
-          const locked = isCategoryLocked(cat.key);
+          const isLocked = locked.has(cat.key);
           const Icon = cat.icon;
 
           return (
             <div
               key={cat.key}
               className={`flex items-center justify-between rounded-xl border p-3 transition-all ${
-                locked
+                isLocked
                   ? "border-danger/40 bg-danger/5"
                   : "border-border/60 bg-surface-elevated/40"
               }`}
@@ -62,7 +65,7 @@ export function CategoryLockControls({
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                    locked ? "bg-danger/10 text-danger" : "bg-primary/10 text-primary"
+                    isLocked ? "bg-danger/10 text-danger" : "bg-primary/10 text-primary"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -71,10 +74,10 @@ export function CategoryLockControls({
                   <p className="text-xs font-semibold text-foreground">{cat.label}</p>
                   <span
                     className={`text-[10px] font-bold ${
-                      locked ? "text-danger" : "text-emerald-500"
+                      isLocked ? "text-danger" : "text-emerald-500"
                     }`}
                   >
-                    {locked ? "BLOQUEADO" : "LIBERADO"}
+                    {isLocked ? "BLOQUEADO" : "LIBERADO"}
                   </span>
                 </div>
               </div>
@@ -82,14 +85,14 @@ export function CategoryLockControls({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={() => handleToggle(cat.key, locked)}
+                onClick={() => handleToggle(cat.key, isLocked)}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  locked
+                  isLocked
                     ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
                     : "bg-danger/10 text-danger hover:bg-danger/20 border border-danger/30"
                 }`}
               >
-                {locked ? (
+                {isLocked ? (
                   <>
                     <Unlock className="h-3.5 w-3.5" />
                     Liberar

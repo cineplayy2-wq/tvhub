@@ -44,9 +44,9 @@ export function ModuloAdulto({
               Módulo Adulto +18 — R$ 15,00/mês
             </h4>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {canaisAdultos.toLocaleString("pt-BR")} canais adultos na lista deste
-              cliente. Bloqueados por padrão; libere apenas para quem contratou o
-              adicional.
+              {canaisAdultos.toLocaleString("pt-BR")} canais adultos no catálogo
+              compartilhado. Bloqueados por padrão; libere apenas para quem
+              contratou o adicional.
             </p>
           </div>
         </div>

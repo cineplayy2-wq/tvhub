@@ -55,7 +55,10 @@ async function handleSync(request: Request) {
   const modo = new URL(request.url).searchParams.get("mode");
   if (modo === "relink") {
     const comBackup = await prisma.m3uPlaylist.findMany({
-      where: { OR: [{ backupSourceUrl: { not: null } }, { backupXtreamServer: { not: null } }] },
+      where: {
+        isSystem: true,
+        OR: [{ backupSourceUrl: { not: null } }, { backupXtreamServer: { not: null } }],
+      },
     });
 
     const relinks = [];
@@ -80,6 +83,7 @@ async function handleSync(request: Request) {
 
   const playlists = await prisma.m3uPlaylist.findMany({
     where: {
+      isSystem: true,
       OR: [
         { syncStatus: "PENDING" },
         { syncStatus: "ERROR" },

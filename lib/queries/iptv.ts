@@ -15,6 +15,47 @@ import {
 
 const PAGE_SIZE = 20;
 
+/**
+ * Catálogo IPTV compartilhado — um só, servido a todos os assinantes.
+ *
+ * Antes cada cliente tinha a própria cópia (userId único). Com milhares de
+ * contas isso estoura disco e memória. A fonte da verdade passou a ser a
+ * playlist marcada `isSystem`; permissões por cliente moram no User.
+ */
+export async function getSystemPlaylist() {
+  return prisma.m3uPlaylist.findFirst({
+    where: { isSystem: true },
+    include: {
+      groups: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          _count: { select: { channels: true } },
+        },
+      },
+      _count: { select: { channels: true } },
+    },
+  });
+}
+
+/** @deprecated Prefer getSystemPlaylist — mantido para o admin legado. */
+export async function getUserPlaylist(userId: string) {
+  const system = await getSystemPlaylist();
+  if (system) return system;
+
+  return prisma.m3uPlaylist.findUnique({
+    where: { userId },
+    include: {
+      groups: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          _count: { select: { channels: true } },
+        },
+      },
+      _count: { select: { channels: true } },
+    },
+  });
+}
+
 export async function listAllPlaylists({
   query,
   page = 1,
@@ -22,15 +63,18 @@ export async function listAllPlaylists({
   query?: string;
   page?: number;
 }) {
-  const where: Prisma.M3uPlaylistWhereInput = query
-    ? {
-        OR: [
-          { label: { contains: query, mode: "insensitive" } },
-          { user: { name: { contains: query, mode: "insensitive" } } },
-          { user: { email: { contains: query, mode: "insensitive" } } },
-        ],
-      }
-    : {};
+  const where: Prisma.M3uPlaylistWhereInput = {
+    isSystem: true,
+    ...(query
+      ? {
+          OR: [
+            { label: { contains: query, mode: "insensitive" } },
+            { user: { name: { contains: query, mode: "insensitive" } } },
+            { user: { email: { contains: query, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
 
   const [items, total] = await prisma.$transaction([
     prisma.m3uPlaylist.findMany({
@@ -49,6 +93,7 @@ export async function listAllPlaylists({
         totalChannels: true,
         totalGroups: true,
         autoSyncHours: true,
+        isSystem: true,
         updatedAt: true,
         user: {
           select: { name: true, email: true },
@@ -67,35 +112,41 @@ export async function listAllPlaylists({
   };
 }
 
-export async function getUserPlaylist(userId: string) {
-  return prisma.m3uPlaylist.findUnique({
-    where: { userId },
-    include: {
-      groups: {
-        orderBy: { sortOrder: "asc" },
-        include: {
-          _count: { select: { channels: true } },
-        },
-      },
-      _count: { select: { channels: true } },
-    },
-  });
-}
-
 const SYNC_STALE_AFTER_MS = 45 * 60 * 1000;
 
 export type ViewablePlaylist = NonNullable<
-  Awaited<ReturnType<typeof getUserPlaylist>>
+  Awaited<ReturnType<typeof getSystemPlaylist>>
 > & {
+  /** Módulo +18 deste assinante (não da playlist). */
+  adultUnlocked: boolean;
+  /** Categorias que o admin ocultou para este cliente. */
+  lockedCategories: string[];
   hasChannels: boolean;
   isSyncing: boolean;
   isSyncStale: boolean;
 };
 
+/**
+ * Resolve o catálogo que o assinante vê.
+ *
+ * Sempre o catálogo do sistema. adultUnlocked e travas vêm do usuário logado —
+ * nunca da playlist, senão um cliente mudaria a configuração de todos.
+ */
 export async function getViewablePlaylist(
   userId: string,
 ): Promise<ViewablePlaylist | null> {
-  const playlist = await getUserPlaylist(userId);
+  const [playlist, user, locks] = await Promise.all([
+    getSystemPlaylist(),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { adultUnlocked: true },
+    }),
+    prisma.userCategoryLock.findMany({
+      where: { userId },
+      select: { category: true },
+    }),
+  ]);
+
   if (!playlist) return null;
 
   const totalChannels = playlist._count.channels;
@@ -106,10 +157,37 @@ export async function getViewablePlaylist(
 
   return {
     ...playlist,
+    adultUnlocked: user?.adultUnlocked ?? false,
+    lockedCategories: locks.map((l) => l.category),
     hasChannels: totalChannels > 0,
     isSyncing,
     isSyncStale,
   };
+}
+
+/**
+ * Marca `isFavorite` a partir da tabela por perfil.
+ *
+ * As queries ainda selecionam o booleano legado do canal; esta função é a
+ * fonte da verdade na resposta ao assinante.
+ */
+export async function annotateFavorites<T extends { id: string; isFavorite?: boolean }>(
+  items: T[],
+  profileId: string | null | undefined,
+): Promise<(T & { isFavorite: boolean })[]> {
+  if (!profileId || items.length === 0) {
+    return items.map((item) => ({ ...item, isFavorite: false }));
+  }
+
+  const favoritos = await prisma.channelFavorite.findMany({
+    where: {
+      profileId,
+      channelId: { in: items.map((i) => i.id) },
+    },
+    select: { channelId: true },
+  });
+  const set = new Set(favoritos.map((f) => f.channelId));
+  return items.map((item) => ({ ...item, isFavorite: set.has(item.id) }));
 }
 
 export async function getPlaylistChannels({
@@ -121,6 +199,8 @@ export async function getPlaylistChannels({
   page = 1,
   pageSize = PAGE_SIZE,
   adultUnlocked = false,
+  lockedCategories = [],
+  profileId,
 }: {
   playlistId: string;
   groupId?: string;
@@ -131,14 +211,29 @@ export async function getPlaylistChannels({
   pageSize?: number;
   /** Módulo +18 contratado. Sem ele a categoria adulta não retorna nada. */
   adultUnlocked?: boolean;
+  /** Categorias ocultas para este cliente no catálogo compartilhado. */
+  lockedCategories?: string[];
+  /** Perfil ativo — necessário para favoritos por perfil. */
+  profileId?: string | null;
 }) {
+  // Categoria travada para este cliente: responde vazio, sem vazar conteúdo.
+  if (category && lockedCategories.includes(category)) {
+    return { items: [], total: 0, page, pageSize, totalPages: 1 };
+  }
+
   const where: Prisma.M3uChannelWhereInput = {
     playlistId,
     isActive: true,
   };
 
   if (groupId) where.groupId = groupId;
-  if (favoritesOnly) where.isFavorite = true;
+
+  if (favoritesOnly) {
+    if (!profileId) {
+      return { items: [], total: 0, page, pageSize, totalPages: 1 };
+    }
+    where.favorites = { some: { profileId } };
+  }
 
   const extraWhere: Prisma.M3uChannelWhereInput[] = [];
 
@@ -200,7 +295,9 @@ export async function getPlaylistChannels({
   if (category !== "adult") {
     where.group = {
       ...((where.group as Prisma.M3uGroupWhereInput) || {}),
-      category: { not: "adult" },
+      category: {
+        notIn: ["adult", ...lockedCategories.filter((c) => c !== "adult")],
+      },
       isHidden: false,
     };
   }
@@ -212,9 +309,9 @@ export async function getPlaylistChannels({
     ];
   }
 
-  const totalCacheKey = `channels_count:${playlistId}:${category ?? "all"}:${search ?? "all"}`;
+  const totalCacheKey = `channels_count:${playlistId}:${category ?? "all"}:${search ?? "all"}:${lockedCategories.join(",")}:${favoritesOnly ? profileId : "all"}`;
 
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     prisma.m3uChannel.findMany({
       where,
       orderBy: { sortOrder: "asc" },
@@ -235,6 +332,8 @@ export async function getPlaylistChannels({
     }),
     cached(totalCacheKey, TTL.playlist, () => prisma.m3uChannel.count({ where })),
   ]);
+
+  const items = await annotateFavorites(rawItems, profileId);
 
   return {
     items,
@@ -473,7 +572,7 @@ export async function getChannelById(channelId: string) {
     where: { id: channelId },
     include: {
       group: { select: { id: true, name: true, slug: true, category: true } },
-      playlist: { select: { id: true, userId: true } },
+      playlist: { select: { id: true, userId: true, isSystem: true } },
     },
   });
 }
@@ -515,6 +614,7 @@ export async function toggleGroupLock(groupId: string, isHidden: boolean) {
   });
 }
 
+/** @deprecated Use setUserCategoryLock — a trava agora é por cliente. */
 export async function toggleCategoryLock(playlistId: string, category: string, isHidden: boolean) {
   const groups = await prisma.m3uGroup.findMany({
     where: { playlistId, category },
@@ -531,6 +631,39 @@ export async function toggleCategoryLock(playlistId: string, category: string, i
   });
 
   return true;
+}
+
+/**
+ * Liga/desliga a trava de uma categoria para UM assinante.
+ *
+ * Não mexe em `M3uGroup.isHidden` — isso esconderia a categoria de todo o
+ * catálogo compartilhado.
+ */
+export async function setUserCategoryLock(
+  userId: string,
+  category: string,
+  locked: boolean,
+) {
+  if (locked) {
+    await prisma.userCategoryLock.upsert({
+      where: { userId_category: { userId, category } },
+      create: { userId, category },
+      update: {},
+    });
+  } else {
+    await prisma.userCategoryLock.deleteMany({
+      where: { userId, category },
+    });
+  }
+  return locked;
+}
+
+export async function getUserCategoryLocks(userId: string) {
+  const locks = await prisma.userCategoryLock.findMany({
+    where: { userId },
+    select: { category: true },
+  });
+  return locks.map((l) => l.category);
 }
 
 /**

@@ -21,15 +21,17 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getUserPlaylist } from "@/lib/queries/iptv";
+// getSystemPlaylist is imported dynamically below to keep the VOD path light
+// when IPTV is not configured.
 
 export default async function HomePage() {
   const user = await requireUser("/inicio");
   const profile = await requireProfile(user.id);
 
-  // If user has an M3U playlist configured, redirect directly to /tv for the IPTV experience
-  const userPlaylist = await getUserPlaylist(user.id);
-  if (userPlaylist && userPlaylist.syncStatus === "SYNCED" && userPlaylist.totalChannels > 0) {
+  // If shared IPTV catalog is ready, redirect directly to /tv
+  const { getSystemPlaylist } = await import("@/lib/queries/iptv");
+  const systemPlaylist = await getSystemPlaylist();
+  if (systemPlaylist && systemPlaylist.syncStatus === "SYNCED" && systemPlaylist.totalChannels > 0) {
     redirect("/tv");
   }
 
@@ -38,9 +40,9 @@ export default async function HomePage() {
     getHeroTitle(profile.maxAgeRating),
     getContinueWatching(profile.id, profile.maxAgeRating),
     getCatalogRows(profile.id, profile.maxAgeRating),
-    userPlaylist
+    systemPlaylist
       ? import("@/lib/iptv/recommendations-service").then((m) =>
-          m.getProfilePersonalizedRecommendations(userPlaylist.id, profile.id)
+          m.getProfilePersonalizedRecommendations(systemPlaylist.id, profile.id)
         )
       : Promise.resolve([]),
   ]);

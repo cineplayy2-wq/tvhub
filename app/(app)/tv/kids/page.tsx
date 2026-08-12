@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Play, Search, Sparkles, Star } from "lucide-react";
 
 import { Artwork } from "@/components/iptv/artwork";
@@ -46,6 +47,8 @@ export default async function KidsHubPage({
         </div>
       );
     }
+
+    if (playlist.lockedCategories.includes("kids")) notFound();
 
     const playlistId = playlist.id;
     const page = Math.max(1, Number(searchParams.page) || 1);

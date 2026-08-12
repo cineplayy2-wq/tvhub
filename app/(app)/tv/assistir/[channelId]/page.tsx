@@ -39,18 +39,21 @@ export default async function WatchChannelPage({
 
   let channel = canalDireto;
 
+  // Catálogo compartilhado: qualquer assinante autenticado pode assistir.
+  // A checagem antiga exigia channel.playlist.userId === user.id e quebrava
+  // para todo mundo que não fosse o dono técnico da playlist do sistema.
   if (!channel) {
-    const userPlaylist = await prisma.m3uPlaylist.findUnique({
-      where: { userId: user.id },
+    const systemPlaylist = await prisma.m3uPlaylist.findFirst({
+      where: { isSystem: true },
       select: { id: true },
     });
 
-    if (userPlaylist) {
+    if (systemPlaylist) {
       const fallbackChannel = await prisma.m3uChannel.findFirst({
-        where: { playlistId: userPlaylist.id, isActive: true },
+        where: { playlistId: systemPlaylist.id, isActive: true },
         include: {
           group: { select: { id: true, name: true, slug: true, category: true } },
-          playlist: { select: { id: true, userId: true } },
+          playlist: { select: { id: true, userId: true, isSystem: true } },
         },
         orderBy: { relevanceScore: "desc" },
       });
@@ -58,8 +61,38 @@ export default async function WatchChannelPage({
     }
   }
 
-  if (!channel || channel.playlist.userId !== user.id) {
+  if (!channel) {
     notFound();
+  }
+
+  const playlistDoSistema =
+    "isSystem" in (channel.playlist as { isSystem?: boolean })
+      ? Boolean((channel.playlist as { isSystem?: boolean }).isSystem)
+      : false;
+
+  if (!playlistDoSistema && channel.playlist.userId !== user.id) {
+    // Fallback legado: playlist ainda amarrada a um usuário antigo.
+    const system = await prisma.m3uPlaylist.findFirst({
+      where: { isSystem: true },
+      select: { id: true },
+    });
+    if (!system || channel.playlistId !== system.id) {
+      notFound();
+    }
+  }
+
+  let isFavorite = false;
+  if (activeProfile?.id) {
+    const fav = await prisma.channelFavorite.findUnique({
+      where: {
+        profileId_channelId: {
+          profileId: activeProfile.id,
+          channelId: channel.id,
+        },
+      },
+      select: { id: true },
+    });
+    isFavorite = Boolean(fav);
   }
 
   // Onde o assinante parou. É rápido e precisa estar pronto antes do player,
@@ -118,7 +151,7 @@ export default async function WatchChannelPage({
             nome={channel.name}
             logoUrl={channel.logoUrl}
             quality={channel.quality}
-            isFavorite={channel.isFavorite}
+            isFavorite={isFavorite}
             group={channel.group}
             isVod={isVod}
           />

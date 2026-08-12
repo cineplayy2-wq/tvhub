@@ -45,6 +45,13 @@ model User {
   blockedReason String?
   lastLoginAt   DateTime?
 
+  /// Módulo adulto (+18) contratado à parte por este cliente.
+  ///
+  /// Mora no usuário — não na playlist — porque o catálogo IPTV é
+  /// compartilhado: liberar o +18 de um assinante não pode abrir o conteúdo
+  /// adulto para todo mundo.
+  adultUnlocked Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -56,6 +63,7 @@ model User {
   streamSessions StreamSession[]
   auditLogs      AuditLog[]      @relation("AuditActor")
   m3uPlaylist    M3uPlaylist?
+  categoryLocks  UserCategoryLock[]
 
   @@index([status])
   @@index([createdAt])
@@ -76,10 +84,11 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   watchlist      WatchlistItem[]
   watchProgress  WatchProgress[]
   streamSessions StreamSession[]
+  channelFavorites ChannelFavorite[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -593,12 +602,16 @@ model M3uPlaylist {
   /// URL do XMLTV (EPG) desta lista. O casamento com os canais é pelo tvg-id.
   epgUrl String?
 
-  /// Módulo adulto (+18) contratado à parte por este cliente.
+  /// Catálogo compartilhado servido a todos os assinantes.
   ///
-  /// O padrão é FALSO e assim permanece: conteúdo adulto fica bloqueado para
-  /// todo mundo, e liberar é ato explícito do painel para quem paga o adicional.
-  /// Mesmo liberado, o conteúdo só aparece na seção dedicada — nunca se mistura
-  /// às trilhas de destaque, busca ou perfil infantil.
+  /// Só pode existir uma playlist com isto em verdadeiro. O acervo mora nela;
+  /// permissões por cliente (módulo adulto, categorias travadas) ficam no
+  /// usuário. Mantemos `userId` por compatibilidade com o painel antigo — ele
+  /// aponta para quem cadastrou a lista, não para o dono exclusivo do conteúdo.
+  isSystem Boolean @default(false)
+
+  /// Legado: o módulo adulto agora mora em `User.adultUnlocked`.
+  /// Mantido para o backfill e para o código antigo até a virada completa.
   adultUnlocked Boolean @default(false)
 
   syncStatus     M3uSyncStatus @default(PENDING)
@@ -619,6 +632,42 @@ model M3uPlaylist {
 
   @@index([syncStatus])
   @@index([nextSyncAt])
+  @@index([isSystem])
+}
+
+/// Categoria que o admin ocultou PARA ESTE CLIENTE no catálogo compartilhado.
+///
+/// Antes a trava gravava `M3uGroup.isHidden`, o que esconderia a categoria de
+/// todo mundo. Com o acervo único, a trava precisa ser por assinante.
+model UserCategoryLock {
+  id       String @id @default(cuid())
+  userId   String
+  category String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
+}
+
+/// Favorito IPTV por perfil.
+///
+/// `M3uChannel.isFavorite` era um booleano no canal: o segundo assinante
+/// herdaria (ou apagaria) o favorito do primeiro. Agora o coração mora no
+/// perfil, como a watchlist de VOD.
+model ChannelFavorite {
+  id        String   @id @default(cuid())
+  profileId String
+  channelId String
+  createdAt DateTime @default(now())
+
+  profile Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  channel M3uChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, channelId])
+  @@index([channelId])
 }
 
 model M3uGroup {
@@ -683,6 +732,7 @@ model M3uChannel {
   playlist M3uPlaylist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   group    M3uGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
   progress WatchProgress[]
+  favorites ChannelFavorite[]
 
   @@index([playlistId, groupId])
   @@index([playlistId, isFavorite])

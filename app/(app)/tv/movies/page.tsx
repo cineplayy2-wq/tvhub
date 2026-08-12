@@ -9,7 +9,7 @@ import { Rail } from "@/components/iptv/rail";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { FILTER_GROUPS, filterWhere, getFilterCounts } from "@/lib/queries/filters";
 import {
   cachedRow,
@@ -34,12 +34,17 @@ export default async function MoviesHubPage({
   searchParams: { q?: string; page?: string; sub?: string; f?: string };
 }) {
   const user = await requireUser();
-  const playlist = await getViewablePlaylist(user.id);
+  const [playlist, profile] = await Promise.all([
+    getViewablePlaylist(user.id),
+    getActiveProfile(user.id),
+  ]);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
+  if (playlist.lockedCategories.includes("movies")) notFound();
 
   const playlistId = playlist.id;
+  const profileId = profile?.id ?? null;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const activeFilters = (searchParams.f ?? "").split(",").filter(Boolean);
   const isBrowsing =
@@ -61,6 +66,8 @@ export default async function MoviesHubPage({
       search: searchParams.q,
       page,
       pageSize: 42,
+      lockedCategories: playlist.lockedCategories,
+      profileId,
     }),
     isBrowsing
       ? cachedRow(`${playlistId}:m-releases`, async () =>

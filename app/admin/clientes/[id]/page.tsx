@@ -178,54 +178,29 @@ export default async function CustomerDetailPage({
           </div>
         </section>
 
-        {/* ---------- IPTV / M3U ---------- */}
         <section className="rounded-xl border border-border/80 bg-surface/50 p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Lista IPTV / M3U
+              IPTV — permissões do cliente
             </h2>
             <Link
               href={`/admin/iptv/${customer.id}`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-surface-hover"
             >
-              <Database className="h-3.5 w-3.5" /> Configurar Lista →
+              <Database className="h-3.5 w-3.5" /> Módulo +18 e categorias →
             </Link>
           </div>
 
-          {customer.m3uPlaylist ? (
-            <dl className="space-y-3 text-sm">
-              <Row label="Nome da Lista" value={customer.m3uPlaylist.label} />
-              <Row label="Total de Canais/VOD" value={customer.m3uPlaylist.totalChannels.toLocaleString("pt-BR")} />
-              <Row label="Total de Grupos" value={String(customer.m3uPlaylist.totalGroups)} />
-              <Row
-                label="Status de Sincronização"
-                value={
-                  customer.m3uPlaylist.syncStatus === "SYNCED"
-                    ? "✓ Atualizada"
-                    : customer.m3uPlaylist.syncStatus === "SYNCING"
-                      ? "⏳ Sincronizando..."
-                      : "✕ Erro"
-                }
-              />
-              <Row
-                label="Última Atualização"
-                value={
-                  customer.m3uPlaylist.lastSyncAt
-                    ? formatDate(customer.m3uPlaylist.lastSyncAt)
-                    : "Nunca"
-                }
-              />
-              {customer.m3uPlaylist.lastSyncError && (
-                <div className="mt-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-300">
-                  <span className="font-bold">Erro:</span> {customer.m3uPlaylist.lastSyncError}
-                </div>
-              )}
-            </dl>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Este cliente ainda não tem uma lista M3U cadastrada.
-            </p>
-          )}
+          <dl className="space-y-3 text-sm">
+            <Row
+              label="Módulo adulto"
+              value={customer.adultUnlocked ? "Liberado" : "Bloqueado"}
+            />
+            <Row
+              label="Catálogo"
+              value="Compartilhado — veja /admin/iptv para fontes e sync"
+            />
+          </dl>
         </section>
 
         {/* ---------- Sessões de Reprodução Recentes ---------- */}
