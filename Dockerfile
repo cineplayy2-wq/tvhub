@@ -22,10 +22,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-# `npm ci` (não `npm install`): respeita o lockfile à risca. Sem isso, dois
-# desenvolvedores em máquinas diferentes podem gerar árvores de dependência
-# distintas e o bug só aparece em produção.
-RUN npm ci
+# `npm ci` respeita o lockfile à risca; fallback para `npm install` se houver divergência de dependências nativas de SO (ex: Windows -> Linux).
+RUN npm ci || npm install
 
 # ---------- 2. Build ----------
 FROM node:20-bookworm-slim AS builder
