@@ -530,14 +530,23 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
     const newChannelsToInsert: Array<any> = [];
 
     /**
-     * Canais preservados que ainda não têm `nameKey`.
+     * Canais preservados: chave de nome e endereço vindos da lista nova.
      *
-     * A coluna é nova: as linhas gravadas antes dela estão com NULL, e sem
-     * chave elas não casam com a lista secundária — nem para failover nem para
-     * a união. Como o ID é preservado, uma reimportação sozinha não corrige;
-     * é preciso preencher explicitamente.
+     * A chave entra aqui porque a coluna é recente — as linhas gravadas antes
+     * dela estão com NULL e, sem chave, não casam com a lista secundária, nem
+     * para reserva nem para a união. Como o ID é preservado, uma reimportação
+     * sozinha não corrigia; era preciso preencher explicitamente.
+     *
+     * O endereço entra por um motivo mais sério. Até aqui, canal já conhecido
+     * só tinha a chave gravada: a `streamUrl` era escrita no dia em que ele
+     * nasceu e nunca mais revista. Quando o provedor trocava de servidor —
+     * coisa que ele faz sem avisar —, o catálogo inteiro continuava apontando
+     * para o endereço velho, e a sincronização seguinte não desfazia isso
+     * porque o casamento por nome dava certo e o registro era considerado em
+     * dia. Foi assim que sobraram no ar dois servidores aposentados: um
+     * devolvendo 404 em tudo e outro que o DNS já nem resolvia.
      */
-    const chavesAtrasadas: Array<[string, string]> = [];
+    const preservados: Array<[string, string, string]> = [];
 
     for (let idx = 0; idx < incomingChannels.length; idx++) {
       const ch = incomingChannels[idx];
@@ -553,7 +562,7 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
         // NULL, "ainda falta chavear" e "não dá para chavear" virariam a mesma
         // coisa — e a trava da união, que olha justamente para o NULL, ficaria
         // presa para sempre por causa de algumas dezenas de linhas.
-        chavesAtrasadas.push([existingId, nameKey ?? ""]);
+        preservados.push([existingId, nameKey ?? "", ch.streamUrl]);
       } else {
         newChannelsToInsert.push({
           playlistId: playlist.id,
@@ -575,17 +584,25 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
       }
     }
 
-    // Preenche a chave dos canais preservados que ainda estão sem ela.
-    for (let i = 0; i < chavesAtrasadas.length; i += 1000) {
-      const bloco = chavesAtrasadas.slice(i, i + 1000);
-      const values = Prisma.join(bloco.map(([id, k]) => Prisma.sql`(${id}, ${k})`));
-      await prisma.$executeRaw`
+    // Põe em dia a chave e o endereço dos canais que já existiam.
+    let enderecosTrocados = 0;
+    for (let i = 0; i < preservados.length; i += 1000) {
+      const bloco = preservados.slice(i, i + 1000);
+      const values = Prisma.join(
+        bloco.map(([id, k, url]) => Prisma.sql`(${id}, ${k}, ${url})`),
+      );
+      enderecosTrocados += await prisma.$executeRaw`
         UPDATE "M3uChannel" AS c
-        SET "nameKey" = v.chave
-        FROM (VALUES ${values}) AS v(id, chave)
-        WHERE c.id = v.id AND c."nameKey" IS DISTINCT FROM v.chave
+        SET "nameKey" = v.chave,
+            "streamUrl" = v.url
+        FROM (VALUES ${values}) AS v(id, chave, url)
+        WHERE c.id = v.id
+          AND (c."nameKey" IS DISTINCT FROM v.chave OR c."streamUrl" IS DISTINCT FROM v.url)
       `;
       await yieldToEventLoop(15);
+    }
+    if (enderecosTrocados > 0) {
+      console.log(`[m3u] ${enderecosTrocados} canais existentes tiveram chave/endereco atualizados`);
     }
 
     // Inserir novos canais em lotes leves de 1.000 itens com pausa de Event Loop
