@@ -236,6 +236,49 @@ export async function alternarModuloAdultoAction(userId: string) {
   return { liberado };
 }
 
+/**
+ * Grava a linha IPTV (user/senha do provedor) DESTE cliente.
+ *
+ * Sem isto ele toca com a conta do catálogo e estoura o limite de conexões
+ * do painel quando outra pessoa também estiver assistindo.
+ */
+export async function salvarLinhaIptvAction(
+  userId: string,
+  username: string,
+  password: string,
+): Promise<{ ok: true } | { erro: string }> {
+  const admin = await requireAdmin();
+
+  const user = username.trim();
+  const pass = password.trim();
+  if (!user || !pass) {
+    return { erro: "Informe usuário e senha da linha IPTV deste cliente." };
+  }
+
+  const existe = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!existe) return { erro: "Cliente não encontrado" };
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { iptvUsername: user, iptvPassword: pass },
+  });
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "iptv.line.update",
+    targetType: "User",
+    targetId: userId,
+    metadata: { iptvUsername: user },
+  });
+
+  revalidatePath(`/admin/iptv/${userId}`);
+  revalidatePath(`/admin/clientes/${userId}`);
+  return { ok: true };
+}
+
 export async function deleteM3uPlaylistAction(userId: string) {
   const admin = await requireAdmin();
 

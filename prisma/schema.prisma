@@ -52,6 +52,15 @@ model User {
   /// adulto para todo mundo.
   adultUnlocked Boolean @default(false)
 
+  /// Linha IPTV DESTE assinante no provedor (Xtream/M3U).
+  ///
+  /// O catálogo é compartilhado; a credencial não. Sem isto, todo mundo
+  /// tocaria com o mesmo usuário do painel, e o limite de 2 conexões do
+  /// servidor cairia na terceira pessoa. Na hora do play o proxy troca o
+  /// user/senha da URL do catálogo por estes.
+  iptvUsername String?
+  iptvPassword String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

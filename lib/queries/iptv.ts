@@ -293,12 +293,11 @@ export async function getPlaylistChannels({
   }
 
   if (category !== "adult") {
+    const bloqueadas = ["adult", ...lockedCategories.filter((c) => c !== "adult")];
     where.group = {
       ...((where.group as Prisma.M3uGroupWhereInput) || {}),
-      category: {
-        notIn: ["adult", ...lockedCategories.filter((c) => c !== "adult")],
-      },
       isHidden: false,
+      OR: [{ category: { notIn: bloqueadas } }, { category: null }],
     };
   }
 

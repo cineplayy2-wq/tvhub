@@ -65,20 +65,21 @@ export default async function WatchChannelPage({
     notFound();
   }
 
-  const playlistDoSistema =
-    "isSystem" in (channel.playlist as { isSystem?: boolean })
-      ? Boolean((channel.playlist as { isSystem?: boolean }).isSystem)
-      : false;
+  // Catálogo compartilhado: qualquer assinante autenticado assiste.
+  // A checagem antiga (playlist.userId === user.id) 404 em todo mundo que
+  // não fosse o dono técnico da lista — e o player simplesmente não abria.
+  const systemId =
+    channel.playlist.isSystem
+      ? channel.playlist.id
+      : (
+          await prisma.m3uPlaylist.findFirst({
+            where: { isSystem: true },
+            select: { id: true },
+          })
+        )?.id;
 
-  if (!playlistDoSistema && channel.playlist.userId !== user.id) {
-    // Fallback legado: playlist ainda amarrada a um usuário antigo.
-    const system = await prisma.m3uPlaylist.findFirst({
-      where: { isSystem: true },
-      select: { id: true },
-    });
-    if (!system || channel.playlistId !== system.id) {
-      notFound();
-    }
+  if (channel.playlistId !== systemId && channel.playlist.userId !== user.id) {
+    notFound();
   }
 
   let isFavorite = false;

@@ -5,6 +5,11 @@ import https from "node:https";
 import { Readable, PassThrough } from "node:stream";
 
 import { auth } from "@/auth";
+import {
+  credencialDoUsuario,
+  paresDoCatalogo,
+  reescreverCredencial,
+} from "@/lib/iptv/credentials";
 import { reconcileContentRange } from "@/lib/iptv/range";
 import { assertPublicStreamUrl } from "@/lib/iptv/ssrf-guard";
 
@@ -347,8 +352,28 @@ export async function GET(request: NextRequest) {
     return new NextResponse("URL do stream não informada", { status: 400 });
   }
 
+  /**
+   * Cada assinante toca com a PRÓPRIA linha no provedor.
+   *
+   * O catálogo guarda URLs da conta usada na importação. Sem esta troca,
+   * 3 clientes assistindo ao mesmo tempo estouram o limite de 2 conexões
+   * daquela conta — e o sintoma é "não roda nada".
+   */
+  let urlPedido = targetUrl;
+  if (session?.user?.id) {
+    try {
+      const [viewer, catalogo] = await Promise.all([
+        credencialDoUsuario(session.user.id),
+        paresDoCatalogo(),
+      ]);
+      urlPedido = reescreverCredencial(targetUrl, viewer, catalogo);
+    } catch (erro) {
+      console.warn("[stream-proxy] falha ao reescrever credencial:", erro);
+    }
+  }
+
   try {
-    assertPublicStreamUrl(targetUrl);
+    assertPublicStreamUrl(urlPedido);
   } catch (error) {
     return new NextResponse(
       error instanceof Error ? error.message : "Destino bloqueado",
@@ -358,7 +383,7 @@ export async function GET(request: NextRequest) {
 
   let hostAlvo = "";
   try {
-    hostAlvo = new URL(targetUrl).hostname;
+    hostAlvo = new URL(urlPedido).hostname;
   } catch {}
 
   // Já sabemos que este nome não resolve: responder na hora deixa o player
@@ -377,7 +402,7 @@ export async function GET(request: NextRequest) {
 
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       try {
-        upstream = await fetchUpstream(targetUrl, rangeHeader);
+        upstream = await fetchUpstream(urlPedido, rangeHeader);
         break;
       } catch (erro) {
         ultimoErro = erro;
@@ -387,7 +412,7 @@ export async function GET(request: NextRequest) {
         }
         if (!ehFalhaPassageira(erro)) throw erro;
         try {
-          dnsCache.delete(new URL(targetUrl).hostname);
+          dnsCache.delete(new URL(urlPedido).hostname);
         } catch {}
         await new Promise((r) => setTimeout(r, 200 * (tentativa + 1)));
       }
@@ -400,8 +425,8 @@ export async function GET(request: NextRequest) {
     let urlEfetiva = upstream.urlFinal;
     let statusCode = upstreamResponse.statusCode ?? 502;
 
-    if (statusCode === 404 && targetUrl.endsWith(".m3u8") && !forceRaw) {
-      const tsTarget = targetUrl.replace(/\.m3u8$/i, ".ts");
+    if (statusCode === 404 && urlPedido.endsWith(".m3u8") && !forceRaw) {
+      const tsTarget = urlPedido.replace(/\.m3u8$/i, ".ts");
       try {
         const tsUpstream = await fetchUpstream(tsTarget, rangeHeader);
         if (tsUpstream.res.statusCode && tsUpstream.res.statusCode < 400) {
@@ -432,7 +457,9 @@ export async function GET(request: NextRequest) {
      * que chega ao usuário é canal que demora a abrir e trava.
      */
     const encerrarUpstream = () => {
-      if (!upstreamResponse.destroyed) upstreamResponse.destroy();
+      try {
+        if (!upstreamResponse.destroyed) upstreamResponse.destroy();
+      } catch {}
     };
     request.signal.addEventListener("abort", encerrarUpstream, { once: true });
 
@@ -448,9 +475,9 @@ export async function GET(request: NextRequest) {
       !forceRaw &&
       (rawContentType.includes("mpegurl") ||
         rawContentType.includes("m3u8") ||
-        targetUrl.includes(".m3u8") ||
+        urlPedido.includes(".m3u8") ||
         urlEfetiva.includes(".m3u8") ||
-        targetUrl.endsWith(".m3u"));
+        urlPedido.endsWith(".m3u"));
 
     let peekResult: { isM3u8: boolean; manifestText?: string; peekBuffer?: Buffer } = { isM3u8: false };
 
@@ -546,10 +573,14 @@ export async function GET(request: NextRequest) {
 
     if (peekResult.peekBuffer && peekResult.peekBuffer.length > 0) {
       const pass = new PassThrough();
+      pass.on("error", () => {});
+      upstreamResponse.on("error", () => {});
       pass.write(peekResult.peekBuffer);
       upstreamResponse.resume();
       upstreamResponse.pipe(pass);
       finalNodeStream = pass;
+    } else {
+      upstreamResponse.on("error", () => {});
     }
 
     const webStream = Readable.toWeb(finalNodeStream) as ReadableStream;

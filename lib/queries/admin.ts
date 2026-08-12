@@ -199,6 +199,7 @@ export async function getCustomer(id: string) {
         },
       },
       adultUnlocked: true,
+      iptvUsername: true,
       profiles: {
         orderBy: { sortOrder: "asc" },
         select: {

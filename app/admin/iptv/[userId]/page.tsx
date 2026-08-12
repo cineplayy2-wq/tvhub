@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CategoryLockControls } from "@/components/admin/iptv/category-lock-controls";
+import { LinhaIptvForm } from "@/components/admin/iptv/linha-iptv-form";
 import { ModuloAdulto } from "@/components/admin/iptv/modulo-adulto";
 import { prisma } from "@/lib/prisma";
 import { getCustomer } from "@/lib/queries/admin";
@@ -50,7 +51,7 @@ export default async function IptvUserPage({
       getUserCategoryLocks(params.userId),
       prisma.user.findUnique({
         where: { id: params.userId },
-        select: { adultUnlocked: true },
+        select: { adultUnlocked: true, iptvUsername: true, iptvPassword: true },
       }),
     ]);
 
@@ -104,6 +105,12 @@ export default async function IptvUserPage({
                 {playlist._count.channels.toLocaleString("pt-BR")} canais
               </p>
             </div>
+
+            <LinhaIptvForm
+              userId={params.userId}
+              username={user?.iptvUsername ?? null}
+              hasPassword={Boolean(user?.iptvPassword)}
+            />
 
             <ModuloAdulto
               userId={params.userId}

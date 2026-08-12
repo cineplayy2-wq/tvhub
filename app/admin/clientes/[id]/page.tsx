@@ -197,8 +197,8 @@ export default async function CustomerDetailPage({
               value={customer.adultUnlocked ? "Liberado" : "Bloqueado"}
             />
             <Row
-              label="Catálogo"
-              value="Compartilhado — veja /admin/iptv para fontes e sync"
+              label="Linha IPTV"
+              value={customer.iptvUsername ? customer.iptvUsername : "Usa a conta do catálogo"}
             />
           </dl>
         </section>
