@@ -26,6 +26,14 @@ type PlayerState = "loading" | "playing" | "paused" | "stalled" | "error";
 const MAX_RETRIES = 3;
 
 /**
+ * Quantas vezes insistir na MESMA fonte antes de trocar.
+ *
+ * O provedor devolve 404 esporádico em URL boa: 1 em 20 requisições, medido.
+ * Duas repetições levam a chance de falsa falha de 5% para menos de 0,02%.
+ */
+const MAX_TENTATIVAS_MESMA_FONTE = 2;
+
+/**
  * Prazo para o primeiro quadro, por perfil de conexão.
  *
  * Existe porque canal morto no provedor não dá erro: ele responde HTTP 200 e
@@ -132,6 +140,12 @@ export function IptvPlayer({
   const [attempt, setAttempt] = useState(1);
   const [failoverCount, setFailoverCount] = useState(0);
 
+  /** Contador de insistências na fonte atual (ver tryNextSourceOrFail). */
+  const tentativasNaFonte = useRef(0);
+  const recargaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Muda para remontar o motor na MESMA URL — é o que materializa a repetição. */
+  const [recarga, setRecarga] = useState(0);
+
   // URL final de mídia enviada ao player
   const playableUrl = useProxyUrl
     ? `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}`
@@ -157,6 +171,30 @@ export function IptvPlayer({
   const tryNextSourceOrFail = useCallback(() => {
     networkRetryCount.current = 0;
 
+    /**
+     * Antes de trocar de fonte, INSISTE na mesma.
+     *
+     * O servidor de IPTV erra sozinho: medindo 20 requisições seguidas à mesma
+     * URL, uma voltou 404 e as outras dezenove vieram com vídeo. É soluço do
+     * provedor, não fonte quebrada.
+     *
+     * Sem esta insistência, cada soluço desses derrubava a reprodução — e pior:
+     * o player descia a lista inteira de variantes, cada uma sujeita ao mesmo
+     * soluço, até esgotar tudo e mostrar a tela de erro. Um canal perfeitamente
+     * bom virava "não reproduz". Com duas repetições, a chance de falsa falha
+     * cai de 5% para menos de 0,02%.
+     */
+    if (tentativasNaFonte.current < MAX_TENTATIVAS_MESMA_FONTE) {
+      tentativasNaFonte.current += 1;
+      setState("loading");
+      if (recargaTimer.current) clearTimeout(recargaTimer.current);
+      // Um respiro antes de repetir: bater na hora costuma pegar o mesmo erro.
+      recargaTimer.current = setTimeout(() => setRecarga((n) => n + 1), 1200);
+      return;
+    }
+
+    tentativasNaFonte.current = 0;
+
     // Se está na URL direta e falhou, tenta o proxy
     if (!useProxyUrl && activeStreamUrl.startsWith("http:")) {
       setUseProxyUrl(true);
@@ -179,6 +217,15 @@ export function IptvPlayer({
     }
     setFailoverCount((c) => c + 1);
   }, [currentStreamIndex, attempt, useProxyUrl, activeStreamUrl, allStreams.length]);
+
+  // Trocar de fonte zera a insistência: a contagem é por fonte, não global.
+  useEffect(() => {
+    tentativasNaFonte.current = 0;
+  }, [currentStreamIndex, useProxyUrl]);
+
+  useEffect(() => () => {
+    if (recargaTimer.current) clearTimeout(recargaTimer.current);
+  }, []);
 
   // Initialize HLS.js or Native Video Engine
   useEffect(() => {
@@ -358,6 +405,7 @@ export function IptvPlayer({
     profile,
     attempt,
     currentStreamIndex,
+    recarga,
     tryNextSourceOrFail,
   ]);
 
@@ -397,6 +445,8 @@ export function IptvPlayer({
 
     const onPlaying = () => {
       clearStall();
+      // Tocou: o crédito de insistência volta cheio para o próximo soluço.
+      tentativasNaFonte.current = 0;
       setState("playing");
 
       if (initialPosition > 10 && !hasResumedRef.current) {

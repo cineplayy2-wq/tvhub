@@ -40,11 +40,15 @@ COPY server-entry.js ./server-entry.js
 # só aparece na primeira query, em produção.
 COPY prisma-client/ ./node_modules/.prisma/client/
 
-# CLI do Prisma + migrations: o deploy roda `migrate deploy` com esta mesma
-# imagem antes de trocar o container, então schema e código sobem juntos.
-COPY migrations/ ./prisma/migrations/
-COPY prisma-cli/prisma/  ./node_modules/prisma/
-COPY prisma-cli/engines/ ./node_modules/@prisma/engines/
+# O CLI do Prisma NÃO entra nesta imagem, ao contrário do Dockerfile da raiz.
+#
+# Lá o `npm ci` roda no Linux do GitHub Actions, então @prisma/engines traz o
+# schema-engine certo e a própria imagem aplica as migrations. Aqui o bundle
+# vem de uma máquina Windows, onde esse pacote contém só
+# schema-engine-windows.exe — 117 MB que não executam num container Linux.
+#
+# Por isso o deploy.ps1 aplica as migrations num container node:20 avulso, que
+# baixa o CLI para Linux na hora. Ver o passo 5 daquele script.
 
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0

@@ -68,13 +68,17 @@ Copy-Item ".\prisma\schema.prisma"      -Destination "$stage\schema.prisma"
 # corta o video de quem esta assistindo - justamente o que este deploy evita.
 Copy-Item ".\server-entry.js" -Destination "$stage\server-entry.js"
 
-# Migrations + CLI do Prisma: o pipeline roda `migrate deploy` antes de trocar
-# o container, e o caminho de emergencia precisa fazer o mesmo. Sem isto, uma
-# correcao urgente que dependa de coluna nova sobe e quebra na primeira query.
+# Migrations: o pipeline roda `migrate deploy` antes de trocar o container, e o
+# caminho de emergencia precisa fazer o mesmo. Sem isto, uma correcao urgente
+# que dependa de coluna nova sobe e quebra na primeira query.
+#
+# So os arquivos .sql viajam. O CLI do Prisma NAO vai junto, de proposito:
+# o node_modules desta maquina foi instalado no Windows, entao
+# @prisma/engines contem apenas schema-engine-windows.exe e a .dll do
+# Windows - 117 MB que nao executam dentro de um container Linux. Mandar isso
+# fazia o `migrate deploy` morrer com "Cannot find module '@prisma/debug'".
+# O passo 5 baixa o CLI certo, para Linux, na hora.
 Copy-Item ".\prisma\migrations" -Destination "$stage\migrations" -Recurse
-New-Item -ItemType Directory -Force -Path "$stage\prisma-cli" | Out-Null
-Copy-Item ".\node_modules\prisma"          -Destination "$stage\prisma-cli\prisma"  -Recurse
-Copy-Item ".\node_modules\@prisma\engines" -Destination "$stage\prisma-cli\engines" -Recurse
 
 # Engine do Prisma: so a de Linux. A .dll do Windows e peso morto na imagem.
 New-Item -ItemType Directory -Force -Path "$stage\prisma-client" | Out-Null
@@ -102,7 +106,7 @@ Write-Host "==> Montando a imagem na VPS..." -ForegroundColor Cyan
 Invoke-Remote @"
 set -e
 cd /opt/tvhub/build
-rm -rf standalone static public prisma-client prisma-cli migrations Dockerfile schema.prisma server-entry.js
+rm -rf standalone static public prisma-client migrations Dockerfile schema.prisma server-entry.js
 tar -xzf tvhub-bundle.tgz
 docker build -t $Image .
 echo "imagem $Image montada"
@@ -112,7 +116,30 @@ echo "imagem $Image montada"
 # Antes da troca do container, e so adicionando colunas: durante o rolling
 # update as duas versoes do codigo rodam juntas e o banco atende as duas.
 # Ver docs/REGRAS.md secao 6.
-# (Migrations de colunas sao sincronizadas automaticamente via SQL na VPS no passo 6)
+#
+# Roda num container node:20 avulso, nao na imagem do app. Motivo: o CLI do
+# Prisma precisa do schema-engine compilado para Linux, e o node_modules desta
+# maquina so tem o binario do Windows. O `npx` baixa o certo na hora.
+#
+# A versao vem do node_modules local em vez de ser escrita aqui: assim o CLI
+# que aplica a migration e sempre o mesmo que gerou o schema, e um `npm update`
+# no futuro nao deixa este arquivo apontando para uma versao velha.
+Write-Host "==> Aplicando migrations..." -ForegroundColor Cyan
+$prismaVersao = (Get-Content ".\node_modules\prisma\package.json" -Raw | ConvertFrom-Json).version
+Write-Host "    prisma $prismaVersao"
+Invoke-Remote @"
+set -e
+cd /opt/tvhub
+set -a; . ./.env; set +a
+DB="postgresql://tvhub:`${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
+docker run --rm --network tvhub_tvhub-internal \
+  -v /opt/tvhub/build/migrations:/app/prisma/migrations:ro \
+  -v /opt/tvhub/build/schema.prisma:/app/prisma/schema.prisma:ro \
+  -w /app \
+  -e DATABASE_URL="`${DB}" -e DIRECT_DATABASE_URL="`${DB}" \
+  node:20-bookworm-slim \
+  sh -c 'apt-get update -qq && apt-get install -y -qq openssl >/dev/null 2>&1; npx --yes prisma@$prismaVersao migrate deploy'
+"@
 
 # ---------- 6. Rolling update ----------
 Write-Host "==> Trocando o container (start-first, sem queda)..." -ForegroundColor Cyan
