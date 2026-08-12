@@ -57,20 +57,21 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    const playableSrc =
+      src.startsWith("http:") || (src.startsWith("https:") && !src.includes(location?.host ?? ""))
+        ? `/api/iptv/stream?url=${encodeURIComponent(src)}`
+        : src;
+
     const isHls = /\.m3u8($|\?)/i.test(src);
 
-    // Safari e iOS tocam HLS nativamente; carregar hls.js ali quebra o AirPlay
-    // e o player nativo do iPhone. Só importamos a lib quando ela é necessária.
     if (!isHls || video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
+      video.src = playableSrc;
       return;
     }
 
     let destroyed = false;
     let instance: { destroy: () => void } | null = null;
 
-    // Import dinâmico: hls.js pesa ~300 kB e não deve entrar no bundle de
-    // quem está só navegando pelo catálogo.
     import("hls.js").then(({ default: Hls }) => {
       if (destroyed || !Hls.isSupported()) {
         if (!destroyed) setError("Seu navegador não suporta este formato.");
@@ -85,7 +86,7 @@ export function VideoPlayer({
         maxBufferLength: 15,
         maxMaxBufferLength: 30,
       });
-      hls.loadSource(src);
+      hls.loadSource(playableSrc);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_evt, data) => {
         if (data.fatal) setError("Falha ao carregar o vídeo.");

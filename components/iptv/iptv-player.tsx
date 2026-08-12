@@ -146,10 +146,14 @@ export function IptvPlayer({
   /** Muda para remontar o motor na MESMA URL — é o que materializa a repetição. */
   const [recarga, setRecarga] = useState(0);
 
-  // URL final de mídia enviada ao player
-  const playableUrl = useProxyUrl
-    ? `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}`
-    : activeStreamUrl;
+  // URL final de mídia enviada ao player:
+  // Em produção (HTTPS), a URL de stream IPTV deve SEMPRE passar pelo proxy
+  // para evitar bloqueio de Mixed Content (HTTP em HTTPS) e resolver CORS/User-Agent.
+  const playableUrl = !activeStreamUrl
+    ? ""
+    : activeStreamUrl.startsWith("/api/")
+    ? activeStreamUrl
+    : `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}`;
 
   // Detect Connection Speed
   useEffect(() => {

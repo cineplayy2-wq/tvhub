@@ -205,7 +205,9 @@ export async function getPlaylistChannels({
     ];
   }
 
-  const [items, total] = await prisma.$transaction([
+  const totalCacheKey = `channels_count:${playlistId}:${category ?? "all"}:${search ?? "all"}`;
+
+  const [items, total] = await Promise.all([
     prisma.m3uChannel.findMany({
       where,
       orderBy: { sortOrder: "asc" },
@@ -224,7 +226,7 @@ export async function getPlaylistChannels({
         group: { select: { name: true, slug: true, category: true } },
       },
     }),
-    prisma.m3uChannel.count({ where }),
+    cached(totalCacheKey, TTL.playlist, () => prisma.m3uChannel.count({ where })),
   ]);
 
   return {
