@@ -120,14 +120,6 @@ export function IptvPlayer({
   /** MPEG-TS cru (sem manifesto HLS): exige mpegts.js, ninguém mais lê isso. */
   const isRawTs = /\.ts(\?|$)/i.test(activeStreamUrl);
 
-  // Se o site rodar em HTTPS e a fonte IPTV for HTTP, usamos o proxy de cara para evitar bloqueio de Mixed Content
-  const [useProxyUrl, setUseProxyUrl] = useState<boolean>(() => {
-    if (typeof window !== "undefined" && window.location.protocol === "https:") {
-      return activeStreamUrl.startsWith("http:");
-    }
-    return false;
-  });
-
   const [state, setState] = useState<PlayerState>("loading");
   const [showDebouncedSpinner, setShowDebouncedSpinner] = useState(false);
   const [profile, setProfile] = useState<ConnectionProfile>("fair");
@@ -214,20 +206,10 @@ export function IptvPlayer({
 
     tentativasNaFonte.current = 0;
 
-    // Se está na URL direta e falhou, tenta o proxy
-    if (!useProxyUrl && activeStreamUrl.startsWith("http:")) {
-      setUseProxyUrl(true);
-      setState("loading");
-      setTimeout(() => {
-        failoverEmVoo.current = false;
-      }, 50);
-      return;
-    }
-
-    // Se o proxy também falhar, vai para a próxima variante de stream
+    // Toda fonte já sai pelo proxy, então não há degrau "direto → proxy":
+    // a fonte esgotada passa direto para a próxima variante de stream.
     if (currentStreamIndex < allStreams.length - 1) {
       setCurrentStreamIndex((prev) => prev + 1);
-      setUseProxyUrl(typeof window !== "undefined" && window.location.protocol === "https:");
       setState("loading");
     } else if (attempt < MAX_RETRIES) {
       setProfile((prev) => escalate(prev));
@@ -240,12 +222,12 @@ export function IptvPlayer({
     setTimeout(() => {
       failoverEmVoo.current = false;
     }, 50);
-  }, [currentStreamIndex, attempt, useProxyUrl, activeStreamUrl, allStreams.length]);
+  }, [currentStreamIndex, attempt, allStreams.length]);
 
   // Trocar de fonte zera a insistência: a contagem é por fonte, não global.
   useEffect(() => {
     tentativasNaFonte.current = 0;
-  }, [currentStreamIndex, useProxyUrl]);
+  }, [currentStreamIndex]);
 
   useEffect(() => () => {
     if (recargaTimer.current) clearTimeout(recargaTimer.current);
@@ -621,10 +603,14 @@ export function IptvPlayer({
 
   // Manual Retry
   const handleManualRetry = () => {
+    tentativasNaFonte.current = 0;
+    failoverEmVoo.current = false;
     setAttempt(1);
-    setUseProxyUrl(typeof window !== "undefined" && window.location.protocol === "https:");
     setCurrentStreamIndex(0);
     setState("loading");
+    // Se já estava na primeira fonte, nada acima mudou: é o `recarga` que
+    // obriga o motor a remontar em vez de deixar a tela de erro congelada.
+    setRecarga((n) => n + 1);
   };
 
   return (
