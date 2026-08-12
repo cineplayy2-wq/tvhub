@@ -62,8 +62,20 @@ const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
   const guardado = dnsCache.get(hostname);
 
   if (guardado && guardado.ate > agora) {
+    /**
+     * Entrada negativa é guardada com endereço vazio (ver o `catch` abaixo).
+     * Devolvê-la como sucesso entregava string vazia ao socket, que morria com
+     * "Invalid IP address" — um erro que não diz nada sobre o DNS e manda o
+     * chamador procurar problema no lugar errado.
+     */
+    const erroCache: NodeJS.ErrnoException | null = guardado.address
+      ? null
+      : Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), {
+          code: "ENOTFOUND",
+        });
+
     process.nextTick(() =>
-      responderLookup(callback, null, guardado.address, guardado.family, querLista),
+      responderLookup(callback, erroCache, guardado.address, guardado.family, querLista),
     );
     return;
   }
@@ -117,16 +129,57 @@ const agenteHttps = new https.Agent({
   timeout: 30_000,
 });
 
-/** Falha temporária de DNS ou de rede: insistir resolve, desistir não. */
+/**
+ * Falha temporária de DNS ou de rede: insistir resolve, desistir não.
+ *
+ * `ENOTFOUND` e `ENODATA` saíram desta lista de propósito. Eles não são
+ * soluço: são o DNS afirmando que aquele nome não tem endereço. Insistir três
+ * vezes com espera entre elas só gasta tempo para chegar na mesma resposta.
+ * `EAI_AGAIN`, esse sim, é falha temporária de resolução e continua valendo a
+ * pena repetir.
+ */
 function ehFalhaPassageira(erro: unknown) {
   const codigo = (erro as NodeJS.ErrnoException)?.code;
   return (
     codigo === "EAI_AGAIN" ||
-    codigo === "ENOTFOUND" ||
     codigo === "ECONNRESET" ||
     codigo === "ETIMEDOUT" ||
     codigo === "ECONNREFUSED"
   );
+}
+
+/** O DNS afirma que este nome não tem endereço — não é lentidão, é ausência. */
+function ehHostInexistente(erro: unknown) {
+  const codigo = (erro as NodeJS.ErrnoException)?.code;
+  return codigo === "ENOTFOUND" || codigo === "ENODATA";
+}
+
+/**
+ * Domínios que o DNS já disse não existir.
+ *
+ * Serve para um caso concreto e caro: quando um dos provedores sai do ar, o
+ * catálogo fica cheio de endereços apontando para um domínio que não resolve
+ * mais — inclusive como reserva de canais cuja URL principal está boa. O
+ * player então percorre a escada inteira de reservas, e cada degrau pagava
+ * resolução de DNS antes de falhar. Multiplicado pelas repetições por fonte,
+ * um canal morto consumia dezenas de segundos antes de mostrar qualquer coisa.
+ *
+ * Guardando o nome por alguns minutos, o segundo degrau em diante falha na
+ * hora e o player chega rápido na fonte que presta.
+ */
+const CACHE_HOST_MORTO_MS = 5 * 60 * 1000;
+const hostsMortos = new Map<string, number>();
+
+function marcarHostMorto(hostname: string) {
+  hostsMortos.set(hostname, Date.now() + CACHE_HOST_MORTO_MS);
+}
+
+function hostEstaMorto(hostname: string) {
+  const ate = hostsMortos.get(hostname);
+  if (ate === undefined) return false;
+  if (ate > Date.now()) return true;
+  hostsMortos.delete(hostname);
+  return false;
 }
 
 /**
@@ -303,6 +356,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  let hostAlvo = "";
+  try {
+    hostAlvo = new URL(targetUrl).hostname;
+  } catch {}
+
+  // Já sabemos que este nome não resolve: responder na hora deixa o player
+  // seguir para a próxima fonte sem pagar DNS de novo.
+  if (hostAlvo && hostEstaMorto(hostAlvo)) {
+    return new NextResponse(`Servidor de origem indisponível: ${hostAlvo}`, {
+      status: 502,
+    });
+  }
+
   try {
     const rangeHeader = request.headers.get("range");
 
@@ -315,6 +381,10 @@ export async function GET(request: NextRequest) {
         break;
       } catch (erro) {
         ultimoErro = erro;
+        if (ehHostInexistente(erro)) {
+          if (hostAlvo) marcarHostMorto(hostAlvo);
+          throw erro;
+        }
         if (!ehFalhaPassageira(erro)) throw erro;
         try {
           dnsCache.delete(new URL(targetUrl).hostname);
