@@ -100,6 +100,46 @@ export type BufferPlan = {
  * 4 MB levariam oito. Quem protege da engasgada é o colchão, que se forma
  * enquanto assiste e não custa espera nenhuma no início.
  */
+/**
+ * Perfil para dimensionar BUFFER — não para escolher qualidade.
+ *
+ * As duas decisões vinham do mesmo `detectConnectionProfile()`, e elas têm
+ * custos opostos quando erram:
+ *
+ *   - errar a QUALIDADE para baixo é definitivo: o provedor não manda stream
+ *     adaptativo, então o assinante fica em SD a sessão inteira. Por isso essa
+ *     decisão é otimista e ignora `downlink`, que subestima no instante em que
+ *     a página abre.
+ *   - errar o BUFFER para baixo é travamento. E errar para cima custa só um
+ *     pouco mais de espera no início.
+ *
+ * Ou seja: na dúvida, qualidade alta e buffer generoso. Tratar as duas com o
+ * mesmo número fazia uma pagar o preço da outra — foi o que encolheu o buffer
+ * no celular quando a detecção de qualidade ficou otimista.
+ *
+ * `saveData` e rede celular puxam para o conservador porque ali a variação é
+ * real: mesmo um 4G rápido oscila de um jeito que fibra não oscila.
+ */
+export function detectBufferProfile(): ConnectionProfile {
+  const info = networkInfo();
+  if (!info) return "fair";
+
+  if (info.saveData) return "poor";
+
+  const effective = info.effectiveType ?? "";
+  if (effective === "slow-2g" || effective === "2g") return "poor";
+  if (effective === "3g") return "poor";
+
+  const downlink = info.downlink;
+  if (typeof downlink === "number" && downlink < 5) return "fair";
+
+  // Celular: mesmo rápido, oscila mais que rede fixa. Colchão maior.
+  const tipo = (info as { type?: string }).type;
+  if (tipo === "cellular") return "fair";
+
+  return "good";
+}
+
 export function bufferPlanFor(profile: ConnectionProfile): BufferPlan {
   switch (profile) {
     case "poor":

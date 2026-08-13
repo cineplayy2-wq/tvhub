@@ -22,6 +22,7 @@ import {
 } from "@/lib/iptv/quality";
 import {
   bufferPlanFor,
+  detectBufferProfile,
   detectConnectionProfile,
   escalate,
   type ConnectionProfile,
@@ -124,7 +125,14 @@ export function IptvPlayer({
    * perfil não aparece em nada renderizado, então não há divergência de
    * hidratação possível.
    */
-  const [profile, setProfile] = useState<ConnectionProfile>(detectConnectionProfile);
+  /**
+   * `detectBufferProfile`, não `detectConnectionProfile`: este estado dimensiona
+   * BUFFER, e buffer generoso demais custa espera, enquanto buffer curto demais
+   * custa travada. A escolha de QUALIDADE logo abaixo continua com a detecção
+   * otimista, porque lá o erro para baixo prende o assinante em SD a sessão
+   * inteira.
+   */
+  const [profile, setProfile] = useState<ConnectionProfile>(detectBufferProfile);
 
   /**
    * Qualidade em uso, escolhida só pelo player — não há troca manual.
