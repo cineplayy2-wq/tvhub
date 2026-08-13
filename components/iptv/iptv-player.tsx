@@ -61,10 +61,50 @@ const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
 
 
 /** Gera todas as variantes possíveis de stream para reprodução (URL original sempre em 1º lugar para zero delay) */
+/**
+ * iOS não toca Matroska (`.mkv`) nem AVI — nem no Safari, nem em nenhum outro
+ * navegador do iPhone, porque todos usam o motor do sistema. O suporte da
+ * Apple é MP4/M4V/MOV e HLS, e não há biblioteca que resolva: container não é
+ * codec, e `<video>` simplesmente recusa o arquivo.
+ *
+ * Reconhecer o aparelho pelo user agent é frágil em geral, mas aqui o alvo é
+ * exatamente "todo navegador rodando no iOS", que é o que essa checagem
+ * acerta. `MacIntel` com toque é o iPad, que se apresenta como desktop desde
+ * o iPadOS 13.
+ */
+function ehIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return (
+    /iPhone|iPod|iPad/i.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
 function buildStreamVariants(rawUrl: string, isLive = true): string[] {
   if (!rawUrl) return [];
   const isProgressive = /\.(mp4|mkv|avi|webm)/i.test(rawUrl);
-  if (isProgressive) return [rawUrl];
+
+  /**
+   * Filme e série NÃO tinham variante nenhuma: `return [rawUrl]` significa uma
+   * fonte só, sem segunda chance. No iPhone, um título `.mkv` batia no
+   * `<video>`, era recusado pelo container, e o failover não tinha para onde
+   * ir — é o "nem abre".
+   *
+   * O painel Xtream serve o mesmo id em mais de um container, então trocar a
+   * extensão costuma devolver o mesmo filme num formato que o aparelho aceita.
+   * No iOS a versão `.mp4` vai na FRENTE, porque ali o `.mkv` é recusa certa e
+   * tentá-lo primeiro só gasta um ciclo de failover na cara do assinante.
+   */
+  if (isProgressive) {
+    const semSuporte = /\.(mkv|avi)(\?|$)/i;
+    if (!semSuporte.test(rawUrl)) return [rawUrl];
+
+    const comoMp4 = rawUrl.replace(semSuporte, ".mp4$2");
+    return Array.from(
+      new Set(ehIOS() ? [comoMp4, rawUrl] : [rawUrl, comoMp4]),
+    );
+  }
 
   const variants: string[] = [];
 
