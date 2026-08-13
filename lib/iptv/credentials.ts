@@ -154,6 +154,55 @@ export function reescreverCredencial(
   );
 }
 
+/** Extrai user/senha de uma URL de playlist (query ou caminho Xtream). */
+function parDaPlaylist(playlist: {
+  xtreamUsername: string | null;
+  xtreamPassword: string | null;
+  sourceUrl: string | null;
+  backupSourceUrl: string | null;
+}): ParCredencial | null {
+  if (playlist.xtreamUsername && playlist.xtreamPassword) {
+    return { user: playlist.xtreamUsername, pass: playlist.xtreamPassword };
+  }
+  for (const url of [playlist.sourceUrl, playlist.backupSourceUrl]) {
+    if (!url) continue;
+    const par = parDaUrl(url);
+    if (par) return par;
+  }
+  return null;
+}
+
+/**
+ * A linha que este assinante usa para tocar.
+ *
+ * Ordem: a linha própria do cliente primeiro; o catálogo do sistema só como
+ * rede de segurança.
+ *
+ * ------------------------------------------------------------------------
+ * POR QUE EXISTE A REDE DE SEGURANÇA
+ * ------------------------------------------------------------------------
+ * A linha por cliente entrou junto com o catálogo compartilhado, e o backfill
+ * da migration `20260812233000_iptv_credencial_por_cliente` só alcança quem
+ * é DONO de uma M3uPlaylist (`WHERE p.userId = u.id`). No modelo
+ * compartilhado existe uma playlist só, marcada `isSystem`, e o dono dela é
+ * uma conta técnica — então todo assinante comum ficou com `iptvUsername`
+ * nulo e passou a receber 403 em TODA reprodução. Foi o "quebrou pra todo
+ * mundo": o catálogo aparece, nada toca.
+ *
+ * Sem esta função, restaurar o serviço exigiria cadastrar a linha de cada
+ * cliente à mão antes de qualquer um conseguir assistir.
+ *
+ * O CUSTO É REAL e precisa ser dito: assinantes sem linha própria voltam a
+ * dividir a conta da importação, e o provedor limita 2 conexões por conta —
+ * o terceiro a assistir simultaneamente cai. É exatamente o comportamento de
+ * antes desta série de commits, nem melhor nem pior, e é estritamente melhor
+ * do que ninguém conseguir assistir.
+ *
+ * O caminho para sair disso não é código: é cadastrar a linha de cada cliente
+ * em Admin → IPTV. Conforme forem cadastradas, cada um passa a usar a sua e
+ * sai do rateio sozinho — esta função prefere a linha própria sempre que ela
+ * existir.
+ */
 export async function credencialDoUsuario(
   userId: string,
 ): Promise<ParCredencial | null> {
@@ -161,6 +210,20 @@ export async function credencialDoUsuario(
     where: { id: userId },
     select: { iptvUsername: true, iptvPassword: true },
   });
-  if (!user?.iptvUsername || !user?.iptvPassword) return null;
-  return { user: user.iptvUsername, pass: user.iptvPassword };
+
+  if (user?.iptvUsername && user?.iptvPassword) {
+    return { user: user.iptvUsername, pass: user.iptvPassword };
+  }
+
+  const catalogo = await prisma.m3uPlaylist.findFirst({
+    where: { isSystem: true },
+    select: {
+      xtreamUsername: true,
+      xtreamPassword: true,
+      sourceUrl: true,
+      backupSourceUrl: true,
+    },
+  });
+
+  return catalogo ? parDaPlaylist(catalogo) : null;
 }
