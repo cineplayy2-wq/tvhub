@@ -199,7 +199,7 @@ export function ShowcaseHero({
 
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-muted md:justify-start">
             {slide.rating > 0 && (
-              <span className="flex items-center gap-1 font-semibold text-primary">
+              <span className="flex items-center gap-1 font-semibold text-accent">
                 <Star className="h-3.5 w-3.5 fill-current" />
                 {slide.rating.toFixed(1)}
               </span>

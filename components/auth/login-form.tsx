@@ -114,13 +114,13 @@ export function LoginForm({ next }: { next?: string }) {
 
         {/* Cabeçalho de Confirmação */}
         <div className="text-center">
-          <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 via-violet-600/25 to-indigo-600/30 border border-primary/50 shadow-[0_0_35px_rgba(108,29,255,0.5)] text-primary">
-            <ShieldCheck className="h-8 w-8 text-primary drop-shadow-[0_0_12px_rgba(108,29,255,0.9)]" />
+          <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 via-primary-hover/25 to-primary-active/30 border border-primary/50 shadow-[0_0_35px_rgba(124,42,158,0.5)] text-accent">
+            <ShieldCheck className="h-8 w-8 text-accent drop-shadow-[0_0_12px_rgba(124,42,158,0.9)]" />
           </div>
           <p className="text-xs font-semibold text-muted-foreground">
             Código enviado para o e-mail:
           </p>
-          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-4 py-1 text-xs font-bold text-primary shadow-[0_0_15px_rgba(108,29,255,0.3)]">
+          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-4 py-1 text-xs font-bold text-accent shadow-[0_0_15px_rgba(124,42,158,0.3)]">
             <Sparkles className="h-3.5 w-3.5" />
             <span className="truncate max-w-[240px]">{state.email}</span>
           </div>
@@ -152,7 +152,7 @@ export function LoginForm({ next }: { next?: string }) {
           </div>
         </div>
 
-        <SubmitButton fullWidth size="lg" className="h-14 sm:h-15 text-lg font-black tracking-wide shadow-[0_0_35px_rgba(108,29,255,0.5)]">
+        <SubmitButton fullWidth size="lg" className="h-14 sm:h-15 text-lg font-black tracking-wide shadow-[0_0_35px_rgba(124,42,158,0.5)]">
           Confirmar e Entrar
         </SubmitButton>
 
@@ -162,9 +162,9 @@ export function LoginForm({ next }: { next?: string }) {
             type="button"
             onClick={handleResend}
             disabled={resending}
-            className="flex items-center gap-1.5 font-bold text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 font-bold text-muted-foreground hover:text-accent transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${resending ? "animate-spin text-primary" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${resending ? "animate-spin text-accent" : ""}`} />
             {resending ? "Enviando..." : "Reenviar e-mail"}
           </button>
 
@@ -197,7 +197,7 @@ export function LoginForm({ next }: { next?: string }) {
         autoComplete="email"
         defaultValue={state.email}
         error={state.fieldErrors?.email}
-        icon={<Mail className="h-4 w-4 text-primary/70" />}
+        icon={<Mail className="h-4 w-4 text-accent/70" />}
         autoFocus
       />
 
@@ -209,12 +209,12 @@ export function LoginForm({ next }: { next?: string }) {
           placeholder="••••••••"
           autoComplete="current-password"
           error={state.fieldErrors?.password}
-          icon={<KeyRound className="h-4 w-4 text-primary/70" />}
+          icon={<KeyRound className="h-4 w-4 text-accent/70" />}
         />
         <div className="mt-2 text-right">
           <Link
             href="/recuperar-senha"
-            className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+            className="text-xs font-medium text-muted-foreground transition-colors hover:text-accent"
           >
             Esqueceu a senha?
           </Link>
@@ -224,7 +224,7 @@ export function LoginForm({ next }: { next?: string }) {
       <SubmitButton
         fullWidth
         size="lg"
-        className="h-14 sm:h-15 text-lg font-black tracking-wide shadow-[0_0_35px_rgba(108,29,255,0.5)] hover:shadow-[0_0_45px_rgba(108,29,255,0.75)]"
+        className="h-14 sm:h-15 text-lg font-black tracking-wide shadow-[0_0_35px_rgba(124,42,158,0.5)] hover:shadow-[0_0_45px_rgba(124,42,158,0.75)]"
       >
         Continuar
       </SubmitButton>

@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PROFILE } from "@/lib/constants";
+import { AVATARES, avatarDoPerfil } from "@/lib/profile/avatars";
+import { cn } from "@/lib/utils";
 import type { ProfileSummary } from "@/types";
 
 const INITIAL: ProfileFormState = {};
@@ -40,11 +42,21 @@ export function ProfileFormModal({
 
   const [isKids, setIsKids] = useState(profile?.isKids ?? false);
   const [removePin, setRemovePin] = useState(false);
+  const [avatar, setAvatar] = useState<string>(
+    profile
+      ? avatarDoPerfil({ id: profile.id, avatarUrl: profile.avatarUrl, isKids: profile.isKids })
+      : AVATARES[0].src,
+  );
 
   // Reabrir o modal para outro perfil precisa recarregar os valores
   useEffect(() => {
     setIsKids(profile?.isKids ?? false);
     setRemovePin(false);
+    setAvatar(
+      profile
+        ? avatarDoPerfil({ id: profile.id, avatarUrl: profile.avatarUrl, isKids: profile.isKids })
+        : AVATARES[0].src,
+    );
   }, [profile]);
 
   // Sem erro após um submit = salvou; o revalidatePath já atualizou a lista
@@ -62,6 +74,42 @@ export function ProfileFormModal({
         <FormError message={state.error} />
         {isEditing && <input type="hidden" name="id" value={profile.id} />}
 
+        {/* O valor vai num campo escondido: o servidor confere contra o
+            catálogo antes de gravar, então o que o cliente manda nunca é
+            aceito de olhos fechados. */}
+        <input type="hidden" name="avatarUrl" value={avatar} />
+
+        <fieldset>
+          <legend className="mb-2.5 text-sm font-medium text-foreground">
+            Escolha a foto
+          </legend>
+          <div className="grid grid-cols-6 gap-2.5">
+            {AVATARES.map((opcao) => {
+              const escolhido = avatar === opcao.src;
+              return (
+                <button
+                  key={opcao.id}
+                  type="button"
+                  onClick={() => setAvatar(opcao.src)}
+                  aria-label={opcao.rotulo}
+                  aria-pressed={escolhido}
+                  title={opcao.rotulo}
+                  className={cn(
+                    "relative aspect-square overflow-hidden rounded-full transition-all",
+                    "ring-2 ring-offset-2 ring-offset-surface",
+                    escolhido
+                      ? "scale-105 ring-accent"
+                      : "ring-transparent hover:ring-white/25 active:scale-95",
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={opcao.src} alt="" className="h-full w-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <Input
           name="name"
           label="Nome do perfil"
@@ -78,7 +126,7 @@ export function ProfileFormModal({
             name="isKids"
             checked={isKids}
             onChange={(e) => setIsKids(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[#E8B44C]"
+            className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span>
             <span className="block text-sm font-medium text-foreground">
@@ -103,7 +151,7 @@ export function ProfileFormModal({
                   name="removePin"
                   checked={removePin}
                   onChange={(e) => setRemovePin(e.target.checked)}
-                  className="h-4 w-4 accent-[#E8B44C]"
+                  className="h-4 w-4 accent-primary"
                 />
                 Remover o PIN deste perfil adulto
               </label>

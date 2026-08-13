@@ -25,12 +25,18 @@ const KIDS_SELECT = {
   quality: true,
   isFavorite: true,
   relevanceScore: true,
+  tmdbPosterUrl: true,
+  tmdbBackdropUrl: true,
+  tmdbRating: true,
+  tmdbYear: true,
+  tmdbOverview: true,
+  tmdbSyncedAt: true,
   group: { select: { name: true, slug: true, category: true } },
 } satisfies Prisma.M3uChannelSelect;
 
 export type KidsChannel = Prisma.M3uChannelGetPayload<{ select: typeof KIDS_SELECT }>;
 
-/** Títulos que a lista classifica como infantil mas são novela adolescente. */
+/** Títulos que a lista classifica como infantil mas são novela adolescente ou conteúdo adulto. */
 const NOT_FOR_KIDS = [
   "novela",
   "dorama",
@@ -44,6 +50,33 @@ const NOT_FOR_KIDS = [
   "violetta",
   "soy luna",
   "carinha de anjo",
+  // Adulto / Explícito / +18 / Sexy / Erotico
+  "xxx",
+  "+18",
+  "18+",
+  "adult",
+  "erot",
+  "erót",
+  "sex",
+  "hot",
+  "playboy",
+  "venus",
+  "prive",
+  "privê",
+  "sexy",
+  "naked",
+  "porno",
+  "porn",
+  "hustler",
+  "penthouse",
+  "redlight",
+  "sensual",
+  "x-rated",
+  "strip",
+  "onlyfans",
+  "privacy",
+  "brasileirinhas",
+  "bella da semana",
 ];
 
 const SAFE_GUARDS: Prisma.M3uChannelWhereInput[] = NOT_FOR_KIDS.map((term) => ({
@@ -106,6 +139,45 @@ export const FRANCHISES: Franchise[] = [
   },
 ];
 
+export type KidsAgeBracket = {
+  key: string;
+  label: string;
+  badge: string;
+  emoji: string;
+  terms: string[];
+};
+
+export const KIDS_AGE_BRACKETS: KidsAgeBracket[] = [
+  {
+    key: "0-3",
+    label: "0 a 3 anos (Primeira Infância)",
+    badge: "0 a 3 anos",
+    emoji: "🎈",
+    terms: ["galinha pintadinha", "bita", "mundo bita", "pocoyo", "bolofofos", "baby shark", "cocomelon", "teletubbies", "totoy", "masha"],
+  },
+  {
+    key: "4-6",
+    label: "4 a 6 anos (Aventuras & Desenhos)",
+    badge: "4 a 6 anos",
+    emoji: "🎨",
+    terms: ["patrulha canina", "paw patrol", "bluey", "peppa", "bob esponja", "show da luna", "pj masks", "blaze", "miraculous", "ladybug", "dora"],
+  },
+  {
+    key: "7-10",
+    label: "7 a 10 anos (Animações & Filmes)",
+    badge: "7 a 10 anos",
+    emoji: "🚀",
+    terms: ["disney", "pixar", "frozen", "moana", "toy story", "encanto", "minions", "meu malvado", "mario", "sonic", "shrek", "lego", "divertida mente"],
+  },
+  {
+    key: "10-plus",
+    label: "10+ anos (Infantojuvenil & Heróis)",
+    badge: "10+ anos",
+    emoji: "⚡",
+    terms: ["pokemon", "pokémon", "dragon ball", "naruto", "homem-aranha", "spider", "batman", "marvel", "harry potter", "percy jackson", "minecraft"],
+  },
+];
+
 function termConditions(terms: string[]): Prisma.M3uChannelWhereInput[] {
   return terms.flatMap((term) => [
     { name: { contains: term, mode: "insensitive" as const } },
@@ -117,7 +189,24 @@ function safeKidsWhere(playlistId: string): Prisma.M3uChannelWhereInput {
   return {
     playlistId,
     isActive: true,
-    group: { isHidden: false, category: { not: "adult" } },
+    group: {
+      isHidden: false,
+      category: { not: "adult" },
+      NOT: [
+        { name: { contains: "xxx", mode: "insensitive" } },
+        { name: { contains: "adult", mode: "insensitive" } },
+        { name: { contains: "+18", mode: "insensitive" } },
+        { name: { contains: "18+", mode: "insensitive" } },
+        { name: { contains: "erot", mode: "insensitive" } },
+        { name: { contains: "hot", mode: "insensitive" } },
+        { name: { contains: "sex", mode: "insensitive" } },
+        { name: { contains: "playboy", mode: "insensitive" } },
+        { name: { contains: "venus", mode: "insensitive" } },
+        { name: { contains: "prive", mode: "insensitive" } },
+        { name: { contains: "sexy", mode: "insensitive" } },
+        { name: { contains: "porn", mode: "insensitive" } },
+      ],
+    },
     AND: SAFE_GUARDS,
   };
 }
@@ -195,6 +284,70 @@ export async function getKidsSeries(playlistId: string, limit = 18) {
   });
 
   return dedupeChannels(items).slice(0, limit);
+}
+
+/** Conteúdo Infantil filtrado por faixa etária */
+export async function getKidsByAgeBracket(
+  playlistId: string,
+  bracket: KidsAgeBracket,
+  limit = 18,
+): Promise<KidsChannel[]> {
+  const items = await prisma.m3uChannel.findMany({
+    where: {
+      ...safeKidsWhere(playlistId),
+      OR: termConditions(bracket.terms),
+    },
+    orderBy: { relevanceScore: "desc" },
+    take: limit * 2,
+    select: KIDS_SELECT,
+  });
+
+  return dedupeChannels(items).slice(0, limit);
+}
+
+/** Sugestões Mágicas da IA baseadas no histórico do perfil infantil */
+export async function getKidsSmartRecommendations(
+  playlistId: string,
+  profileId?: string,
+  limit = 18,
+): Promise<KidsChannel[]> {
+  try {
+    let recentTerms: string[] = [];
+
+    if (profileId) {
+      const history = await prisma.watchProgress.findMany({
+        where: { profileId },
+        orderBy: { lastWatched: "desc" },
+        take: 6,
+        select: { itemKey: true },
+      });
+
+      recentTerms = history.map((h) => h.itemKey.replace(/-/g, " "));
+    }
+
+    const searchClauses =
+      recentTerms.length > 0
+        ? recentTerms.flatMap((t) => [
+            { name: { contains: t.slice(0, 5), mode: "insensitive" as const } },
+          ])
+        : [];
+
+    const items = await prisma.m3uChannel.findMany({
+      where: {
+        ...safeKidsWhere(playlistId),
+        ...(searchClauses.length > 0
+          ? { OR: searchClauses }
+          : { group: { isHidden: false, category: "kids" } }),
+      },
+      orderBy: { relevanceScore: "desc" },
+      take: limit * 2,
+      select: KIDS_SELECT,
+    });
+
+    return dedupeChannels(items).slice(0, limit);
+  } catch {
+    return getKidsMovies(playlistId, limit);
+  }
 }
 
 /** Grade completa infantil, paginada — usada na busca e no "ver tudo". */

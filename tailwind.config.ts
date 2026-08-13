@@ -1,11 +1,21 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Paleta HUBFLIX, do manual da marca.
+ * Paleta HUBFLIX, amostrada da própria logo.
  *
- * Roxo #6C1DFF sobre quase-preto #0D0D14. O neutro puxa levemente para o roxo
- * (não para o azul, como na paleta anterior): fundo frio sob primária fria
- * mantém a arte do pôster como único ponto quente da tela.
+ * A versão anterior usava #6C1DFF — hue 261, saturação 100%. A película da
+ * marca (public/brand/wordmark.png) vive em hue 282-288 com saturação entre
+ * 48% e 69%: um roxo de tinta, não de LED. Meio ponto de hue já se nota lado a
+ * lado; 40 pontos de saturação faziam a interface parecer de outro produto.
+ *
+ * Os três tons abaixo saem direto dessa amostragem — #7C2A9E é o miolo da
+ * película, #611E7C a parte na sombra, #8F37B4 a parte iluminada. O `accent`
+ * é o roxo claro do "X" da logo, e existe porque a primária, sendo escura o
+ * bastante para carregar texto branco (7.8:1), não tem contraste para virar
+ * texto sobre o fundo (2.5:1). Rótulo e ícone soltos usam `accent` (5.5:1).
+ *
+ * Os neutros acompanham a mesma hue: fundo azulado sob roxo avermelhado deixa
+ * a tela com duas temperaturas brigando.
  *
  * O vermelho fica reservado para AO VIVO e alertas — nunca para marca.
  */
@@ -19,22 +29,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // --- Neutros ---
-        background: "#0D0D14",
+        // --- Neutros (hue 280, a mesma da marca) ---
+        background: "#0C0A12",
         surface: {
-          DEFAULT: "#15151F",
-          hover: "#1A1A23",
-          elevated: "#22222E",
+          DEFAULT: "#16131D",
+          hover: "#1B1724",
+          elevated: "#241F30",
         },
         border: {
-          DEFAULT: "#2A2A38",
-          strong: "#3A3A4C",
+          DEFAULT: "#2B2536",
+          strong: "#3B3349",
         },
-        foreground: "#F5F5F7",
+        foreground: "#F5F3F7",
         muted: {
-          DEFAULT: "#9E9EAF",
-          // Mínimo que ainda passa em AA para texto normal sobre #0D0D14
-          foreground: "#7E7E92",
+          DEFAULT: "#A099AF",
+          // Mínimo que ainda passa em AA para texto normal sobre #0C0A12
+          foreground: "#847C93",
         },
 
         // Banda editorial invertida. Quebra o preto contínuo e cria ritmo —
@@ -47,15 +57,18 @@ const config: Config = {
           border: "#D3D9E1",
         },
 
-        // --- Primária ---
+        // --- Primária (amostrada da película da logo) ---
         primary: {
-          DEFAULT: "#6C1DFF",
-          hover: "#8A2BE2",
-          active: "#5A16D6",
+          DEFAULT: "#7C2A9E",
+          hover: "#8F37B4",
+          active: "#611E7C",
           foreground: "#FFFFFF",
         },
-        /** Roxo claro do manual, para realce sobre fundo escuro. */
-        accent: "#B15CFF",
+        /**
+         * Roxo claro do "X" da logo. É o tom que se lê SOBRE o fundo escuro —
+         * a primária não serve para texto solto, só para superfície.
+         */
+        accent: "#B569D2",
 
         // --- Estados ---
         success: "#3FBF7F",
@@ -87,7 +100,7 @@ const config: Config = {
 
       boxShadow: {
         // Halo do card em foco no carrossel
-        glow: "0 0 0 1px #6C1DFF, 0 0 32px -8px rgba(108, 29, 255, 0.55)",
+        glow: "0 0 0 1px #7C2A9E, 0 0 32px -8px rgba(124,42,158, 0.55)",
         card: "0 12px 40px -12px rgba(0, 0, 0, 0.85)",
       },
 

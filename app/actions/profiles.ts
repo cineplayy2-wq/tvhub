@@ -23,10 +23,10 @@ export type ProfileFormState = {
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: "lax",
-  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  secure: false,
   path: "/",
-} as const;
+};
 
 // ==========================================================
 // SELEÇÃO E DESBLOQUEIO
@@ -130,6 +130,7 @@ export async function createProfileAction(
   const parsed = createProfileSchema.safeParse({
     name: formData.get("name"),
     isKids: formData.get("isKids") === "on",
+    avatarUrl: formData.get("avatarUrl") ?? "",
     pin: formData.get("pin") ?? "",
   });
 
@@ -142,7 +143,7 @@ export async function createProfileAction(
     return { error: `Limite de ${PROFILE.MAX_PER_ACCOUNT} perfis por conta.` };
   }
 
-  const { name, isKids, pin } = parsed.data;
+  const { name, isKids, avatarUrl, pin } = parsed.data;
 
   try {
     await prisma.profile.create({
@@ -150,6 +151,7 @@ export async function createProfileAction(
         userId: user.id,
         name,
         isKids,
+        avatarUrl: avatarUrl || null,
         maxAgeRating: isKids ? PROFILE.KIDS_MAX_AGE_RATING : "EIGHTEEN",
         pinHash: isKids ? null : pin ? await hashPassword(pin) : null,
         sortOrder: count,
@@ -181,6 +183,7 @@ export async function updateProfileAction(
     id: formData.get("id"),
     name: formData.get("name"),
     isKids: formData.get("isKids") === "on",
+    avatarUrl: formData.get("avatarUrl") ?? "",
     pin: formData.get("pin") ?? "",
     removePin: formData.get("removePin") === "on",
   });
@@ -189,13 +192,14 @@ export async function updateProfileAction(
     return { fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  const { id, name, isKids, pin, removePin } = parsed.data;
+  const { id, name, isKids, avatarUrl, pin, removePin } = parsed.data;
 
   const result = await prisma.profile.updateMany({
     where: { id, userId: user.id },
     data: {
       name,
       isKids,
+      ...(avatarUrl ? { avatarUrl } : {}),
       maxAgeRating: isKids ? PROFILE.KIDS_MAX_AGE_RATING : "EIGHTEEN",
       ...(isKids || removePin
         ? { pinHash: null }

@@ -45,26 +45,26 @@ export function KidsCard({
   return (
     <Link
       href={`/tv/assistir/${channel.id}`}
-      className={cn("group block w-full", className)}
+      className={cn("group block w-full transition-transform duration-300 hover:scale-[1.04] active:scale-[0.97]", className)}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-3xl bg-surface ring-1 ring-inset ring-white/10 transition-all duration-300 group-hover:ring-2 group-hover:ring-indigo-300/70 group-active:scale-[0.97]">
-        <Artwork src={art} alt={name} seed={channel.id} sizes="(max-width: 768px) 136px, 164px" />
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[1.75rem] bg-surface ring-2 ring-white/10 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-pink-400 group-hover:shadow-[0_0_30px_rgba(236,72,153,0.4)]">
+        <Artwork src={art} alt={name} seed={channel.id} sizes="(max-width: 768px) 150px, 190px" />
 
         <div className="absolute inset-0 flex items-center justify-center bg-background/0 opacity-0 transition-all duration-300 group-hover:bg-background/40 group-hover:opacity-100">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-xl">
-            <Play className="ml-1 h-6 w-6" fill="currentColor" />
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-primary-active text-white shadow-2xl transition-transform duration-200 group-hover:scale-110">
+            <Play className="ml-1 h-7 w-7" fill="currentColor" />
           </span>
         </div>
 
         {live && (
-          <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+          <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-xl">
+            <span className="h-2 w-2 animate-ping rounded-full bg-white" />
             Ao vivo
           </span>
         )}
       </div>
 
-      <p className="mt-2.5 line-clamp-2 px-1 text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-indigo-200">
+      <p className="mt-3 line-clamp-2 px-1 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-pink-300">
         {name}
       </p>
     </Link>
@@ -73,10 +73,6 @@ export function KidsCard({
 
 /**
  * Bolha de personagem/estúdio.
- *
- * É o atalho principal da área infantil: redondo, grande e com a arte do
- * personagem. Funciona antes da alfabetização — o rótulo abaixo é para o
- * adulto que está por perto.
  */
 export function FranchiseBubble({
   label,
@@ -90,28 +86,35 @@ export function FranchiseBubble({
   active?: boolean;
 }) {
   return (
-    <Link href={href} className="group flex w-full flex-col items-center gap-2.5">
+    <Link href={href} className="group flex w-full flex-col items-center gap-2.5 transition-transform duration-300 hover:scale-110 active:scale-95">
       <div
         className={cn(
-          "relative aspect-square w-full overflow-hidden rounded-full bg-surface transition-all duration-300",
-          "ring-2 ring-inset",
+          "relative aspect-square w-full overflow-hidden rounded-full bg-surface shadow-xl transition-all duration-300",
+          "ring-4",
           active
-            ? "ring-indigo-300"
-            : "ring-white/10 group-hover:ring-indigo-300/70 group-active:scale-95",
+            ? "ring-pink-400 shadow-[0_0_25px_rgba(236,72,153,0.5)]"
+            : "ring-white/20 group-hover:ring-purple-400 group-hover:shadow-[0_0_25px_rgba(168,85,247,0.4)]",
         )}
       >
-        <Artwork src={artwork} alt={label} seed={label} />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+        <Artwork
+          src={artwork}
+          alt={label}
+          seed={`franchise-${label}`}
+          sizes="(max-width: 768px) 80px, 110px"
+        />
+        <div className="absolute inset-0 bg-background/0 transition-colors duration-200 group-hover:bg-background/20" />
       </div>
 
-      <span
+      <p
         className={cn(
-          "line-clamp-2 text-center text-[13px] font-semibold leading-tight transition-colors",
-          active ? "text-indigo-200" : "text-muted group-hover:text-foreground",
+          "text-center text-xs font-bold transition-colors line-clamp-1",
+          active
+            ? "text-pink-300 font-extrabold"
+            : "text-muted-foreground group-hover:text-white",
         )}
       >
         {label}
-      </span>
+      </p>
     </Link>
   );
 }

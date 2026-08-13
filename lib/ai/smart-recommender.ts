@@ -36,14 +36,20 @@ export async function getAiPickedCurations(playlistId: string): Promise<AiPicked
     }
   } catch {}
 
-  // 2. Fetch top candidates from user's active playlist
+  // 2. Fetch top VOD candidates from user's active playlist (only movies and series)
   const candidateChannels = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
       isActive: true,
-      group: { isHidden: false, category: { not: "adult" } },
+      group: { isHidden: false, category: { in: ["movies", "series"] } },
+      OR: [
+        { streamUrl: { contains: "/movie/" } },
+        { streamUrl: { contains: "/series/" } },
+        { streamUrl: { contains: ".mp4" } },
+        { streamUrl: { contains: ".mkv" } },
+      ],
     },
-    take: 30,
+    take: 35,
     orderBy: { relevanceScore: "desc" },
     select: {
       id: true,

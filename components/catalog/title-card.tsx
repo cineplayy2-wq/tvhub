@@ -10,11 +10,11 @@ import type { TitleCard as TitleCardData, TitleCardWithProgress } from "@/types"
  * gradiente. Aleatório mudaria a cada render e destruiria o reconhecimento.
  */
 const TINTS = [
-  "from-[#1E2A3A] to-[#0A0B0D]",
-  "from-[#2A1E3A] to-[#0A0B0D]",
-  "from-[#1E3A2C] to-[#0A0B0D]",
-  "from-[#3A2A1E] to-[#0A0B0D]",
-  "from-[#3A1E28] to-[#0A0B0D]",
+  "from-[#1E2A3A] to-[#0C0A12]",
+  "from-[#2A1E3A] to-[#0C0A12]",
+  "from-[#1E3A2C] to-[#0C0A12]",
+  "from-[#3A2A1E] to-[#0C0A12]",
+  "from-[#3A1E28] to-[#0C0A12]",
 ];
 
 function tintFor(id: string) {

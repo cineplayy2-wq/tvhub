@@ -49,7 +49,7 @@ export function SectionHeader({
         {href && (
           <Link
             href={href}
-            className="group flex items-center gap-0.5 rounded-full px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-primary"
+            className="group flex items-center gap-0.5 rounded-full px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-accent"
           >
             Ver tudo
             <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

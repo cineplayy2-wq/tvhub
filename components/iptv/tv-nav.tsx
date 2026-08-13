@@ -17,7 +17,6 @@ const STANDARD_LINKS = [
   { href: "/tv/live", label: "Canais" },
   { href: "/tv/sports", label: "Esportes" },
   { href: "/tv/novelas", label: "Novelas" },
-  { href: "/tv/kids", label: "Kids" },
   { href: "/tv/dicas", label: "Dicas" },
 ];
 
@@ -87,7 +86,7 @@ export function TvNav({
             <LogoHMark className="transition-transform duration-300 group-hover:scale-105" />
             <div className="flex items-center gap-2.5">
               <span className="h-4 w-[1px] bg-white/20" />
-              <span className="text-sm font-extrabold tracking-tight text-foreground transition-colors group-hover:text-primary flex items-center gap-1.5">
+              <span className="text-sm font-extrabold tracking-tight text-foreground transition-colors group-hover:text-accent flex items-center gap-1.5">
                 {isKidsProfile && <Sparkles className="h-4 w-4 text-amber-400 animate-pulse" />}
                 {categoryTitle}
               </span>
@@ -111,7 +110,7 @@ export function TvNav({
                 >
                   {link.label}
                   {active && (
-                    <span className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-primary shadow-[0_0_8px_rgba(108,29,255,0.8)]" />
+                    <span className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-primary shadow-[0_0_8px_rgba(124,42,158,0.8)]" />
                   )}
                 </Link>
               );
@@ -142,11 +141,11 @@ export function TvNav({
               <AlertCircle className="h-4 w-4" />
             </button>
 
-            {/* Minha Lista */}
+            {/* Favoritos */}
             <Link
               href="/minha-lista"
-              aria-label="Minha Lista"
-              title="Minha Lista de Favoritos"
+              aria-label="Favoritos"
+              title="Favoritos"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-surface/80 text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
             >
               <Heart className="h-4 w-4" />

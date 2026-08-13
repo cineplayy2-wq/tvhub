@@ -384,7 +384,7 @@ export function TitleForm({
             type="checkbox"
             name="isFeatured"
             defaultChecked={title?.isFeatured}
-            className="mt-0.5 h-4 w-4 accent-[#E8B44C]"
+            className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span>
             <span className="block text-sm font-medium text-foreground">

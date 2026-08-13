@@ -48,14 +48,19 @@ export function detectCategory(groupName: string, channelName = "", streamUrl = 
     return "adult";
   }
 
-  // Se a URL explicitamente apontar para mídias VOD
-  if (streamUrl.includes("/series/")) return "series";
-  if (streamUrl.includes("/movie/")) return "movies";
+  const combinedGroup = groupName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
   const combined = `${groupName} ${channelName}`
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+
+  const isLiveStreamUrl =
+    streamUrl.includes("/live/") ||
+    (streamUrl.endsWith(".ts") && !streamUrl.includes("/series/") && !streamUrl.includes("/movie/"));
 
   // 1. Esportes (Canais de Esportes e Ligas)
   if (
@@ -104,43 +109,50 @@ export function detectCategory(groupName: string, channelName = "", streamUrl = 
     return "kids";
   }
 
-  // 3. Séries / Animes / Doramas
+  // Se a URL apontar explicitamente para mídias VOD
+  if (streamUrl.includes("/series/")) return "series";
+  if (streamUrl.includes("/movie/")) return "movies";
+
+  // Se o grupo for explicitamente um canal de TV ao vivo (ex: "CANAIS | NOVELAS", "CANAIS | TELECINE", "TV AO VIVO")
+  // ou se for uma URL /live/, não deve ir para filmes/séries mesmo que contenha "novela" ou "telecine" no nome
   if (
-    combined.includes("serie") ||
-    combined.includes("series") ||
-    combined.includes("dorama") ||
-    combined.includes("anime") ||
-    combined.includes("novela") ||
-    combined.includes("temporada")
+    isLiveStreamUrl ||
+    combinedGroup.includes("canais") ||
+    combinedGroup.includes("tv ao vivo") ||
+    combinedGroup.includes("abertos") ||
+    combinedGroup.includes("variedades") ||
+    combinedGroup.includes("noticias") ||
+    combinedGroup.includes("legendado 24h") ||
+    combinedGroup.includes("24h")
+  ) {
+    return "live";
+  }
+
+  // 3. Séries / Animes / Doramas (VOD)
+  if (
+    combinedGroup.includes("serie") ||
+    combinedGroup.includes("series") ||
+    combinedGroup.includes("dorama") ||
+    combinedGroup.includes("anime") ||
+    combinedGroup.includes("novela") ||
+    combinedGroup.includes("temporada")
   ) {
     return "series";
   }
 
   // 4. Filmes & Mídias VOD
   if (
-    combined.includes("filme") ||
-    combined.includes("movie") ||
-    combined.includes("vod") ||
-    combined.includes("cinema") ||
-    combined.includes("cine") ||
-    combined.includes("telecine") ||
-    combined.includes("lancamento") ||
-    combined.includes("legendado") ||
-    combined.includes("dublado") ||
-    combined.includes("acao") ||
-    combined.includes("comedia") ||
-    combined.includes("drama") ||
-    combined.includes("terror") ||
-    combined.includes("horror") ||
-    combined.includes("suspense") ||
-    combined.includes("ficcao") ||
-    combined.includes("romance") ||
-    combined.includes("prime video") ||
-    combined.includes("netflix") ||
-    combined.includes("paramount") ||
-    combined.includes("apple tv") ||
-    combined.includes("hbo") ||
-    combined.includes("max")
+    combinedGroup.includes("filme") ||
+    combinedGroup.includes("movie") ||
+    combinedGroup.includes("vod") ||
+    combinedGroup.includes("cinema") ||
+    combinedGroup.includes("cine") ||
+    combinedGroup.includes("lancamento") ||
+    combinedGroup.includes("prime video") ||
+    combinedGroup.includes("netflix") ||
+    combinedGroup.includes("paramount") ||
+    combinedGroup.includes("apple tv") ||
+    combinedGroup.includes("hbo max")
   ) {
     return "movies";
   }

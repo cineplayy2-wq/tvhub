@@ -40,7 +40,7 @@ export default async function TvSearchPage({
 
   return (
     <div className={`${GUTTER} min-h-screen pb-24 pt-24`}>
-      <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+      <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
         {isFavoritesMode ? <Heart className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
         {isFavoritesMode ? "Sua lista" : "Buscar"}
       </p>

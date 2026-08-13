@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BookOpen, Search, Sparkles } from "lucide-react";
 
 import { cleanGroupLabel, FilterChips } from "@/components/iptv/filter-chips";
 import { PosterCard } from "@/components/iptv/poster-card";
+import { TileCard } from "@/components/iptv/tile-card";
 import { Rail } from "@/components/iptv/rail";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { getNovelasList, getPlaylistChannels, getViewablePlaylist } from "@/lib/queries/iptv";
 import { enrichChannelsWithTmdb } from "@/lib/tmdb/client";
 
@@ -21,6 +22,10 @@ export default async function NovelasPage({
   searchParams: { q?: string; sub?: string; page?: string };
 }) {
   const user = await requireUser();
+  const activeProfile = await getActiveProfile(user.id).catch(() => null);
+  if (activeProfile?.isKids) {
+    redirect("/tv/kids");
+  }
   const playlist = await getViewablePlaylist(user.id);
 
   if (!playlist) notFound();
@@ -40,8 +45,11 @@ export default async function NovelasPage({
 
   const selectedSubGroup = novelaGroups.find((g) => g.slug === searchParams.sub);
 
-  // Busca lista de novelas
-  const rawNovelas = await getNovelasList(playlistId, 120);
+  // Busca lista de novelas VOD (Capítulo a capítulo) e canais ao vivo separadamente
+  const [rawNovelas, liveNovelaChannels] = await Promise.all([
+    getNovelasList(playlistId, 150, "vod"),
+    getNovelasList(playlistId, 24, "live"),
+  ]);
   
   // Filtragem por grupo ou busca
   let filteredList = rawNovelas;
@@ -69,7 +77,6 @@ export default async function NovelasPage({
       rating: item.tmdbRating ?? 0,
       year: item.year ?? null,
       label: "Em alta nas Novelas",
-      meta: item.quality ?? "HD",
       isSeries: true,
       isFavorite: item.isFavorite,
     }));
@@ -143,6 +150,21 @@ export default async function NovelasPage({
       {/* Trilhas Temáticas de Novelas */}
       {isBrowsing && (
         <div className="space-y-12 pb-4">
+          {liveNovelaChannels.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Canais de Novela 24h & Ao Vivo"
+                eyebrow="Transmissão Contínua"
+                className={`${GUTTER} mb-4`}
+              />
+              <Rail itemClassName="w-[188px] md:w-[220px]">
+                {liveNovelaChannels.map((channel) => (
+                  <TileCard key={channel.id} channel={channel} />
+                ))}
+              </Rail>
+            </section>
+          )}
+
           {emExibicao.length > 0 && (
             <section>
               <SectionHeader

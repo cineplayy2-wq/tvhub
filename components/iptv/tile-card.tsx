@@ -55,18 +55,13 @@ export function TileCard({
             </span>
           )}
 
-          {channel.quality && (
-            <span className="chip-over-art absolute right-2 top-2 text-[10px] font-bold uppercase tracking-wide text-muted">
-              {channel.quality}
-            </span>
-          )}
         </div>
       </Link>
 
       <div className="mt-2 flex items-start justify-between gap-2 px-0.5">
         <div className="min-w-0">
           <Link href={href} prefetch>
-            <p className="truncate text-[13px] font-medium text-foreground transition-colors group-hover:text-primary">
+            <p className="truncate text-[13px] font-medium text-foreground transition-colors group-hover:text-accent">
               {name}
             </p>
           </Link>

@@ -61,7 +61,7 @@ export function SeasonTabs({
             href={`/tv/assistir/${episode.id}`}
             className="group flex items-center gap-4 py-4 transition-colors hover:bg-surface/40"
           >
-            <span className="w-8 shrink-0 text-center text-lg font-semibold tabular-nums text-muted-foreground transition-colors group-hover:text-primary">
+            <span className="w-8 shrink-0 text-center text-lg font-semibold tabular-nums text-muted-foreground transition-colors group-hover:text-accent">
               {episode.episodeNum || index + 1}
             </span>
 

@@ -33,7 +33,7 @@ export async function sendOtpEmail(toEmail: string, code: string, userName?: str
       <meta charset="UTF-8">
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c10; color: #ffffff; margin: 0; padding: 40px 20px; }
-        .card { max-width: 480px; margin: 0 auto; background-color: #16181f; border-radius: 20px; border: 1px solid rgba(108, 29, 255, 0.4); padding: 40px 32px; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); }
+        .card { max-width: 480px; margin: 0 auto; background-color: #16181f; border-radius: 20px; border: 1px solid rgba(124,42,158, 0.4); padding: 40px 32px; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); }
         .logo { font-size: 32px; font-weight: 900; color: #ffffff; letter-spacing: -1px; margin-bottom: 24px; }
         .logo span { color: #6C1DF5; }
         .title { font-size: 22px; font-weight: 800; margin-bottom: 12px; color: #ffffff; }

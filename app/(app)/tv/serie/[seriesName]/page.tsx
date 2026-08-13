@@ -115,7 +115,7 @@ export default async function SeriesPage({
               </div>
 
               <div className="max-w-2xl">
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
                   Série
                 </p>
 
@@ -125,7 +125,7 @@ export default async function SeriesPage({
 
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
                   {tmdb && tmdb.rating > 0 && (
-                    <span className="flex items-center gap-1 font-semibold text-primary">
+                    <span className="flex items-center gap-1 font-semibold text-accent">
                       <Star className="h-3.5 w-3.5 fill-current" />
                       {tmdb.rating.toFixed(1)}
                     </span>

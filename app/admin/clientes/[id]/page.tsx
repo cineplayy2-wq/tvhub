@@ -156,6 +156,7 @@ export default async function CustomerDetailPage({
                     <ProfileAvatar
                       id={profile.id}
                       name={profile.name}
+                      avatarUrl={profile.avatarUrl}
                       isKids={profile.isKids}
                       size="sm"
                       className="h-7 w-7 rounded-full text-xs font-bold"

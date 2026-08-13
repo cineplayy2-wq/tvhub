@@ -71,6 +71,7 @@ const TABS: Tab[] = [
       </svg>
     ),
   },
+
   {
     href: "/tv/dicas",
     label: "Dicas",
@@ -122,10 +123,11 @@ export function TabBar() {
     return observeResize(list, move);
   }, [active]);
 
-  // No player a barra sai de cena: o vídeo ocupa a tela inteira
+  // No player e nas Dicas a barra sai de cena: o vídeo ocupa a tela inteira
   const [hidden, setHidden] = useState(false);
-  useEffect(() => setHidden(pathname.includes("/assistir/")), [pathname]);
-  if (hidden) return null;
+  useEffect(() => setHidden(pathname.includes("/assistir/") || pathname === "/tv/dicas"), [pathname]);
+
+  if (hidden || pathname === "/tv/dicas" || pathname?.startsWith("/tv/assistir")) return null;
 
   return (
     <nav
@@ -133,8 +135,13 @@ export function TabBar() {
       className={cn(
         "fixed left-1/2 z-40 h-16 w-[min(372px,calc(100%-26px))] -translate-x-1/2",
         "bottom-[calc(env(safe-area-inset-bottom)+18px)]",
-        "rounded-full border border-white/[0.08] bg-surface/90 px-1.5 shadow-card",
-        "supports-[backdrop-filter]:bg-surface/70 supports-[backdrop-filter]:backdrop-blur-xl",
+        // A barra precisa se destacar do fundo para ser lida como menu. Em
+        // `bg-surface` ela ficava a três pontos de luminância do background e
+        // sumia. `surface-elevated` + borda mais clara + sombra dão a ela um
+        // plano próprio, sem virar um bloco chapado no meio da tela.
+        "rounded-full border border-white/[0.12] bg-surface-elevated/95 px-1.5",
+        "shadow-[0_10px_36px_-8px_rgba(0,0,0,0.9)] ring-1 ring-black/40",
+        "supports-[backdrop-filter]:bg-surface-elevated/80 supports-[backdrop-filter]:backdrop-blur-xl",
         "md:hidden",
       )}
     >

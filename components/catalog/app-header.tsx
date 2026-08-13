@@ -15,7 +15,7 @@ import type { ProfileSummary } from "@/types";
 const NAV = [
   { href: "/tv", label: "Canais & IPTV" },
   { href: "/inicio", label: "Catálogo VOD" },
-  { href: "/minha-lista", label: "Minha lista" },
+  { href: "/minha-lista", label: "Favoritos" },
 ];
 
 export function AppHeader({
@@ -93,6 +93,7 @@ export function AppHeader({
               <ProfileAvatar
                 id={profile.id}
                 name={profile.name}
+                avatarUrl={profile.avatarUrl}
                 isKids={profile.isKids}
                 size="sm"
               />
@@ -146,7 +147,7 @@ export function AppHeader({
                     <Link
                       href="/admin"
                       role="menuitem"
-                      className="block border-t border-border px-4 py-2.5 text-sm text-primary transition-colors hover:bg-surface-hover"
+                      className="block border-t border-border px-4 py-2.5 text-sm text-accent transition-colors hover:bg-surface-hover"
                     >
                       Painel administrativo
                     </Link>

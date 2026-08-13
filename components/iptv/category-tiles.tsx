@@ -90,7 +90,7 @@ export function CategoryTiles({
                 "relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
-                  : "bg-white/[0.06] text-primary",
+                  : "bg-white/[0.06] text-accent",
               )}
             >
               <Icon className="h-4 w-4" strokeWidth={1.75} />

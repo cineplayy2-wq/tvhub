@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Avatar">
+  <defs>
+    <linearGradient id="bg10" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5FC9A8"/>
+      <stop offset="1" stop-color="#2C8A72"/>
+    </linearGradient>
+    <radialGradient id="gl10" cx="0.32" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="url(#bg10)"/>
+  <circle cx="100" cy="100" r="100" fill="url(#gl10)"/>
+  <path d="M62 56l10 14 10-14 10 14 10-14 10 14 10-14 10 14 10-14" stroke="#237A61" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <ellipse cx="100" cy="110" rx="50" ry="46" fill="#4FBE9C"/>
+  <ellipse cx="100" cy="126" rx="32" ry="22" fill="#CFF0E4" opacity="0.65"/>
+  <circle cx="80" cy="98" r="8" fill="#241F30"/>
+  <circle cx="120" cy="98" r="8" fill="#241F30"/>
+  <circle cx="82.4" cy="95.6" r="2.56" fill="#fff" opacity="0.9"/>
+  <circle cx="122.4" cy="95.6" r="2.56" fill="#fff" opacity="0.9"/>
+  <circle cx="86" cy="118" r="2.6" fill="#1F5F4C"/>
+  <circle cx="114" cy="118" r="2.6" fill="#1F5F4C"/>
+  <path d="M76 128c7 9 17 13 24 13s17-4 24-13" stroke="#1F5F4C" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <ellipse cx="64" cy="112" rx="9" ry="6" fill="#F08CA0" opacity="0.45"/>
+  <ellipse cx="136" cy="112" rx="9" ry="6" fill="#F08CA0" opacity="0.45"/>
+</svg>

@@ -69,6 +69,7 @@ export function ProfileGrid({
               <ProfileAvatar
                 id={profile.id}
                 name={profile.name}
+                avatarUrl={profile.avatarUrl}
                 isKids={profile.isKids}
                 size="lg"
                 className={cn(
@@ -106,7 +107,7 @@ export function ProfileGrid({
           >
             <span className="flex h-28 w-28 items-center justify-center rounded-xl border border-dashed border-border-strong transition-colors duration-300 group-hover:border-primary">
               <Plus
-                className="h-8 w-8 text-muted-foreground transition-colors group-hover:text-primary"
+                className="h-8 w-8 text-muted-foreground transition-colors group-hover:text-accent"
                 strokeWidth={1.5}
                 aria-hidden
               />

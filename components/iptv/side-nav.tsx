@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, PanelLeft, Search } from "lucide-react";
+import { Heart, PanelLeft, Search, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,7 @@ const ITEMS: Item[] = [
       </svg>
     ),
   },
+
   {
     href: "/tv/dicas",
     label: "Dicas",
@@ -96,7 +97,14 @@ function isActive(pathname: string, item: Item) {
   );
 }
 
-export function SideNav() {
+export function SideNav({
+  avatarUrl,
+  profileName,
+}: {
+  /** Foto do perfil ativo, resolvida no servidor pelo layout. */
+  avatarUrl?: string | null;
+  profileName?: string | null;
+}) {
   const pathname = usePathname();
   const [pinned, setPinned] = useState(false);
 
@@ -106,8 +114,10 @@ export function SideNav() {
     <aside
       data-pinned={pinned || undefined}
       className={cn(
-        "group/nav fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-white/[0.06] md:flex",
-        "bg-background/95 supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-xl",
+        "group/nav fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-white/[0.10] md:flex",
+        // Um plano acima do fundo, não o próprio fundo: em `bg-background` a
+        // coluna não tinha onde começar e o menu se confundia com a página.
+        "bg-surface/95 supports-[backdrop-filter]:bg-surface/75 supports-[backdrop-filter]:backdrop-blur-xl",
         // Abre por CSS, não por estado do React: `focus-within` é o que faz o
         // menu se abrir quando o foco do controle remoto chega nele, e
         // funciona mesmo onde os eventos sintéticos do React falham — que é
@@ -119,7 +129,7 @@ export function SideNav() {
       {/* Marca */}
       <div className="flex h-20 items-center gap-3 px-4">
         <Link href="/tv" aria-label="HUBFLIX — início" className="shrink-0">
-          <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-gradient-to-br from-[#8A2BE2] to-[#4A0FB0]">
+          <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-gradient-to-br from-[#8F37B4] to-[#4E1566]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/mark.png" alt="HUBFLIX" className="h-full w-full object-cover" />
           </span>
@@ -176,6 +186,30 @@ export function SideNav() {
             <Heart className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </span>
           <span className={LABEL + " text-[15px] font-semibold"}>Favoritos</span>
+        </Link>
+
+        {/* Trocar de perfil. Também tinha sumido na reconstrução do menu — e
+            sem esta porta não havia como sair de um perfil infantil. */}
+        <Link
+          href="/perfis"
+          title={profileName ? `Perfil de ${profileName} — trocar` : "Trocar perfil"}
+          className="flex h-12 items-center gap-3 rounded-xl px-3 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+        >
+          <span className="grid h-6 w-6 shrink-0 place-items-center">
+            {avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-[26px] w-[26px] rounded-full object-cover ring-1 ring-white/20"
+              />
+            ) : (
+              <UserRound className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            )}
+          </span>
+          <span className={LABEL + " truncate text-[15px] font-semibold"}>
+            {profileName ?? "Trocar perfil"}
+          </span>
         </Link>
       </nav>
 

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -72,7 +73,7 @@ export async function listProfiles(userId: string): Promise<ProfileSummary[]> {
  * sessão: trocar o valor do cookie no navegador não dá acesso ao perfil de
  * outra conta.
  */
-export async function getActiveProfile(userId: string) {
+export const getActiveProfile = cache(async function getActiveProfile(userId: string) {
   const profileId = cookies().get(ACTIVE_PROFILE_COOKIE)?.value;
   if (!profileId) return null;
 
@@ -95,7 +96,7 @@ export async function getActiveProfile(userId: string) {
 
   const { pinHash, ...safe } = profile;
   return { ...safe, hasPin: pinHash !== null } satisfies ProfileSummary;
-}
+});
 
 /** Exige perfil ativo. Manda escolher um quando não há. */
 export async function requireProfile(userId: string) {

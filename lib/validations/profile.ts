@@ -1,5 +1,19 @@
 import { z } from "zod";
 import { PROFILE } from "@/lib/constants";
+import { ehAvatarValido } from "@/lib/profile/avatars";
+
+/**
+ * O avatar tem que estar no catálogo.
+ *
+ * O campo chega de um `input hidden`, ou seja, é texto que o cliente controla.
+ * Sem esta checagem daria para gravar qualquer URL em `Profile.avatarUrl` — e
+ * a imagem do perfil passaria a ser carregada de um host arbitrário em toda
+ * tela do app.
+ */
+export const avatarSchema = z
+  .string()
+  .refine((valor) => valor === "" || ehAvatarValido(valor), "Avatar inválido")
+  .optional();
 
 export const profileNameSchema = z
   .string()
@@ -15,6 +29,7 @@ export const pinSchema = z
 export const createProfileSchema = z.object({
   name: profileNameSchema,
   isKids: z.coerce.boolean().default(false),
+  avatarUrl: avatarSchema,
   // Campo vazio no formulário significa "sem PIN", não PIN inválido
   pin: z.union([pinSchema, z.literal("")]).optional(),
 });

@@ -55,7 +55,7 @@ export function CastModal({
               className="flex w-full items-center justify-between rounded-xl border border-white/[0.08] bg-surface p-3.5 text-left transition-all hover:border-primary/50 hover:bg-surface-elevated active:scale-[0.99]"
             >
               <div className="flex items-center gap-3.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-accent">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div>
