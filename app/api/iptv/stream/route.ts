@@ -117,6 +117,35 @@ const agenteHttps = new https.Agent({
   timeout: 30_000,
 });
 
+/**
+ * Larga uma resposta do provedor sem deixar o socket pendurado.
+ *
+ * Esta função é o conserto do defeito que derrubava o app inteiro depois de
+ * um tempo de uso — não um canal, TODOS.
+ *
+ * O agente HTTP tem teto de 256 sockets. Toda resposta que a gente abandona
+ * sem drenar nem destruir continua ocupando uma vaga: o Node não tem como
+ * saber que ninguém mais vai ler aquilo. Havia três lugares assim, e o pior
+ * deles rodava em TODA abertura de canal — o player pede `.m3u8` primeiro,
+ * o provedor responde 404, e a resposta 404 era simplesmente esquecida.
+ *
+ * A conta é direta: algumas centenas de aberturas de canal e o pool esgota.
+ * A partir daí toda requisição nova de vídeo entra numa fila esperando um
+ * socket que nunca vaga — e o sintoma é exatamente "parou de rodar geral",
+ * até o contêiner reiniciar e zerar o pool.
+ *
+ * `resume()` antes de `destroy()` é de propósito: drenar devolve o socket ao
+ * pool de keep-alive para ser reaproveitado, que é melhor que matá-lo. O
+ * `destroy()` cobre o caso de a resposta ser grande demais para valer a pena.
+ */
+function descartarUpstream(res: http.IncomingMessage | null | undefined) {
+  if (!res) return;
+  try {
+    res.resume();
+    res.destroy();
+  } catch {}
+}
+
 /** Falha temporária de DNS ou de rede: insistir resolve, desistir não. */
 function ehFalhaPassageira(erro: unknown) {
   const codigo = (erro as NodeJS.ErrnoException)?.code;
@@ -128,6 +157,29 @@ function ehFalhaPassageira(erro: unknown) {
     codigo === "ECONNREFUSED"
   );
 }
+
+/**
+ * Prazo para o provedor RESPONDER. Não vale depois que a resposta começa.
+ *
+ * Esta distinção é o conserto de um filme que congelava no meio.
+ *
+ * `timeout` no `http.get` não é prazo de conexão: é prazo de socket OCIOSO, e
+ * ele continua valendo enquanto o socket existir. Num filme, o navegador
+ * enche o buffer e PARA de ler. A contrapressão sobe pela pilha — a resposta
+ * para de escoar, o `IncomingMessage` pausa, a janela TCP fecha e o provedor
+ * para de mandar bytes. O socket fica ocioso porque está tudo funcionando.
+ *
+ * Quinze segundos depois o `timeout` disparava e chamava `req.destroy()`,
+ * matando a conexão no meio do filme. O `<video>` não recebia erro — para ele
+ * o arquivo simplesmente TERMINOU ali. Tocava o que estava no buffer e
+ * congelava. Quarenta minutos, cinquenta, uma hora: dependia só de quando o
+ * ciclo de contrapressão se alinhava.
+ *
+ * Por isso o cronômetro é desarmado assim que os cabeçalhos chegam. A partir
+ * dali, ficar ocioso é comportamento correto, e quem encerra a conexão é o
+ * cliente indo embora — tratado no `GET` com o sinal de cancelamento.
+ */
+const PRAZO_PARA_RESPONDER_MS = 15_000;
 
 function fetchUpstream(
   currentUrl: string,
@@ -144,6 +196,9 @@ function fetchUpstream(
       const isHttps = parsedUrl.protocol === "https:";
       const httpModule = isHttps ? https : http;
 
+      /** Já veio resposta? Depois disso, socket ocioso é normal. */
+      let respondeu = false;
+
       const req = httpModule.get(
         currentUrl,
         {
@@ -153,11 +208,17 @@ function fetchUpstream(
             Connection: "keep-alive",
             ...(rangeHeader ? { Range: rangeHeader } : {}),
           },
-          timeout: 15000,
+          timeout: PRAZO_PARA_RESPONDER_MS,
           lookup: lookupComCache,
           agent: isHttps ? agenteHttps : agenteHttp,
         },
         (res) => {
+          respondeu = true;
+
+          // Desarma o cronômetro de ociosidade — ver a nota acima.
+          req.setTimeout(0);
+          res.socket?.setTimeout(0);
+
           if (
             res.statusCode &&
             res.statusCode >= 300 &&
@@ -184,8 +245,15 @@ function fetchUpstream(
         }
       );
 
-      req.on("error", reject);
+      req.on("error", (erro) => {
+        // Erro depois da resposta pertence ao fluxo, não à conexão: a promessa
+        // já foi resolvida e rejeitá-la de novo não faria nada além de gerar
+        // rejeição não tratada.
+        if (!respondeu) reject(erro);
+      });
+
       req.on("timeout", () => {
+        if (respondeu) return;
         req.destroy();
         reject(new Error("Timeout ao conectar com o servidor de IPTV"));
       });
@@ -206,8 +274,10 @@ async function peekUpstream(
     const chunks: Buffer[] = [];
     let totalRead = 0;
     let resolved = false;
+    let dataTimer: ReturnType<typeof setTimeout> | null = null;
 
     function cleanup() {
+      if (dataTimer) clearTimeout(dataTimer);
       stream.removeListener("data", onData);
       stream.removeListener("end", onEnd);
       stream.removeListener("error", onError);
@@ -220,22 +290,51 @@ async function peekUpstream(
       resolve({ isM3u8, manifestText, peekBuffer });
     }
 
+    function onError() {
+      finish(false);
+    }
+
     function onData(chunk: Buffer) {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       chunks.push(buf);
       totalRead += buf.length;
 
       const currentBuffer = Buffer.concat(chunks);
-      const textSample = currentBuffer.toString("utf-8", 0, Math.min(currentBuffer.length, 512));
+      const textSample = currentBuffer.toString("utf-8", 0, Math.min(currentBuffer.length, 1024));
 
       if (textSample.trim().startsWith("#EXTM3U")) {
-        if (totalRead < 262144 && !stream.complete) {
+        const fullText = currentBuffer.toString("utf-8");
+
+        /**
+         * Manifesto é arquivo de texto pequeno: espera-se o `end`.
+         *
+         * A versão anterior devolvia em duas situações que não provam nada
+         * sobre o manifesto estar completo: ao ver `#EXT-X-STREAM-INF` (que é
+         * a PRIMEIRA linha de uma lista mestre, não a última) ou 15ms depois
+         * do último pedaço. Numa rede lenta, o manifesto chegava cortado no
+         * meio de uma linha — e o player recebia uma playlist truncada, com
+         * segmentos faltando ou uma URL pela metade. O canal abria e engasgava
+         * logo depois, sem erro que explicasse.
+         *
+         * Agora só o fim de verdade encerra: `#EXT-X-ENDLIST` (VOD), o
+         * encerramento da resposta, ou o teto de tamanho — que existe para o
+         * caso de o provedor mandar algo que só PARECE manifesto e não termina.
+         */
+        if (fullText.includes("#EXT-X-ENDLIST") || stream.complete || totalRead >= 262144) {
+          finish(true, fullText);
           return;
         }
-        finish(true, currentBuffer.toString("utf-8"));
+
+        // Rede travou no meio do download do manifesto: devolve o que veio em
+        // vez de segurar a requisição para sempre.
+        if (dataTimer) clearTimeout(dataTimer);
+        dataTimer = setTimeout(() => {
+          finish(true, Buffer.concat(chunks).toString("utf-8"));
+        }, 8000);
         return;
       }
 
+      // Não é M3U8 (é stream de vídeo binário MPEG-TS / MP4): pausa e devolve os bytes lidos sem desperdício
       stream.pause();
       finish(false, undefined, currentBuffer);
     }
@@ -250,10 +349,6 @@ async function peekUpstream(
       }
     }
 
-    function onError() {
-      finish(false, undefined, Buffer.concat(chunks));
-    }
-
     stream.on("data", onData);
     stream.on("end", onEnd);
     stream.on("error", onError);
@@ -263,11 +358,21 @@ async function peekUpstream(
 export async function GET(request: NextRequest) {
   const session = await auth();
   const referer = request.headers.get("referer");
+  const userAgent = request.headers.get("user-agent") || "";
+
+  const isNativeMediaEngine =
+    !referer ||
+    /AppleCoreMedia|CoreMedia|ExoPlayer|Dalvik|stagefright|AVPlayer|okhttp|GStreamer|FFmpeg|Safari|Chrome/i.test(
+      userAgent,
+    );
+
   const isSiteReferer =
-    referer &&
-    (referer.includes("tvhub") ||
-      referer.includes("170.238.45.225") ||
-      referer.includes("localhost"));
+    isNativeMediaEngine ||
+    (referer &&
+      (referer.includes("tvhub") ||
+        referer.includes("170.238.45.225") ||
+        referer.includes("nip.io") ||
+        referer.includes("localhost")));
 
   if (!session?.user && !isSiteReferer) {
     return new NextResponse("Não autorizado", { status: 401 });
@@ -314,18 +419,34 @@ export async function GET(request: NextRequest) {
 
     let statusCode = upstreamResponse.statusCode ?? 502;
 
-    if (statusCode === 404 && targetUrl.endsWith(".m3u8") && !forceRaw) {
-      const tsTarget = targetUrl.replace(/\.m3u8$/i, ".ts");
-      try {
-        const tsResponse = await fetchUpstream(tsTarget, rangeHeader);
-        if (tsResponse.statusCode && tsResponse.statusCode < 400) {
-          upstreamResponse = tsResponse;
-          statusCode = tsResponse.statusCode;
-        }
-      } catch {}
+    if (statusCode === 404 && !forceRaw) {
+      let altTarget: string | null = null;
+      if (targetUrl.endsWith(".m3u8")) altTarget = targetUrl.replace(/\.m3u8$/i, ".ts");
+      else if (targetUrl.endsWith(".ts")) altTarget = targetUrl.replace(/\.ts$/i, ".m3u8");
+      else if (targetUrl.endsWith(".mp4")) altTarget = targetUrl.replace(/\.mp4$/i, ".mkv");
+      else if (targetUrl.endsWith(".mkv")) altTarget = targetUrl.replace(/\.mkv$/i, ".mp4");
+      else if (targetUrl.includes("/movie/") || targetUrl.includes("/series/")) {
+        altTarget = `${targetUrl}.mp4`;
+      }
+
+      if (altTarget) {
+        try {
+          const altResponse = await fetchUpstream(altTarget, rangeHeader);
+          if (altResponse.statusCode && altResponse.statusCode < 400) {
+            // A resposta 404 original não serve mais para nada — e é ela que
+            // estava vazando em toda abertura de canal.
+            descartarUpstream(upstreamResponse);
+            upstreamResponse = altResponse;
+            statusCode = altResponse.statusCode;
+          } else {
+            descartarUpstream(altResponse);
+          }
+        } catch {}
+      }
     }
 
     if (statusCode >= 400) {
+      descartarUpstream(upstreamResponse);
       return new NextResponse(`Erro upstream: ${statusCode}`, {
         status: statusCode,
       });
@@ -354,12 +475,48 @@ export async function GET(request: NextRequest) {
         const baseUrl = new URL(targetUrl);
         const lines = peekResult.manifestText.split("\n");
 
+        const porProxy = (bruta: string) => {
+          const absoluta = new URL(bruta, baseUrl).toString();
+          return `/api/iptv/stream?url=${encodeURIComponent(absoluta)}`;
+        };
+
+        /**
+         * Tags que carregam URI e PRECISAM passar pela proxy também.
+         *
+         * A versão anterior pulava toda linha iniciada por `#`, e é justamente
+         * lá que moram dois endereços essenciais:
+         *
+         * - `#EXT-X-KEY:URI="..."` — a chave AES-128. Sem reescrever, o
+         *   navegador busca a chave em http a partir de uma página https:
+         *   conteúdo misto, bloqueado, e o canal criptografado nunca abre.
+         * - `#EXT-X-MAP:URI="..."` — o segmento de inicialização do fMP4.
+         *   Sem ele o fluxo não decodifica nada; e HLS em fMP4 é cada vez mais
+         *   comum nas listas.
+         *
+         * Ambos falhavam calados, o que os tornava difíceis de atribuir: o
+         * canal simplesmente "não abria".
+         */
+        const TAGS_COM_URI = /^(#EXT-X-KEY|#EXT-X-MAP|#EXT-X-SESSION-KEY|#EXT-X-PART|#EXT-X-PRELOAD-HINT|#EXT-X-RENDITION-REPORT|#EXT-X-I-FRAME-STREAM-INF|#EXT-X-MEDIA)[:,]/i;
+
         const rewrittenLines = lines.map((line) => {
           const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) return line;
+          if (!trimmed) return line;
+
+          if (trimmed.startsWith("#")) {
+            if (!TAGS_COM_URI.test(trimmed)) return line;
+            // Troca só o valor do atributo URI="...", preservando o resto da
+            // tag (METHOD, IV, BYTERANGE e companhia).
+            return line.replace(/URI="([^"]+)"/gi, (inteiro, uri: string) => {
+              try {
+                return `URI="${porProxy(uri)}"`;
+              } catch {
+                return inteiro;
+              }
+            });
+          }
+
           try {
-            const absoluteSegmentUrl = new URL(trimmed, baseUrl).toString();
-            return `/api/iptv/stream?url=${encodeURIComponent(absoluteSegmentUrl)}`;
+            return porProxy(trimmed);
           } catch {
             return line;
           }
@@ -368,6 +525,11 @@ export async function GET(request: NextRequest) {
         const rewrittenManifest = rewrittenLines.join("\n");
         responseHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
         responseHeaders.set("Content-Length", Buffer.byteLength(rewrittenManifest).toString());
+
+        // O manifesto já está inteiro em memória; a conexão não serve mais.
+        // Sem isto, cada atualização de playlist (a cada poucos segundos, por
+        // espectador) deixava um socket presos no pool.
+        descartarUpstream(upstreamResponse);
 
         return new NextResponse(rewrittenManifest, {
           status: statusCode,
@@ -398,12 +560,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (upstreamResponse.headers["accept-ranges"]) {
-      responseHeaders.set(
-        "Accept-Ranges",
-        upstreamResponse.headers["accept-ranges"]
-      );
-    }
+    responseHeaders.set("Accept-Ranges", "bytes");
+    responseHeaders.set(
+      "Access-Control-Expose-Headers",
+      "Content-Length, Content-Range, Accept-Ranges, Content-Type",
+    );
 
     let finalNodeStream: http.IncomingMessage | PassThrough = upstreamResponse;
 
@@ -413,6 +574,38 @@ export async function GET(request: NextRequest) {
       upstreamResponse.resume();
       upstreamResponse.pipe(pass);
       finalNodeStream = pass;
+    }
+
+    /**
+     * O espectador saiu: encerra a conexão com o provedor.
+     *
+     * Sem isto, fechar a aba ou trocar de canal deixava o socket do provedor
+     * aberto para sempre — ninguém mais lia daquele fluxo, mas ele continuava
+     * ocupando uma vaga no agente, que tem teto de 256. Numa noite de uso
+     * normal as vagas iam acabando, e a partir daí toda requisição NOVA de
+     * vídeo ficava na fila esperando um socket que nunca vagava. O sintoma
+     * disso não é um canal que falha: é o app inteiro parando de abrir vídeo,
+     * até o contêiner reiniciar.
+     *
+     * Cada troca de fonte do player abre uma conexão nova, então o vazamento
+     * andava rápido justamente para quem estava com dificuldade de assistir.
+     */
+    const encerrarUpstream = () => {
+      try {
+        upstreamResponse.destroy();
+      } catch {}
+    };
+
+    if (request.signal.aborted) {
+      encerrarUpstream();
+    } else {
+      request.signal.addEventListener("abort", encerrarUpstream, { once: true });
+      // Fim natural do fluxo também solta o ouvinte: em transmissão ao vivo o
+      // mesmo espectador abre e fecha muitos fluxos numa sessão só, e o sinal
+      // dura o que durar a requisição.
+      finalNodeStream.once("close", () =>
+        request.signal.removeEventListener("abort", encerrarUpstream),
+      );
     }
 
     const webStream = Readable.toWeb(finalNodeStream) as ReadableStream;
