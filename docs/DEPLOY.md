@@ -3,22 +3,26 @@
 ## O que acontece quando você faz merge na `main`
 
 ```
-merge na main
+merge / push na main
    │
-   ├─ 1. GitHub Actions compila a imagem            (automático, ~5 min)
-   │     next build + prisma generate → ghcr.io/<org>/tvhub:sha-a1b2c3d
+   └─ 1. GitHub Actions COMPILA a imagem            (automático)
+         next build → ghcr.io/<org>/tvhub:sha-a1b2c3d
+         A VPS NÃO é tocada.
+
+Publicar na VPS (só à mão, Actions → Deploy → Run workflow)
    │
-   ├─ 2. PAUSA esperando aprovação                  ← alguém precisa clicar
-   │
-   ├─ 3. VPS baixa a imagem                         (antes da troca, de propósito)
-   ├─ 4. prisma migrate deploy                      (só adiciona — ver REGRAS.md §6)
-   ├─ 5. Rolling update start-first                 (o site NÃO cai)
-   └─ 6. Confere https://<host>/api/ready = 200
+   ├─ 0. Recusa se TVHUB_PROTECT_IMAGE=1 ou se a
+   │     imagem no ar for `emergencia-*`
+   ├─ 2. VPS baixa a imagem
+   ├─ 3. prisma migrate deploy                      (só adiciona — ver REGRAS.md §6)
+   ├─ 4. Rolling update start-first
+   └─ 5. Confere https://<host>/api/ready = 200
 ```
 
-A pausa do passo 2 existe porque o vídeo passa pelo próprio app: toda troca de
-versão mexe com quem está assistindo naquele instante. Quem aprova escolhe a
-hora.
+Push sozinho já reverteu logo e configs duas vezes: a VPS estava numa imagem
+de emergência que o GitHub não tem. Por isso o job `producao` não roda no
+push. A trava `TVHUB_PROTECT_IMAGE=1` no `.env` da VPS é a segunda barreira —
+mesmo o botão recusa enquanto ela estiver ligada.
 
 ## Por que o site não cai
 

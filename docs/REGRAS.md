@@ -122,10 +122,16 @@ O repositório é **privado** e precisa continuar assim: o `tvhub-stack.yml` ain
 carrega chaves de TMDB e DeepSeek como valor padrão. Tornar o repositório
 público expõe as duas.
 
-## 9. Ninguém faz push direto na `main`
+`TVHUB_PROTECT_IMAGE=1` no `.env` da VPS impede o CI de trocar a imagem no ar.
+Enquanto a produção for uma imagem `emergencia-*` (logo e configs que ainda
+não estão no Git), essa trava fica ligada. Push na `main` só publica no GHCR;
+não mexe na VPS.
 
-Trabalho novo sai em branch e entra por Pull Request, com o CI verde. A `main` é
-o que vai para produção — veja [CONTRIBUTING.md](../CONTRIBUTING.md).
+## 9. Push na `main` não publica a VPS
+
+A `main` guarda o código. A VPS só muda pelo botão **Run workflow** no Actions,
+e só se `TVHUB_PROTECT_IMAGE` não estiver em `1`. Sem isso, o próximo push
+apaga a imagem de emergência — logo e configs que o GitHub ainda não tem.
 
 ---
 

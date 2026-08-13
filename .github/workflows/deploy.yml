@@ -2,11 +2,12 @@
 #
 # COMO FUNCIONA
 #   merge na main  →  job `imagem` (compila e publica no GHCR, automático)
-#                  →  job `producao` (PARADO, esperando alguém aprovar)
+#                  →  job `producao` NÃO roda no push
 #
-# A pausa não é burocracia: o /api/iptv/stream faz proxy do vídeo pelo próprio
-# Node, então toda troca de versão mexe com quem está assistindo naquele
-# instante. Quem aprova escolhe a hora.
+# Publicar na VPS é só pelo botão "Run workflow" (workflow_dispatch).
+# Push sozinho já reverteu logo e configs duas vezes: a VPS estava numa
+# imagem de emergência que o GitHub não tem. Sem esta trava, o próximo
+# `git push` na main apaga de novo o que está no ar.
 #
 # O build NUNCA roda na VPS. Ela tem ~830 MB livres e hospeda um Odoo em
 # produção — o `next build` lá aciona o OOM killer, que escolhe a vítima pelo
@@ -91,9 +92,10 @@ jobs:
     name: Publicar em produção
     runs-on: ubuntu-latest
     needs: [imagem]
-    # Sempre roda: com `workflow_dispatch` + tag informada, o job `imagem` é
-    # pulado e `needs` sozinho bloquearia este aqui.
-    if: ${{ always() && (needs.imagem.result == 'success' || github.event.inputs.imagem != '') }}
+    # Só no botão. Push na main NÃO troca a VPS — foi assim que a imagem
+    # de emergência (logo/config) sumiu duas vezes.
+    # Com tag informada o job `imagem` é pulado; `always()` evita o bloqueio.
+    if: ${{ github.event_name == 'workflow_dispatch' && always() && (needs.imagem.result == 'success' || github.event.inputs.imagem != '') }}
 
     # É este `environment` que cria o portão de aprovação. Configure em
     # Settings → Environments → production → Required reviewers.
@@ -142,6 +144,25 @@ jobs:
             BatchMode yes
             ServerAliveInterval 30
           EOF
+
+      - name: Recusar se a VPS estiver protegida
+        run: |
+          set -euo pipefail
+          ssh vps bash -euo pipefail <<'EOS'
+          cd /opt/tvhub
+          set -a; . ./.env; set +a
+          ATUAL=$(grep '^TVHUB_IMAGE=' .env | cut -d= -f2- | tr -d '\r')
+          if [ "${TVHUB_PROTECT_IMAGE:-}" = "1" ]; then
+            echo "::error::VPS protegida (TVHUB_PROTECT_IMAGE=1). A imagem no ar (${ATUAL}) não pode ser trocada pelo GitHub — é assim que a logo e as configs da emergência somem. Para publicar de propósito: tire a trava no .env da VPS e rode este workflow de novo."
+            exit 1
+          fi
+          case "$ATUAL" in
+            *emergencia*)
+              echo "::error::VPS está numa imagem de emergência (${ATUAL}). Publicar o GitHub apaga o que só existe nessa imagem. Só siga se for de propósito: TVHUB_PROTECT_IMAGE=0 e TVHUB_IMAGE apontando para o SHA."
+              exit 1
+              ;;
+          esac
+          EOS
 
       - name: Enviar a definição da stack
         run: scp deploy/tvhub-stack.yml vps:/opt/tvhub/tvhub-stack.yml
@@ -204,6 +225,11 @@ jobs:
         run: |
           ssh vps bash -euo pipefail <<'EOS'
           cd /opt/tvhub
+          set -a; . ./.env; set +a
+          if [ "${TVHUB_PROTECT_IMAGE:-}" = "1" ]; then
+            echo "Recusado: TVHUB_PROTECT_IMAGE=1 — não troco a imagem no ar."
+            exit 1
+          fi
           # TVHUB_IMAGE é o único ponto do sistema que diz qual código está em
           # produção. Fica no .env da VPS, que não está no Git.
           if grep -q '^TVHUB_IMAGE=' .env; then
