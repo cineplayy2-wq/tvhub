@@ -3,7 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { cached, TTL } from "@/lib/cache";
-import { dedupeChannels, cleanSeriesTitle } from "@/lib/utils";
+import { agruparVariantes, dedupeChannels, cleanSeriesTitle } from "@/lib/utils";
 
 
 const PAGE_SIZE = 20;
@@ -223,14 +223,31 @@ export async function getPlaylistChannels({
         country: true,
         isFavorite: true,
         relevanceScore: true,
+        tmdbPosterUrl: true,
+        tmdbBackdropUrl: true,
+        tmdbRating: true,
+        tmdbYear: true,
+        tmdbOverview: true,
+        tmdbSyncedAt: true,
         group: { select: { name: true, slug: true, category: true } },
       },
     }),
     cached(totalCacheKey, TTL.playlist, () => prisma.m3uChannel.count({ where })),
   ]);
 
+  /**
+   * As variantes de resolução do mesmo título viram um item só.
+   *
+   * O agrupamento é por página, não sobre o acervo inteiro: agrupar antes de
+   * paginar exigiria varrer as 60 mil linhas a cada abertura de tela. O efeito
+   * colateral é que uma página pode vir com menos itens que o tamanho pedido —
+   * o que na prática não se percebe, e é muito melhor que a mesma coisa
+   * repetida quatro vezes na grade.
+   */
+  const agrupados = agruparVariantes(items);
+
   return {
-    items,
+    items: agrupados,
     total,
     page,
     pageSize,
@@ -251,6 +268,12 @@ export async function getFeaturedChannels(playlistId: string, limit = 10) {
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
   });
@@ -281,6 +304,12 @@ export async function getRegionalChannels(playlistId: string, limit = 18) {
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
   });
@@ -314,6 +343,12 @@ export async function getStateChannels(
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
   });
@@ -321,7 +356,30 @@ export async function getStateChannels(
   return dedupeChannels(items).slice(0, limit);
 }
 
-export async function getNovelasList(playlistId: string, limit = 18) {
+export async function getNovelasList(
+  playlistId: string,
+  limit = 18,
+  filterType: "all" | "vod" | "live" = "all",
+) {
+  const andClauses: Prisma.M3uChannelWhereInput[] = [];
+
+  if (filterType === "vod") {
+    andClauses.push({
+      OR: [
+        { streamUrl: { contains: "/series/" } },
+        { streamUrl: { contains: "/movie/" } },
+        { group: { category: "series" } },
+      ],
+    });
+  } else if (filterType === "live") {
+    andClauses.push({
+      NOT: [
+        { streamUrl: { contains: "/series/" } },
+        { streamUrl: { contains: "/movie/" } },
+      ],
+    });
+  }
+
   const items = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
@@ -333,6 +391,7 @@ export async function getNovelasList(playlistId: string, limit = 18) {
         { name: { contains: "NOVELA", mode: "insensitive" } },
         { name: { contains: "DORAMA", mode: "insensitive" } },
       ],
+      AND: andClauses.length > 0 ? andClauses : undefined,
     },
     orderBy: { relevanceScore: "desc" },
     take: limit * 3,
@@ -344,6 +403,12 @@ export async function getNovelasList(playlistId: string, limit = 18) {
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
   });
@@ -391,6 +456,12 @@ export async function getChannelsByCategory(
         quality: true,
         isFavorite: true,
         relevanceScore: true,
+        tmdbPosterUrl: true,
+        tmdbBackdropUrl: true,
+        tmdbRating: true,
+        tmdbYear: true,
+        tmdbOverview: true,
+        tmdbSyncedAt: true,
         group: { select: { name: true, slug: true, category: true } },
       },
     });
@@ -425,6 +496,12 @@ export async function getChannelsByCategory(
         quality: true,
         isFavorite: true,
         relevanceScore: true,
+        tmdbPosterUrl: true,
+        tmdbBackdropUrl: true,
+        tmdbRating: true,
+        tmdbYear: true,
+        tmdbOverview: true,
+        tmdbSyncedAt: true,
         group: { select: { name: true, slug: true, category: true } },
       },
     });
@@ -454,6 +531,12 @@ export async function getChannelsByCategory(
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
   });
@@ -527,18 +610,38 @@ export async function toggleCategoryLock(playlistId: string, category: string, i
 }
 
 export async function getSeriesEpisodes(playlistId: string, seriesName: string) {
-  const cleanStem = cleanSeriesTitle(seriesName);
+  const cleanStem = cleanSeriesTitle(seriesName).toLowerCase();
   const words = cleanStem.split(/\s+/).filter((w) => w.length > 2);
   const searchStem = words.slice(0, 3).join(" ");
 
-  return prisma.m3uChannel.findMany({
+  const candidates = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
       isActive: true,
-      name: { contains: searchStem || cleanStem || seriesName, mode: "insensitive" },
+      AND: [
+        {
+          OR: [
+            { streamUrl: { contains: "/series/" } },
+            { group: { category: "series" } },
+            { name: { contains: "S0", mode: "insensitive" } },
+            { name: { contains: "T0", mode: "insensitive" } },
+            { name: { contains: "S1", mode: "insensitive" } },
+            { name: { contains: "T1", mode: "insensitive" } },
+            { name: { contains: "EP", mode: "insensitive" } },
+          ],
+        },
+        {
+          NOT: [
+            { streamUrl: { contains: "/movie/" } },
+          ],
+        },
+        {
+          name: { contains: searchStem || cleanStem || seriesName, mode: "insensitive" },
+        },
+      ],
     },
     orderBy: { name: "asc" },
-    take: 300,
+    take: 400,
     select: {
       id: true,
       name: true,
@@ -547,8 +650,24 @@ export async function getSeriesEpisodes(playlistId: string, seriesName: string) 
       quality: true,
       isFavorite: true,
       relevanceScore: true,
+      tmdbPosterUrl: true,
+      tmdbBackdropUrl: true,
+      tmdbRating: true,
+      tmdbYear: true,
+      tmdbOverview: true,
+      tmdbSyncedAt: true,
       group: { select: { name: true, slug: true, category: true } },
     },
+  });
+
+  return candidates.filter((c) => {
+    const cClean = cleanSeriesTitle(c.name).toLowerCase();
+    return (
+      cClean === cleanStem ||
+      cClean.startsWith(cleanStem) ||
+      cleanStem.startsWith(cClean) ||
+      c.name.toLowerCase().includes(cleanStem)
+    );
   });
 }
 
@@ -642,27 +761,84 @@ export async function getSeriesList(playlistId: string, limitArg?: number | stri
   }));
 }
 
+/**
+ * Categorias REAIS do conteúdo ao vivo, com quantos canais cada uma tem.
+ *
+ * A versão anterior filtrava `category: "live"` e depois agrupava por
+ * `g.category` — que, por causa do próprio filtro, era sempre "live". O
+ * resultado era uma lista de blocos todos iguais dizendo a mesma coisa, e pior:
+ * a página descarta as fileiras cuja categoria não aparece aqui, então
+ * Esportes, Notícias, Infantil e Documentários simplesmente nunca eram
+ * exibidos. A aba Canais virava um amontoado sem sentido.
+ *
+ * "Ao vivo" aqui é definido pela URL, não pelo rótulo do grupo: o que não é
+ * `/movie/` nem `/series/` é sinal contínuo.
+ */
 export async function getLiveCategoryOverview(playlistId: string) {
-  const groups = await prisma.m3uGroup.findMany({
-    where: { playlistId, isHidden: false, category: "live" },
-    select: {
-      category: true,
-      channels: {
-        where: { isActive: true },
-        take: 3,
-        select: { logoUrl: true },
-      },
-      _count: { select: { channels: true } },
-    },
-  });
+  const linhas = await prisma.$queryRaw<
+    Array<{ category: string; total: number; logos: string[] }>
+  >`
+    SELECT
+      g.category                                   AS category,
+      COUNT(*)::int                                AS total,
+      (array_remove(array_agg(c."logoUrl" ORDER BY c."relevanceScore" DESC), NULL))[1:3] AS logos
+    FROM "M3uChannel" c
+    JOIN "M3uGroup" g ON g.id = c."groupId"
+    WHERE c."playlistId" = ${playlistId}
+      AND c."isActive" = true
+      AND g."isHidden" = false
+      AND g.category IS NOT NULL
+      AND g.category <> 'adult'
+      AND c."streamUrl" NOT LIKE '%/movie/%'
+      AND c."streamUrl" NOT LIKE '%/series/%'
+    GROUP BY g.category
+    HAVING COUNT(*) > 0
+    ORDER BY COUNT(*) DESC
+  `;
 
-  return groups.map((g) => ({
-    category: g.category ?? "live",
-    count: g._count.channels,
-    logos: g.channels.map((c) => c.logoUrl).filter((l): l is string => Boolean(l)),
+  return linhas.map((l) => ({
+    category: l.category,
+    count: l.total,
+    logos: (l.logos ?? []).filter(Boolean),
   }));
 }
 
-export async function getLiveChannelsByCategory(playlistId: string, category: string, limit = 18) {
-  return getChannelsByCategory(playlistId, "live", limit);
+/**
+ * Canais ao vivo de UMA categoria.
+ *
+ * A versão anterior recebia `category` e descartava, chamando sempre com
+ * "live": todas as fileiras da aba Canais mostravam exatamente o mesmo
+ * conteúdo, independente do título em cima delas.
+ */
+export async function getLiveChannelsByCategory(
+  playlistId: string,
+  category: string,
+  limit = 18,
+) {
+  // Busca com folga: o agrupamento das variantes de resolução encolhe a lista,
+  // e sem a folga a trilha viria com metade dos canais que deveria mostrar.
+  const items = await prisma.m3uChannel.findMany({
+    where: {
+      playlistId,
+      isActive: true,
+      group: { isHidden: false, category },
+      NOT: [
+        { streamUrl: { contains: "/movie/" } },
+        { streamUrl: { contains: "/series/" } },
+      ],
+    },
+    orderBy: [{ relevanceScore: "desc" }, { sortOrder: "asc" }],
+    take: limit * 3,
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+      quality: true,
+      isFavorite: true,
+      streamUrl: true,
+      group: { select: { name: true, slug: true, category: true } },
+    },
+  });
+
+  return agruparVariantes(items).slice(0, limit);
 }

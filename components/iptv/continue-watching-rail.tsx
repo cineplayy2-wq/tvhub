@@ -1,11 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { Play, RotateCcw, Sparkles } from "lucide-react";
+import { Play, Radio, RotateCcw, Sparkles } from "lucide-react";
 
 import { Rail } from "@/components/iptv/rail";
 import { GUTTER } from "@/components/iptv/section";
 import type { ContinueWatchingItem } from "@/lib/iptv/watch-progress-service";
+
+/**
+ * A trilha atende dois casos que só parecem o mesmo.
+ *
+ * Em filme e série existe posição salva: a promessa é "você parou aos 34 min".
+ * Em canal ao vivo não existe posição nenhuma — o que a lista guarda é o que a
+ * pessoa costuma ver. Chamar os dois de "Continuar assistindo" faz o canal
+ * parecer um vídeo que ficou pela metade, e era isso que a barra de progresso
+ * vazia comunicava.
+ */
+const VARIANTS = {
+  vod: {
+    titulo: "Continuar assistindo",
+    legenda: "Você parou no meio destes títulos",
+    Icone: RotateCcw,
+  },
+  live: {
+    titulo: "Voltar aos canais",
+    legenda: "Os canais que você mais abre neste perfil",
+    Icone: Radio,
+  },
+} as const;
 
 function formatMinutesLeft(positionSeconds: number, durationSeconds: number): string {
   if (!durationSeconds || durationSeconds <= positionSeconds) return "";
@@ -19,25 +41,28 @@ function formatMinutesLeft(positionSeconds: number, durationSeconds: number): st
 
 export function ContinueWatchingRail({
   items,
+  variant = "vod",
 }: {
   items: ContinueWatchingItem[];
+  /** `vod` retoma a posição salva; `live` só relista os canais mais abertos. */
+  variant?: keyof typeof VARIANTS;
 }) {
   if (!items || items.length === 0) return null;
+
+  const { titulo, legenda, Icone } = VARIANTS[variant];
 
   return (
     <section className="my-8">
       <div className={`${GUTTER} mb-4 flex items-center justify-between gap-4`}>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-primary border border-primary/30">
-            <RotateCcw className="h-4 w-4" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/30 bg-primary/20 text-accent">
+            <Icone className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground md:text-2xl flex items-center gap-2">
-              Continuar Assistindo
+            <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-foreground md:text-2xl">
+              {titulo}
             </h2>
-            <p className="text-xs text-muted-foreground">
-              Continue de onde você parou no seu perfil
-            </p>
+            <p className="text-xs text-muted-foreground">{legenda}</p>
           </div>
         </div>
       </div>
@@ -52,7 +77,7 @@ export function ContinueWatchingRail({
               {/* Card Thumbnail */}
               <Link
                 href={`/tv/assistir/${item.channelId}`}
-                className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-md transition-all duration-300 group-hover:scale-[1.03] group-hover:border-primary/60 group-hover:shadow-[0_0_25px_rgba(108,29,255,0.4)]"
+                className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-md transition-all duration-300 group-hover:scale-[1.03] group-hover:border-primary/60 group-hover:shadow-[0_0_25px_rgba(124,42,158,0.4)]"
               >
                 {item.logoUrl ? (
                   <img
@@ -75,30 +100,39 @@ export function ContinueWatchingRail({
 
                 {/* Badge de Vezes Assistido ("Assistido 3x") */}
                 {item.watchCount > 1 && (
-                  <span className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/80 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-300 backdrop-blur-md shadow-lg">
-                    <Sparkles className="h-3 w-3 text-amber-400 fill-amber-400" />
+                  <span className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full border border-accent/40 bg-black/80 px-2.5 py-0.5 text-[11px] font-extrabold text-accent backdrop-blur-md shadow-lg">
+                    <Sparkles className="h-3 w-3 fill-accent text-accent" />
                     Assistido {item.watchCount}x
                   </span>
                 )}
 
-                {/* Barra de Progresso com % */}
-                <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-6">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-white mb-1.5 drop-shadow-sm">
-                    <span className="text-primary-light font-extrabold">{percent}% concluído</span>
-                    {minutesLeft && <span className="text-white/80">{minutesLeft}</span>}
+                {/* Barra de Progresso com % (Apenas para Filmes e Séries) */}
+                {percent > 0 && item.durationSeconds > 0 ? (
+                  <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-6">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-white mb-1.5 drop-shadow-sm">
+                      <span className="text-primary-light font-extrabold">{percent}% concluído</span>
+                      {minutesLeft && <span className="text-white/80">{minutesLeft}</span>}
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary via-primary-hover to-accent shadow-[0_0_10px_rgba(124,42,158,0.9)] transition-all duration-300"
+                        style={{ width: `${Math.max(4, percent)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary via-violet-500 to-indigo-400 shadow-[0_0_10px_rgba(108,29,255,0.9)] transition-all duration-300"
-                      style={{ width: `${Math.max(4, percent)}%` }}
-                    />
+                ) : (
+                  <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-4">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-600/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                      Canal
+                    </span>
                   </div>
-                </div>
+                )}
               </Link>
 
               {/* Nome do Conteúdo */}
               <div className="px-0.5">
-                <h3 className="text-sm font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                <h3 className="text-sm font-bold text-foreground line-clamp-1 group-hover:text-accent transition-colors">
                   {item.cleanName}
                 </h3>
               </div>

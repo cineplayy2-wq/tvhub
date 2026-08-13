@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isSeriesItem, mediaKindOf } from "@/lib/iptv/media-kind";
 import { prisma } from "@/lib/prisma";
 import { cleanMediaTitle, slugify } from "@/lib/utils";
 
@@ -123,6 +124,7 @@ export async function getContinueWatchingList(
   playlistId: string,
   profileId: string,
   limit = 12,
+  filterType: "vod" | "live" | "all" = "vod",
 ): Promise<ContinueWatchingItem[]> {
   if (!profileId || !playlistId) return [];
 
@@ -134,7 +136,7 @@ export async function getContinueWatchingList(
         positionSeconds: { gt: MIN_POSITION_SECONDS },
       },
       orderBy: { lastWatched: "desc" },
-      take: limit * 2,
+      take: limit * 3,
       select: {
         itemKey: true,
         channelId: true,
@@ -173,6 +175,23 @@ export async function getContinueWatchingList(
               isActive: true,
               group: { isHidden: false, category: { not: "adult" } },
               name: { contains: record.itemKey.replace(/-/g, " "), mode: "insensitive" },
+              // Busca por nome casa com qualquer coisa parecida, inclusive o
+              // canal 24h homônimo do filme. Restringir ao formato certo evita
+              // recuperar o item errado e depois descartá-lo no filtro abaixo,
+              // que faria o título sumir da lista sem motivo aparente.
+              ...(filterType === "vod"
+                ? {
+                    OR: [
+                      { streamUrl: { contains: "/movie/" } },
+                      { streamUrl: { contains: "/series/" } },
+                      { streamUrl: { endsWith: ".mp4" } },
+                      { streamUrl: { endsWith: ".mkv" } },
+                    ],
+                  }
+                : {}),
+              ...(filterType === "live"
+                ? { NOT: [{ streamUrl: { contains: "/movie/" } }, { streamUrl: { contains: "/series/" } }] }
+                : {}),
             },
             select: {
               id: true,
@@ -189,8 +208,20 @@ export async function getContinueWatchingList(
 
       if (!channel) continue;
 
+      // A URL decide antes da categoria do grupo — ver lib/iptv/media-kind.ts.
+      // Era por confiar na categoria que canal de "CANAIS | TELECINE" (grupo
+      // classificado como `movies`) aparecia no Continuar Assistindo de filmes.
+      const isVodChannel =
+        mediaKindOf({
+          streamUrl: channel.streamUrl,
+          category: channel.group?.category,
+        }) === "vod";
+
+      if (filterType === "vod" && !isVodChannel) continue;
+      if (filterType === "live" && isVodChannel) continue;
+
       const percent =
-        record.durationSeconds > 0
+        isVodChannel && record.durationSeconds > 0
           ? Math.min(100, Math.round((record.positionSeconds / record.durationSeconds) * 100))
           : 0;
 
@@ -199,15 +230,20 @@ export async function getContinueWatchingList(
         cleanName: cleanMediaTitle(channel.name),
         originalName: channel.name,
         logoUrl: channel.logoUrl,
-        positionSeconds: record.positionSeconds,
-        durationSeconds: record.durationSeconds,
+        positionSeconds: isVodChannel ? record.positionSeconds : 0,
+        durationSeconds: isVodChannel ? record.durationSeconds : 0,
         progressPercent: percent,
-        remainingSeconds: Math.max(0, record.durationSeconds - record.positionSeconds),
-        category: channel.group?.category ?? "movies",
+        remainingSeconds: isVodChannel ? Math.max(0, record.durationSeconds - record.positionSeconds) : 0,
+        category: channel.group?.category ?? (isVodChannel ? "movies" : "live"),
         lastWatched: record.lastWatched,
         watchCount: record.watchCount,
         isSeries:
-          channel.streamUrl.includes("/series/") || channel.group?.category === "series",
+          isVodChannel &&
+          isSeriesItem({
+            streamUrl: channel.streamUrl,
+            name: channel.name,
+            category: channel.group?.category,
+          }),
       });
     }
 

@@ -98,7 +98,11 @@ export function cleanMediaTitle(rawName: string): string {
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2000}-\u{206F}\u{2100}-\u{214F}]/gu, "")
     .replace(/[⚽|✔️|★|✨|🔞|❌|⛹|🍿|📺|💬|📡|🎭|🎬|✝️|🎵|🎥|📰|🧸|⚡|🥊|🏆|🏎️|🏀|💖|🐾]/g, "")
     .replace(/\[.*?\]|\(.*?\)/g, "")
-    .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H265|UHD|HDR|BLURAY|WEB-DL|WEBDL)\b/gi, "")
+    // As formas COMPOSTAS têm que sair antes das simples. Tirando "HD" de
+    // "FULL HD" primeiro, sobra "FULL" pendurado no nome — era assim que
+    // "Band FULL HD" virava "Band FULL" na tela.
+    .replace(/\b(FULL\s*HD|ULTRA\s*HD|WEB[\s.-]?DL|BLU[\s-]?RAY|H[\s.]?26[45])\b/gi, "")
+    .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H265|UHD|HDR|BLURAY|WEBDL)\b/gi, "")
     .replace(/\b(DUBLADO|LEGENDADO|DUB|LEG|DUBL|LEGEN|LEG\/DUB)\b/gi, "")
     .replace(/^[-:|/\s]+|[-:|/\s]+$/g, "")
     .replace(/\s+/g, " ")
@@ -183,6 +187,47 @@ export async function mapWithConcurrency<T, R>(
 
   await Promise.all(workers);
   return results;
+}
+
+/**
+ * Junta as variantes do mesmo canal num item só.
+ *
+ * A lista do provedor traz "SBT", "SBT HD", "SBT FHD" e "SBT 4K" como quatro
+ * canais diferentes. São o mesmo canal em quatro resoluções — e o assinante vê
+ * quatro vezes a mesma coisa na grade, tendo que adivinhar qual abre.
+ *
+ * A chave é o nome já limpo (`cleanMediaTitle` remove 4K/FHD/HD/SD), então as
+ * quatro caem no mesmo balde. Fica a de maior resolução, porque é a que o
+ * player consegue reduzir sozinho se a rede não acompanhar — o caminho
+ * contrário não existe.
+ *
+ * Diferente de `dedupeChannels`, que fica com a PRIMEIRA ocorrência: aqui a
+ * ordem original da lista é preservada (a posição é a da primeira variante
+ * vista), mas o item escolhido é o melhor do grupo, não o que veio antes.
+ */
+export function agruparVariantes<
+  T extends { id: string; name: string; quality?: string | null },
+>(canais: T[]): T[] {
+  const porChave = new Map<string, { indice: number; melhor: T }>();
+
+  for (const canal of canais) {
+    const chave = cleanMediaTitle(canal.name).toLowerCase();
+    if (!chave) continue;
+
+    const existente = porChave.get(chave);
+    if (!existente) {
+      porChave.set(chave, { indice: porChave.size, melhor: canal });
+      continue;
+    }
+
+    if (qualityRank(canal.quality) > qualityRank(existente.melhor.quality)) {
+      existente.melhor = canal;
+    }
+  }
+
+  return [...porChave.values()]
+    .sort((a, b) => a.indice - b.indice)
+    .map(({ melhor }) => ({ ...melhor, name: cleanMediaTitle(melhor.name) }));
 }
 
 /** Agrupa séries eliminando duplicatas de episódios avulsos (S01E01, T1E2) em um único card de Série */
