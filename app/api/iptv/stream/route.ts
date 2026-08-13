@@ -7,6 +7,8 @@ import { Readable, PassThrough } from "node:stream";
 import { auth } from "@/auth";
 import {
   credencialDoUsuario,
+  eContaDoCatalogo,
+  paresDoCatalogo,
   reescreverCredencial,
 } from "@/lib/iptv/credentials";
 import { reconcileContentRange } from "@/lib/iptv/range";
@@ -360,11 +362,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const urlPedido = reescreverCredencial(targetUrl, viewer);
-  if (!urlPedido) {
-    return new NextResponse("Não foi possível usar a linha deste cliente neste endereço.", {
-      status: 403,
-    });
+  /**
+   * Conta da importação (usuário de teste / dono técnico): não reescreve.
+   *
+   * O acervo mistura dois painéis. Forçar a senha da lista ao vivo nos
+   * filmes da lista de backup devolve 404 em tudo — foi isso que parou
+   * o usuário de teste. Cliente com linha NOVA continua só na conta dele.
+   */
+  const catalogo = await paresDoCatalogo();
+  let urlPedido: string;
+  if (eContaDoCatalogo(viewer, catalogo)) {
+    urlPedido = targetUrl;
+  } else {
+    const reescrita = reescreverCredencial(targetUrl, viewer);
+    if (!reescrita) {
+      return new NextResponse(
+        "Não foi possível usar a linha deste cliente neste endereço.",
+        { status: 403 },
+      );
+    }
+    urlPedido = reescrita;
   }
 
   try {
