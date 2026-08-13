@@ -127,12 +127,35 @@ público expõe as duas.
 Trabalho novo sai em branch e entra por Pull Request, com o CI verde. A `main` é
 o que vai para produção — veja [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+## 10. Mexeu no player ou na proxy de vídeo? Leia o Manual do Player antes.
+
+**[docs/MANUAL-DO-PLAYER.md](MANUAL-DO-PLAYER.md)** — obrigatório antes de
+tocar em:
+
+- `components/iptv/iptv-player.tsx`
+- `app/api/iptv/stream/route.ts`
+- `lib/iptv/media-kind.ts`
+
+Ele é diário de bordo: guarda o sintoma, a causa e a correção de tudo que já
+quebrou a reprodução, **e o que já foi tentado e deu errado**. Duas mudanças
+que pareciam melhorias óbvias estão lá marcadas como revertidas, com o motivo.
+Sem ler, a chance de reintroduzir uma delas é alta.
+
+Terminou de mexer? **Acrescente a entrada no diário.** Principalmente se deu
+errado — é o que tem mais valor lá dentro.
+
 ---
 
 ## Antes de abrir o PR
 
 ```bash
 npm run typecheck && npm run lint && npm run build
+```
+
+Mexeu no player ou na proxy de vídeo (regra 10):
+
+```bash
+node tests/prova-fontes.mjs && node tests/prova-timeout-socket.mjs
 ```
 
 Mexeu no banco:
