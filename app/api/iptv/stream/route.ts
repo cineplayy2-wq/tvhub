@@ -30,7 +30,19 @@ export const maxDuration = 3600;
  * provedor e longo o bastante para tirar o DNS do caminho crítico.
  */
 const CACHE_DNS_MS = 5 * 60 * 1000;
-const dnsCache = new Map<string, { address: string; family: number; ate: number }>();
+/**
+ * `codigo` guarda o erro ORIGINAL das entradas negativas.
+ *
+ * Não é detalhe de arrumação: o resto deste arquivo trata EAI_AGAIN
+ * (passageiro, insiste) e ENOTFOUND (ausência, desiste e marca o host como
+ * morto por 5 minutos) de formas opostas. Guardar só "endereço vazio" apagava
+ * essa distinção e fazia toda falha temporária ressurgir do cache como
+ * ENOTFOUND — ver o comentário no `lookupComCache`.
+ */
+const dnsCache = new Map<
+  string,
+  { address: string; family: number; ate: number; codigo?: string }
+>();
 
 /**
  * O formato da resposta depende de `options.all`.
@@ -73,12 +85,27 @@ const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
      * Devolvê-la como sucesso entregava string vazia ao socket, que morria com
      * "Invalid IP address" — um erro que não diz nada sobre o DNS e manda o
      * chamador procurar problema no lugar errado.
+     *
+     * O código replicado é o ORIGINAL, não um ENOTFOUND fixo. Fixar ENOTFOUND
+     * aqui tirava o player do ar por inteiro, assim:
+     *
+     *   1. um EAI_AGAIN (falha TEMPORÁRIA de DNS, comum sob carga) gravava a
+     *      entrada negativa;
+     *   2. a requisição seguinte lia o cache e recebia ENOTFOUND;
+     *   3. `ehHostInexistente` via ENOTFOUND e chamava `marcarHostMorto`;
+     *   4. por 5 MINUTOS todo play para aquele host devolvia 502 na hora, sem
+     *      nem tentar conectar.
+     *
+     * Como o catálogo inteiro vem de um punhado de hosts do provedor, um
+     * soluço de DNS derrubava tudo para todo mundo — e, com os espectadores
+     * repetindo, a janela se renovava sozinha antes de expirar.
      */
     const erroCache: NodeJS.ErrnoException | null = guardado.address
       ? null
-      : Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), {
-          code: "ENOTFOUND",
-        });
+      : Object.assign(
+          new Error(`getaddrinfo ${guardado.codigo ?? "EAI_AGAIN"} ${hostname}`),
+          { code: guardado.codigo ?? "EAI_AGAIN" },
+        );
 
     process.nextTick(() =>
       responderLookup(callback, erroCache, guardado.address, guardado.family, querLista),
@@ -99,8 +126,15 @@ const lookupComCache: NonNullable<http.RequestOptions["lookup"]> = (
       if (!err && address) {
         dnsCache.set(hostname, { address, family, ate: agora + CACHE_DNS_MS });
       } else if (err) {
-        // Se deu erro temporário, guarda por 5s para evitar rajada de getaddrinfo que trava o libuv
-        dnsCache.set(hostname, { address: "", family: 4, ate: agora + 5000 });
+        // Guarda por 5s para evitar rajada de getaddrinfo que trava o libuv.
+        // O código vai junto: é ele que diz, na próxima leitura, se a falha era
+        // passageira (insiste) ou ausência de verdade (desiste).
+        dnsCache.set(hostname, {
+          address: "",
+          family: 4,
+          ate: agora + 5000,
+          codigo: err.code ?? "EAI_AGAIN",
+        });
       }
       responderLookup(callback, err, address, family, querLista);
     });
@@ -176,15 +210,44 @@ function ehHostInexistente(erro: unknown) {
 const CACHE_HOST_MORTO_MS = 5 * 60 * 1000;
 const hostsMortos = new Map<string, number>();
 
+/**
+ * Dois strikes antes de condenar, não um.
+ *
+ * Marcar na primeira falha dá ao acaso o poder de tirar o catálogo inteiro do
+ * ar: os canais vêm de um punhado de hosts do provedor, e `hostEstaMorto`
+ * responde 502 sem nem tentar conectar. Um ENOTFOUND isolado — resolvedor
+ * reiniciando, pacote perdido, resposta truncada — bastava para bloquear todo
+ * mundo por 5 minutos.
+ *
+ * Exigir confirmação preserva o ganho que o cache existe para dar (a escada de
+ * reservas de um provedor realmente fora do ar falha rápido a partir da
+ * segunda tentativa) e tira o gatilho do acaso. A contagem zera junto com a
+ * condenação, quando a janela expira.
+ */
+const strikesDeHost = new Map<string, number>();
+
 function marcarHostMorto(hostname: string) {
-  hostsMortos.set(hostname, Date.now() + CACHE_HOST_MORTO_MS);
+  const strikes = (strikesDeHost.get(hostname) ?? 0) + 1;
+  strikesDeHost.set(hostname, strikes);
+  if (strikes >= 2) {
+    hostsMortos.set(hostname, Date.now() + CACHE_HOST_MORTO_MS);
+  }
+}
+
+/** Host respondeu: zera o histórico para não condenar por falhas espalhadas. */
+function marcarHostVivo(hostname: string) {
+  if (strikesDeHost.size > 0) strikesDeHost.delete(hostname);
+  if (hostsMortos.size > 0) hostsMortos.delete(hostname);
 }
 
 function hostEstaMorto(hostname: string) {
   const ate = hostsMortos.get(hostname);
   if (ate === undefined) return false;
   if (ate > Date.now()) return true;
+  // Cumpriu a pena: sai limpo, senão a próxima falha isolada o condenaria de
+  // imediato pelo strike antigo e a janela se renovaria para sempre.
   hostsMortos.delete(hostname);
+  strikesDeHost.delete(hostname);
   return false;
 }
 
@@ -431,6 +494,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (!upstream) throw ultimoErro ?? new Error("Falha ao conectar no upstream");
+
+    // Conectou: o host está de pé. Zera qualquer strike solto para que falhas
+    // espalhadas ao longo de horas não somem até virar uma condenação.
+    if (hostAlvo) marcarHostVivo(hostAlvo);
 
     let upstreamResponse = upstream.res;
     /** Base para resolver segmentos e adivinhar o tipo: o que serviu, não o que pedimos. */
