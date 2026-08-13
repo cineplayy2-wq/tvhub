@@ -34,11 +34,31 @@ export function detectConnectionProfile(): ConnectionProfile {
   if (effective === "slow-2g" || effective === "2g") return "poor";
   if (effective === "3g") return "fair";
 
+  /**
+   * Com `4g`, para por aqui — sem consultar `downlink`.
+   *
+   * `downlink` NÃO é a capacidade do link: é a média móvel do que já trafegou,
+   * arredondada e limitada a 10 Mbps. No instante em que a página abre quase
+   * nada trafegou, então uma fibra de 300 Mbps costuma reportar 1,5 ou 3 —
+   * valores que caíam direto em "poor" e "fair" aqui embaixo.
+   *
+   * O efeito era o assinante de conexão ótima receber SD e achar, com razão,
+   * que a qualidade piorou. Como o provedor não manda stream adaptativo, essa
+   * escolha é definitiva: não existe subir de faixa depois.
+   *
+   * `effectiveType` responde outra pergunta, e é a pergunta certa aqui: em que
+   * categoria de rede este aparelho está. O navegador a calcula com histórico
+   * de latência e vazão, não com o tráfego dos últimos milissegundos.
+   */
+  if (effective === "4g") return "good";
+
+  /**
+   * Sem `effectiveType` (navegador que expõe só `downlink`), o valor volta a
+   * ser o único sinal — mas com limiar baixo, para ele acusar apenas o que é
+   * inequivocamente ruim, em vez de rebaixar quem só acabou de abrir a página.
+   */
   const downlink = info.downlink;
-  if (typeof downlink === "number") {
-    if (downlink < 2) return "poor";
-    if (downlink < 6) return "fair";
-  }
+  if (typeof downlink === "number" && downlink < 1) return "poor";
 
   return "good";
 }
