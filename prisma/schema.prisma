@@ -80,6 +80,7 @@ model Profile {
   watchlist      WatchlistItem[]
   watchProgress  WatchProgress[]
   streamSessions StreamSession[]
+  dismissed      DismissedRecommendation[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -455,6 +456,29 @@ model WatchlistItem {
   @@index([titleId])
 }
 
+/// Sugestão que o perfil dispensou no "x" da trilha de recomendação.
+///
+/// Dispensar tira o título das DICAS, nunca do catálogo: ele continua na
+/// busca, na grade do gênero e em Todo o acervo. São coisas diferentes —
+/// "não me sugira isto" não é "não quero ter acesso a isto".
+///
+/// A chave é o `itemKey` normalizado, não o id do canal, porque a
+/// sincronização da M3U recria linhas e o id nem sempre sobrevive; a dispensa
+/// precisa sobreviver.
+model DismissedRecommendation {
+  id        String   @id @default(cuid())
+  profileId String
+  itemKey   String
+  channelId String?
+  tmdbId    Int?
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, itemKey])
+  @@index([profileId])
+}
+
 model WatchProgress {
   id        String  @id @default(cuid())
   profileId String
@@ -671,11 +695,32 @@ model M3uChannel {
   quality    String?
   language   String?
   country    String?
-  
+
+  /// Arte e metadados resolvidos no TMDB, gravados aqui de propósito.
+  ///
+  /// Antes o cruzamento acontecia a cada renderização: uma busca no TMDB por
+  /// canal, com teto de 24 por trilha. Quem passava do teto ficava só com o
+  /// `logoUrl` da M3U — e VOD raramente traz logo. Era por isso que gêneros
+  /// inteiros apareciam sem capa: o teto cortava, e o que sobrava era nulo.
+  ///
+  /// Com a arte gravada, a busca acontece uma vez por título na vida e a
+  /// listagem seguinte sai do banco, junto com o resto da linha.
+  tmdbId          Int?
+  tmdbMediaType   String?
+  tmdbPosterUrl   String?  @db.Text
+  tmdbBackdropUrl String?  @db.Text
+  tmdbRating      Float?
+  tmdbYear        Int?
+  tmdbOverview    String?  @db.Text
+  /// Quando o TMDB foi consultado. Preenchido MESMO quando não houve
+  /// resultado — sem isso, título que o TMDB não conhece seria reconsultado
+  /// em toda renderização, para sempre, sem nunca preencher nada.
+  tmdbSyncedAt    DateTime?
+
   isActive   Boolean    @default(true)
   isFavorite Boolean    @default(false)
   sortOrder  Int        @default(0)
-  
+
   relevanceScore Int    @default(0)
 
   createdAt DateTime @default(now())
@@ -689,4 +734,5 @@ model M3uChannel {
   @@index([playlistId, relevanceScore])
   @@index([playlistId, nameKey])
   @@index([name])
+  @@index([playlistId, tmdbSyncedAt])
 }
