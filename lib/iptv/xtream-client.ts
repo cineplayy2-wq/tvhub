@@ -24,7 +24,28 @@ type XtreamStream = {
   cover?: string;
   epg_channel_id?: string;
   category_id?: string;
+  /**
+   * Container real do arquivo ("mp4", "mkv", "avi"), devolvido pelo painel em
+   * `get_vod_streams`. É com ele que a URL de VOD tem de ser montada.
+   */
+  container_extension?: string;
 };
+
+/**
+ * Extensão do arquivo de VOD.
+ *
+ * O painel Xtream serve filme e episódio como ARQUIVO, em
+ * `/movie/user/senha/<id>.<container>` — não como HLS. Pedir `.m3u8` para VOD
+ * é endereço que a maioria dos painéis não serve: ou devolve 404, ou entrega
+ * um TS remuxado sem duração nem busca na barra.
+ *
+ * `mp4` como padrão porque é o que todo aparelho toca, incluindo o iPhone;
+ * `mkv` e `avi` o painel informa explicitamente quando é o caso.
+ */
+function extensaoDeVod(stream: XtreamStream): string {
+  const bruta = (stream.container_extension ?? "").trim().toLowerCase();
+  return /^[a-z0-9]{2,5}$/.test(bruta) ? bruta : "mp4";
+}
 
 type XtreamAuth = {
   user_info: {
@@ -140,7 +161,7 @@ export async function fetchXtreamPlaylist(
         const groupTitle = vodCategoryMap.get(String(stream.category_id)) ?? "Filmes";
         groupSet.add(groupTitle);
 
-        const streamUrl = `${baseUrl}/movie/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${stream.stream_id}.m3u8`;
+        const streamUrl = `${baseUrl}/movie/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${stream.stream_id}.${extensaoDeVod(stream)}`;
 
         channels.push({
           name: stream.name,
@@ -183,7 +204,7 @@ export async function fetchXtreamPlaylist(
         groupSet.add(groupTitle);
 
         const streamId = series.series_id || series.stream_id;
-        const streamUrl = `${baseUrl}/series/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.m3u8`;
+        const streamUrl = `${baseUrl}/series/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.${extensaoDeVod(series)}`;
 
         channels.push({
           name: series.name,

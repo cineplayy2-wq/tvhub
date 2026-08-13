@@ -106,6 +106,31 @@ function buildStreamVariants(rawUrl: string, isLive = true): string[] {
     );
   }
 
+  /**
+   * VOD gravado com a extensão errada — conserto em tempo de reprodução.
+   *
+   * O `xtream-client.ts` montava toda URL de filme e episódio com `.m3u8`
+   * fixo, ignorando o `container_extension` que o painel informa. Painel
+   * Xtream serve VOD como ARQUIVO (`/movie/user/senha/<id>.mp4`), não como
+   * HLS: pedir `.m3u8` devolve 404 na maioria dos painéis, ou um TS remuxado
+   * sem duração e sem busca na barra.
+   *
+   * O `xtream-client.ts` já foi corrigido, mas as 150 mil linhas gravadas
+   * continuam com `.m3u8` até a próxima sincronização. Aqui as alternativas
+   * corretas entram na FRENTE, então filme e série voltam a tocar sem
+   * depender de ressincronizar o catálogo inteiro.
+   */
+  const ehVod = /\/(movie|series)\//i.test(rawUrl);
+  if (ehVod && /\.m3u8(\?|$)/i.test(rawUrl)) {
+    return Array.from(
+      new Set([
+        rawUrl.replace(/\.m3u8(\?|$)/i, ".mp4$1"),
+        rawUrl.replace(/\.m3u8(\?|$)/i, ".mkv$1"),
+        rawUrl,
+      ]),
+    );
+  }
+
   const variants: string[] = [];
 
   // A URL exata do provedor entra SEMPRE em primeiro lugar para reprodução instantânea
