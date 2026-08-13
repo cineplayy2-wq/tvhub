@@ -333,7 +333,50 @@ export function IptvPlayer({
 
     let disposed = false;
     let engine: { destroy: () => void } | null = null;
+    let abortarSonda: AbortController | null = null;
     hasResumedRef.current = false;
+
+    /**
+     * Descobre o formato REAL lendo os primeiros bytes, em vez de deduzir do
+     * endereço.
+     *
+     * O painel Xtream nomeia canal ao vivo como `.m3u8` mesmo quando entrega
+     * MPEG-TS puro, sem manifesto nenhum. Escolhendo o motor pela extensão, o
+     * player entregava esse TS binário ao hls.js, que procura linhas de texto
+     * de playlist, não acha nada para baixar e fica girando para sempre — o
+     * "canal só carregando". Filme (`.mp4`) escapava porque vai pelo caminho
+     * nativo.
+     *
+     * Dois sinais bastam e nenhum depende do provedor mandar cabeçalho certo:
+     *   - manifesto HLS começa, obrigatoriamente, com `#EXTM3U`
+     *   - MPEG-TS começa com o byte de sincronismo 0x47
+     *
+     * São 8 bytes por Range, e o pedido é abortado logo em seguida: o
+     * provedor concede poucas conexões por conta e nenhuma pode ficar presa
+     * numa sonda.
+     */
+    async function detectarFormato(url: string): Promise<"hls" | "mpegts" | null> {
+      abortarSonda = new AbortController();
+      try {
+        const resposta = await fetch(url, {
+          headers: { Range: "bytes=0-7" },
+          signal: abortarSonda.signal,
+        });
+        const buffer = new Uint8Array(await resposta.arrayBuffer());
+        if (buffer.length === 0) return null;
+
+        const texto = new TextDecoder().decode(buffer.slice(0, 7));
+        if (texto.startsWith("#EXTM3U")) return "hls";
+        if (buffer[0] === 0x47) return "mpegts";
+        return null;
+      } catch {
+        // Sonda falhou (rede, CORS, aborto): segue pelo palpite da extensão.
+        return null;
+      } finally {
+        abortarSonda?.abort();
+        abortarSonda = null;
+      }
+    }
 
     const start = () => {
       if (disposed) return;
@@ -359,10 +402,29 @@ export function IptvPlayer({
       start();
     };
 
-    if (isProgressive) {
-      // .mp4/.mkv: o próprio navegador resolve, com Range e busca na barra.
-      usarNativo();
-    } else if (isRawTs) {
+    /**
+     * Só o `.mp4` decide pela extensão sem sonda: ele é servido pelo caminho
+     * nativo, com Range e busca na barra, e nunca foi o problema. Todo o resto
+     * pergunta ao stream o que ele é de fato.
+     */
+    const escolherMotor = async () => {
+      if (isProgressive) {
+        // .mp4/.mkv: o próprio navegador resolve, com Range e busca na barra.
+        usarNativo();
+        return;
+      }
+
+      const formatoReal = await detectarFormato(playableUrl);
+      if (disposed) return;
+
+      // A sonda manda; sem resposta dela, vale o palpite antigo da extensão.
+      const usarMpegts = formatoReal === "mpegts" || (formatoReal === null && isRawTs);
+
+      iniciarMotor(usarMpegts);
+    };
+
+    const iniciarMotor = (usarMpegts: boolean) => {
+    if (usarMpegts) {
       /**
        * MPEG-TS puro precisa de mpegts.js.
        *
@@ -512,9 +574,13 @@ export function IptvPlayer({
           start();
         });
     }
+    };
+
+    void escolherMotor();
 
     return () => {
       disposed = true;
+      abortarSonda?.abort();
       engine?.destroy();
       video.removeAttribute("src");
       video.load();
