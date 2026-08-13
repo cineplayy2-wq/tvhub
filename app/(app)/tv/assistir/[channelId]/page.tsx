@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BackButton } from "@/components/iptv/back-button";
 import { IptvPlayer } from "@/components/iptv/iptv-player";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
+import { credencialDoUsuario } from "@/lib/iptv/credentials";
 import { getChannelById, getQualityVariants } from "@/lib/queries/iptv";
 import { prisma } from "@/lib/prisma";
 import { cleanMediaTitle, slugify } from "@/lib/utils";
@@ -32,9 +33,10 @@ export default async function WatchChannelPage({
   const user = await requireUser();
 
   // Independentes: vão em paralelo em vez de uma esperar a outra.
-  const [activeProfile, canalDireto] = await Promise.all([
+  const [activeProfile, canalDireto, linhaIptv] = await Promise.all([
     getActiveProfile(user.id),
     getChannelById(params.channelId),
+    credencialDoUsuario(user.id),
   ]);
 
   let channel = canalDireto;
@@ -133,15 +135,30 @@ export default async function WatchChannelPage({
       </div>
 
       <div className="relative aspect-video w-full bg-black shadow-2xl">
-        <IptvPlayer
-          streamUrl={channel.streamUrl}
-          channelName={channel.name}
-          channelId={channel.id}
-          isLive={!isVod}
-          alternativeStreams={channel.backupStreamUrl ? [channel.backupStreamUrl] : []}
-          qualidades={qualidades}
-          initialPosition={initialPosition}
-        />
+        {linhaIptv ? (
+          <IptvPlayer
+            streamUrl={channel.streamUrl}
+            channelName={channel.name}
+            channelId={channel.id}
+            isLive={!isVod}
+            alternativeStreams={channel.backupStreamUrl ? [channel.backupStreamUrl] : []}
+            qualidades={qualidades}
+            initialPosition={initialPosition}
+          />
+        ) : (
+          <div className="flex h-full min-h-[240px] items-center justify-center px-6 text-center">
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                Este cliente não tem linha IPTV
+              </p>
+              <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                Sem usuário e senha do provedor cadastrados para esta conta, o
+                vídeo não abre — a conta da lista nunca é usada. O admin grava
+                a linha em Admin → cliente → IPTV.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="relative bg-background px-4 py-6 md:px-8">

@@ -49,9 +49,8 @@ export function LinhaIptvForm({
             Linha IPTV deste cliente
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Usuário e senha que o provedor deu para ESTA pessoa. Na hora de
-            assistir o proxy troca a conta do catálogo por esta — senão todo
-            mundo divide as 2 conexões da mesma linha e o terceiro cai.
+            Usuário e senha que o provedor deu para ESTA pessoa. Sem isto o
+            cliente não assiste nada — a conta da lista nunca é usada no play.
           </p>
         </div>
       </div>
@@ -97,11 +96,15 @@ export function LinhaIptvForm({
         >
           {pendente ? "Salvando…" : "Salvar linha"}
         </button>
-        {ok && <p className="text-xs text-emerald-400">Linha gravada. Este cliente toca com a conta dele.</p>}
+        {ok && (
+          <p className="text-xs text-emerald-400">
+            Linha gravada. Este cliente só toca com a conta dele.
+          </p>
+        )}
         {erro && <p className="text-xs text-danger">{erro}</p>}
         {!username && !ok && (
           <p className="text-xs text-amber-400">
-            Sem linha própria este cliente ainda usa a conta do catálogo.
+            Sem linha este cliente não consegue assistir.
           </p>
         )}
       </div>

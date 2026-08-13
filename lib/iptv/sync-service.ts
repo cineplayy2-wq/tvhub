@@ -1,7 +1,6 @@
 import "server-only";
 
 import { invalidatePlaylistCache } from "@/lib/cache";
-import { invalidarParesDoCatalogo } from "@/lib/iptv/credentials";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeTitleKey, slugify } from "@/lib/utils";
@@ -346,7 +345,6 @@ export async function revincularBackup(playlist: M3uPlaylist) {
   });
 
   await invalidatePlaylistCache(playlist.id);
-  invalidarParesDoCatalogo();
   return resultado;
 }
 
@@ -591,7 +589,6 @@ export async function syncPlaylist(playlist: M3uPlaylist): Promise<{
     });
 
     await invalidatePlaylistCache(playlist.id);
-    invalidarParesDoCatalogo();
 
     return { totalChannels, totalGroups };
   } catch (error) {

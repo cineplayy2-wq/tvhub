@@ -198,7 +198,7 @@ export default async function CustomerDetailPage({
             />
             <Row
               label="Linha IPTV"
-              value={customer.iptvUsername ? customer.iptvUsername : "Usa a conta do catálogo"}
+              value={customer.iptvUsername ? customer.iptvUsername : "Sem linha — não assiste"}
             />
           </dl>
         </section>

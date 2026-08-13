@@ -239,8 +239,7 @@ export async function alternarModuloAdultoAction(userId: string) {
 /**
  * Grava a linha IPTV (user/senha do provedor) DESTE cliente.
  *
- * Sem isto ele toca com a conta do catálogo e estoura o limite de conexões
- * do painel quando outra pessoa também estiver assistindo.
+ * Sem isto ele não assiste — a conta da lista nunca entra no play.
  */
 export async function salvarLinhaIptvAction(
   userId: string,

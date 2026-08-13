@@ -7,7 +7,6 @@ import { Readable, PassThrough } from "node:stream";
 import { auth } from "@/auth";
 import {
   credencialDoUsuario,
-  paresDoCatalogo,
   reescreverCredencial,
 } from "@/lib/iptv/credentials";
 import { reconcileContentRange } from "@/lib/iptv/range";
@@ -333,14 +332,8 @@ async function peekUpstream(
 
 export async function GET(request: NextRequest) {
   const session = await auth();
-  const referer = request.headers.get("referer");
-  const isSiteReferer =
-    referer &&
-    (referer.includes("tvhub") ||
-      referer.includes("170.238.45.225") ||
-      referer.includes("localhost"));
 
-  if (!session?.user && !isSiteReferer) {
+  if (!session?.user?.id) {
     return new NextResponse("Não autorizado", { status: 401 });
   }
 
@@ -353,23 +346,25 @@ export async function GET(request: NextRequest) {
   }
 
   /**
-   * Cada assinante toca com a PRÓPRIA linha no provedor.
+   * Só toca com a linha DESTE assinante.
    *
-   * O catálogo guarda URLs da conta usada na importação. Sem esta troca,
-   * 3 clientes assistindo ao mesmo tempo estouram o limite de 2 conexões
-   * daquela conta — e o sintoma é "não roda nada".
+   * Sem user/senha cadastrados no cliente, recusa — nunca usa a conta da
+   * importação. O painel limita 2 conexões por usuário; se o catálogo
+   * vazasse, o terceiro a assistir caía e "não rodava nada".
    */
-  let urlPedido = targetUrl;
-  if (session?.user?.id) {
-    try {
-      const [viewer, catalogo] = await Promise.all([
-        credencialDoUsuario(session.user.id),
-        paresDoCatalogo(),
-      ]);
-      urlPedido = reescreverCredencial(targetUrl, viewer, catalogo);
-    } catch (erro) {
-      console.warn("[stream-proxy] falha ao reescrever credencial:", erro);
-    }
+  const viewer = await credencialDoUsuario(session.user.id);
+  if (!viewer) {
+    return new NextResponse(
+      "Este cliente não tem linha IPTV. Cadastre usuário e senha do provedor em Admin → IPTV.",
+      { status: 403 },
+    );
+  }
+
+  const urlPedido = reescreverCredencial(targetUrl, viewer);
+  if (!urlPedido) {
+    return new NextResponse("Não foi possível usar a linha deste cliente neste endereço.", {
+      status: 403,
+    });
   }
 
   try {
