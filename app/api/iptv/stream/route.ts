@@ -619,13 +619,32 @@ export async function GET(request: NextRequest) {
     }
 
     const semQuery = urlEfetiva.split("?")[0];
-    const contentType =
-      rawContentType ||
-      (semQuery.endsWith(".ts")
-        ? "video/mp2t"
-        : semQuery.endsWith(".m3u8")
-        ? "application/vnd.apple.mpegurl"
-        : "video/mp4");
+
+    /**
+     * Chegar aqui com `isM3u8Requested` significa que o peek OLHOU os
+     * primeiros bytes e provou que NÃO é manifesto: não começam com `#EXTM3U`.
+     * O que vem é vídeo bruto, quase sempre MPEG-TS, num endereço `.m3u8`
+     * porque é assim que o painel Xtream nomeia o canal ao vivo.
+     *
+     * Rotular isso de `application/vnd.apple.mpegurl` — seja pelo sufixo da
+     * URL, seja repetindo o content-type que o próprio provedor mandou errado —
+     * entrega bytes binários a um player que vai tentar lê-los como texto de
+     * playlist. O hls.js não acha nenhuma linha válida, não tem o que baixar, e
+     * fica girando para sempre: é o "canal só carregando", enquanto o filme
+     * (`.mp4`, que nem passa pelo peek) toca normalmente.
+     *
+     * A prova do peek vale mais que o palpite da extensão.
+     */
+    const provouQueNaoEManifesto = isM3u8Requested && !peekResult.isM3u8;
+
+    const contentType = provouQueNaoEManifesto
+      ? "video/mp2t"
+      : rawContentType ||
+        (semQuery.endsWith(".ts")
+          ? "video/mp2t"
+          : semQuery.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "video/mp4");
 
     responseHeaders.set("Content-Type", contentType);
 
