@@ -233,9 +233,16 @@ export function IptvPlayer({
   channelId?: string;
   isLive?: boolean;
   alternativeStreams?: string[];
-  /** Mesmo canal em outras resoluções; vazio quando não há alternativa. */
   qualidades?: VarianteQualidade[];
   initialPosition?: number;
+  episodes?: Array<{
+    id: string;
+    name: string;
+    isCurrent: boolean;
+    isWatched?: boolean;
+    season?: number;
+    episodeNum?: number;
+  }>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

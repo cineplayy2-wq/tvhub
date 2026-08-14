@@ -71,7 +71,6 @@ export function ProfileGrid({
                 name={profile.name}
                 avatarUrl={profile.avatarUrl}
                 isKids={profile.isKids}
-                avatarUrl={profile.avatarUrl}
                 size="lg"
                 className={cn(
                   "ring-2 ring-transparent transition-all duration-300 ease-smooth",

@@ -266,7 +266,7 @@ async function FavoritesRail({
           <TileCard
             key={channel.id}
             channel={channel}
-            live={channel.group?.category === "live"}
+            live={(channel as any).group?.category === "live"}
           />
         ))}
       </Rail>
@@ -484,11 +484,11 @@ async function GenreRail({
       overview: c.overview ?? "",
       rating: c.tmdbRating ?? 0,
       year: c.year ?? null,
-      mediaType: (c.group?.category === "series" ? "tv" : "movie") as "tv" | "movie",
+      mediaType: ((c as any).group?.category === "series" ? "tv" : "movie") as "tv" | "movie",
       isSeries: isSeriesItem({
         streamUrl: c.streamUrl,
         name: c.name,
-        category: c.group?.category,
+        category: (c as any).group?.category,
       }),
     }));
   });

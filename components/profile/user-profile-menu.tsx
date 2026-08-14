@@ -67,7 +67,6 @@ export function UserProfileMenu({
               name={current.name}
               avatarUrl={current.avatarUrl}
               isKids={current.isKids}
-              avatarUrl={current.avatarUrl}
               size="sm"
               className="h-7 w-7 rounded-full ring-1 ring-primary/40"
             />
@@ -78,7 +77,7 @@ export function UserProfileMenu({
           )}
 
           <span className="hidden max-w-[100px] truncate text-xs font-bold text-foreground sm:inline-block">
-            {current?.name || "Perfil"}
+            {current?.name || user?.name || "Perfil"}
           </span>
 
           <ChevronDown
@@ -94,94 +93,87 @@ export function UserProfileMenu({
           <>
             {/* Backdrop transparente para fechar ao clicar fora */}
             <div
-              className="fixed inset-0 z-40"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
 
-            <div className="absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-white/[0.1] bg-surface/95 p-4 shadow-card backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="fixed right-4 top-16 z-50 w-80 rounded-2xl border border-white/15 bg-surface-elevated p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               {/* Cabeçalho com Conta do Assinante */}
-              <div className="mb-3 border-b border-white/[0.08] pb-3">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-accent">
-                    <Crown className="h-3 w-3" />
-                    Assinante VIP
-                  </span>
-                  {user?.role === "ADMIN" && (
-                    <Link
-                      href="/admin"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:underline"
-                    >
-                      <Shield className="h-3 w-3" />
-                      Admin
-                    </Link>
-                  )}
+              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                    Perfis da Conta
+                  </p>
+                  <p className="text-xs text-muted-foreground/80 truncate max-w-[180px]">
+                    {user?.email}
+                  </p>
                 </div>
-                <p className="mt-2 truncate text-xs font-semibold text-foreground">
-                  {user?.email || "Cliente Hubflix"}
-                </p>
+                {user?.role === "ADMIN" && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-black uppercase text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
+                  >
+                    <Crown className="h-3 w-3" />
+                    Admin
+                  </Link>
+                )}
               </div>
 
               {/* Seção: Perfis de Usuário */}
-              <div className="mb-2">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Trocar Perfil
-                </p>
-                <div className="space-y-1">
-                  {profiles.map((profile) => {
-                    const isSelected = profile.id === current?.id;
-                    return (
-                      <div
-                        key={profile.id}
-                        className={cn(
-                          "flex items-center justify-between rounded-xl p-2 transition-colors",
-                          isSelected
-                            ? "bg-primary/15 border border-primary/30"
-                            : "hover:bg-surface-elevated",
-                        )}
+              <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                {profiles.map((profile) => {
+                  const isSelected = profile.id === current?.id;
+                  return (
+                    <div
+                      key={profile.id}
+                      className={cn(
+                        "flex items-center justify-between rounded-xl p-2 transition-all",
+                        isSelected
+                          ? "bg-primary/20 border border-primary/40 text-foreground"
+                          : "hover:bg-white/5 text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleSelectProfile(profile)}
+                        className="flex flex-1 items-center gap-2.5 text-left"
                       >
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleSelectProfile(profile)}
-                          className="flex flex-1 items-center gap-2.5 text-left"
-                        >
-                          <ProfileAvatar
-                            id={profile.id}
-                            name={profile.name}
-                            avatarUrl={profile.avatarUrl}
-                            isKids={profile.isKids}
-                            avatarUrl={profile.avatarUrl}
-                            size="sm"
-                            className="h-7 w-7 rounded-lg"
-                          />
-                          <span className="truncate text-xs font-semibold text-foreground">
-                            {profile.name}
+                        <ProfileAvatar
+                          id={profile.id}
+                          name={profile.name}
+                          avatarUrl={profile.avatarUrl}
+                          isKids={profile.isKids}
+                          size="sm"
+                          className="h-7 w-7 rounded-lg"
+                        />
+                        <span className="truncate text-xs font-semibold text-foreground">
+                          {profile.name}
+                        </span>
+                        {profile.isKids && (
+                          <span className="rounded bg-primary/25 px-1.5 py-0.5 text-[9px] font-black uppercase text-accent">
+                            Kids
                           </span>
-                          {profile.isKids && (
-                            <span className="rounded bg-primary/25 px-1.5 py-0.5 text-[9px] font-black uppercase text-accent">
-                              Kids
-                            </span>
-                          )}
-                        </button>
+                        )}
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingProfile(profile);
-                            setIsFormOpen(true);
-                            setIsOpen(false);
-                          }}
-                          aria-label={`Editar ${profile.name}`}
-                          title="Editar Perfil"
-                          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProfile(profile);
+                          setIsFormOpen(true);
+                          setIsOpen(false);
+                        }}
+                        aria-label={`Editar ${profile.name}`}
+                        title="Editar Perfil"
+                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Botão Adicionar Perfil */}

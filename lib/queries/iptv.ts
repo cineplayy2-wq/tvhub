@@ -3,8 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { cached, TTL } from "@/lib/cache";
-<<<<<<< HEAD
-import { dedupeChannels } from "@/lib/utils";
+import { agruparVariantes, cleanSeriesTitle, dedupeChannels } from "@/lib/utils";
 import {
   mesmaBase,
   nivelDe,
@@ -12,9 +11,6 @@ import {
   umaPorNivel,
   type VarianteQualidade,
 } from "@/lib/iptv/quality";
-=======
-import { agruparVariantes, dedupeChannels, cleanSeriesTitle } from "@/lib/utils";
->>>>>>> fix/player-e-proxy-ponta-a-ponta
 
 
 const PAGE_SIZE = 20;
@@ -340,6 +336,8 @@ export async function getPlaylistChannels({
       },
     }),
     cached(totalCacheKey, TTL.playlist, () => prisma.m3uChannel.count({ where })),
+  ]);
+
   const dedupedItems = dedupeChannels(rawItems);
   const items = await annotateFavorites(dedupedItems, profileId);
   const agrupados = agruparVariantes(items);
@@ -708,7 +706,6 @@ export async function toggleCategoryLock(playlistId: string, category: string, i
   return true;
 }
 
-<<<<<<< HEAD
 /**
  * Liga/desliga a trava de uma categoria para UM assinante.
  *
@@ -976,24 +973,14 @@ export async function getLiveCategoryOverview(playlistId: string) {
   }));
 }
 
-<<<<<<< HEAD
-export async function getLiveChannelsByCategory(playlistId: string, category: string, limit = 18) {
-  return getChannelsByCategory(playlistId, category, limit);
-=======
 /**
  * Canais ao vivo de UMA categoria.
- *
- * A versão anterior recebia `category` e descartava, chamando sempre com
- * "live": todas as fileiras da aba Canais mostravam exatamente o mesmo
- * conteúdo, independente do título em cima delas.
  */
 export async function getLiveChannelsByCategory(
   playlistId: string,
   category: string,
   limit = 18,
 ) {
-  // Busca com folga: o agrupamento das variantes de resolução encolhe a lista,
-  // e sem a folga a trilha viria com metade dos canais que deveria mostrar.
   const items = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
@@ -1018,5 +1005,4 @@ export async function getLiveChannelsByCategory(
   });
 
   return agruparVariantes(items).slice(0, limit);
->>>>>>> fix/player-e-proxy-ponta-a-ponta
 }

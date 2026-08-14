@@ -101,7 +101,7 @@ export default async function TvSearchPage({
                 <TileCard
                   key={channel.id}
                   channel={channel}
-                  live={channel.group?.category === "live"}
+                  live={(channel as any).group?.category === "live"}
                 />
               ))}
             </div>

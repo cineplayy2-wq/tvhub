@@ -55,7 +55,7 @@ export default async function NovelasPage({
   // Filtragem por grupo ou busca
   let filteredList = rawNovelas;
   if (selectedSubGroup) {
-    filteredList = filteredList.filter((item) => item.group?.slug === selectedSubGroup.slug);
+    filteredList = filteredList.filter((item) => (item as any).group?.slug === selectedSubGroup.slug);
   }
   if (searchParams.q) {
     const qLower = searchParams.q.toLowerCase();
@@ -83,9 +83,9 @@ export default async function NovelasPage({
     }));
 
   // Trilhas por categoria temática
-  const doramas = enrichedAll.filter((i) => /dorama|k-drama|corean/i.test(i.name + (i.group?.name || "")));
-  const nacionais = enrichedAll.filter((i) => /globo|sbt|record|nacional|br/i.test(i.name + (i.group?.name || "")));
-  const turcas = enrichedAll.filter((i) => /turca|turqu/i.test(i.name + (i.group?.name || "")));
+  const doramas = enrichedAll.filter((i) => /dorama|k-drama|corean/i.test(i.name + ((i as any).group?.name || "")));
+  const nacionais = enrichedAll.filter((i) => /globo|sbt|record|nacional|br/i.test(i.name + ((i as any).group?.name || "")));
+  const turcas = enrichedAll.filter((i) => /turca|turqu/i.test(i.name + ((i as any).group?.name || "")));
   const emExibicao = enrichedAll.slice(0, 16);
 
   const chips = [

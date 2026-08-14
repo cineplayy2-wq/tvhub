@@ -12,10 +12,7 @@ import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
-<<<<<<< HEAD
-=======
 import { getDismissedKeys, semDispensados } from "@/lib/queries/dismissed";
->>>>>>> fix/player-e-proxy-ponta-a-ponta
 import { FILTER_GROUPS, filterWhere, getFilterCounts } from "@/lib/queries/filters";
 import {
   cachedRow,
