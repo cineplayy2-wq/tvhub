@@ -546,9 +546,11 @@ model StreamSession {
 
   sessionId String @unique
 
-  profileId String?
-  titleId   String?
-  episodeId String?
+  profileId   String?
+  titleId     String?
+  episodeId   String?
+  channelId   String?
+  iptvLineId  String?
 
   deviceId    String?
   deviceLabel String?
@@ -561,16 +563,43 @@ model StreamSession {
   endedAt    DateTime?
   endReason  StreamEndReason?
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  title   Title?   @relation(fields: [titleId], references: [id], onDelete: SetNull)
-  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile  Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  title    Title?      @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  episode  Episode?    @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  channel  M3uChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  iptvLine IptvLine?   @relation(fields: [iptvLineId], references: [id], onDelete: SetNull)
 
   @@index([userId, isActive])
   @@index([lastSeenAt])
   @@index([profileId])
   @@index([titleId])
   @@index([episodeId])
+  @@index([channelId])
+  @@index([iptvLineId])
+}
+
+// ==========================================================
+// 6.1. POOL DINÂMICO DE LINHAS IPTV (LOAD BALANCER & REDUNDÂNCIA)
+// ==========================================================
+
+model IptvLine {
+  id         String   @id @default(cuid())
+  label      String
+  serverUrl  String
+  username   String
+  password   String
+  maxScreens Int      @default(2)
+  isActive   Boolean  @default(true)
+  notes      String?
+
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions   StreamSession[]
+
+  @@index([isActive])
 }
 
 // ==========================================================
@@ -787,6 +816,7 @@ model M3uChannel {
   group    M3uGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
   progress WatchProgress[]
   favorites ChannelFavorite[]
+  sessions StreamSession[]
 
   @@index([playlistId, groupId])
   @@index([playlistId, isFavorite])

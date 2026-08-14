@@ -21,10 +21,32 @@ export type ProfileFormState = {
   fieldErrors?: Record<string, string>;
 };
 
+/** Sinaliza estouro do limite de dentro da transação, para o `catch` traduzir. */
+class LimiteDePerfis extends Error {
+  constructor() {
+    super("Limite de perfis atingido");
+    this.name = "LimiteDePerfis";
+  }
+}
+
+/**
+ * `secure` acompanha o ambiente — estava fixo em `false`.
+ *
+ * Sem a marca, o navegador manda o cookie também em http. Num site que roda em
+ * https isso é caminho para downgrade: basta induzir uma única requisição em
+ * texto claro (uma imagem, um link) para o cookie viajar legível na rede.
+ *
+ * O que trafega aqui não é enfeite: `tvhub_unlocked` é a prova de que o PIN de
+ * um perfil adulto já foi digitado. Copiado, ele libera esse perfil em outro
+ * navegador sem PIN nenhum.
+ *
+ * Fica `false` só em desenvolvimento, onde não existe https e um cookie
+ * `secure` simplesmente não seria gravado.
+ */
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: false,
+  secure: process.env.NODE_ENV === "production",
   path: "/",
 };
 
@@ -138,33 +160,60 @@ export async function createProfileAction(
     return { fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  const count = await prisma.profile.count({ where: { userId: user.id } });
-  if (count >= PROFILE.MAX_PER_ACCOUNT) {
-    return { error: `Limite de ${PROFILE.MAX_PER_ACCOUNT} perfis por conta.` };
-  }
-
   const { name, isKids, avatarUrl, pin } = parsed.data;
 
+  // O hash é caro (bcrypt) e não pode rodar dentro da transação: seguraria a
+  // linha do usuário pelo tempo do cálculo, multiplicando o risco de conflito.
+  const pinHash = isKids ? null : pin ? await hashPassword(pin) : null;
+
   try {
-    await prisma.profile.create({
-      data: {
-        userId: user.id,
-        name,
-        isKids,
-        avatarUrl: avatarUrl || null,
-        maxAgeRating: isKids ? PROFILE.KIDS_MAX_AGE_RATING : "EIGHTEEN",
-        pinHash: isKids ? null : pin ? await hashPassword(pin) : null,
-        sortOrder: count,
+    /**
+     * Contar e depois criar é uma janela de corrida.
+     *
+     * Entre o `count()` e o `create()` não havia nada segurando o estado: dois
+     * envios simultâneos do formulário liam a mesma contagem, os dois passavam
+     * pela checagem e os dois criavam. O limite de perfis por conta — que é o
+     * que sustenta a regra comercial de telas — virava sugestão.
+     *
+     * `Serializable` faz o Postgres abortar uma das transações concorrentes
+     * quando elas dependem da mesma leitura, e o Prisma devolve isso como
+     * P2034. Aí basta pedir para tentar de novo: na segunda passada a
+     * contagem já enxerga o perfil da primeira e o limite é respeitado.
+     */
+    await prisma.$transaction(
+      async (tx) => {
+        const count = await tx.profile.count({ where: { userId: user.id } });
+        if (count >= PROFILE.MAX_PER_ACCOUNT) {
+          throw new LimiteDePerfis();
+        }
+
+        await tx.profile.create({
+          data: {
+            userId: user.id,
+            name,
+            isKids,
+            avatarUrl: avatarUrl || null,
+            maxAgeRating: isKids ? PROFILE.KIDS_MAX_AGE_RATING : "EIGHTEEN",
+            pinHash,
+            sortOrder: count,
+          },
+        });
       },
-    });
+      { isolationLevel: "Serializable" },
+    );
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "P2002"
-    ) {
-      return { fieldErrors: { name: "Você já tem um perfil com esse nome." } };
+    if (error instanceof LimiteDePerfis) {
+      return { error: `Limite de ${PROFILE.MAX_PER_ACCOUNT} perfis por conta.` };
+    }
+
+    if (typeof error === "object" && error !== null && "code" in error) {
+      if (error.code === "P2002") {
+        return { fieldErrors: { name: "Você já tem um perfil com esse nome." } };
+      }
+      // Conflito de serialização: outra criação simultânea ganhou a corrida.
+      if (error.code === "P2034") {
+        return { error: "Tente novamente." };
+      }
     }
     throw error;
   }

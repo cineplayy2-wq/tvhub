@@ -11,6 +11,7 @@ import {
   RefreshCw,
   RotateCcw,
   RotateCw,
+  Tv,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -343,14 +344,59 @@ export function IptvPlayer({
     failoverEmVoo.current = false;
   }, [urlBase]);
 
+  const sessionId = useRef(
+    "s_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString(36),
+  ).current;
+  const [screenLimitError, setScreenLimitError] = useState(false);
+
+  // Heartbeat do limite de telas e alocação do Pool
+  useEffect(() => {
+    let isMounted = true;
+
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch("/api/iptv/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            channelId,
+            deviceLabel: typeof navigator !== "undefined" ? navigator.userAgent.substring(0, 50) : "Navegador",
+          }),
+        });
+
+        if (res.status === 429) {
+          if (isMounted) {
+            setScreenLimitError(true);
+            setState("error");
+          }
+        }
+      } catch {}
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 20_000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      try {
+        fetch(`/api/iptv/session?sessionId=${sessionId}`, {
+          method: "DELETE",
+          keepalive: true,
+        });
+      } catch {}
+    };
+  }, [sessionId, channelId]);
+
   // URL final de mídia enviada ao player:
   // Em produção (HTTPS), a URL de stream IPTV deve SEMPRE passar pelo proxy
   // para evitar bloqueio de Mixed Content (HTTP em HTTPS) e resolver CORS/User-Agent.
   const playableUrl = !activeStreamUrl
     ? ""
     : activeStreamUrl.startsWith("/api/")
-    ? activeStreamUrl
-    : `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}`;
+    ? `${activeStreamUrl}${activeStreamUrl.includes("?") ? "&" : "?"}sessionId=${sessionId}`
+    : `/api/iptv/stream?url=${encodeURIComponent(activeStreamUrl)}&sessionId=${sessionId}${channelId ? `&channelId=${channelId}` : ""}`;
 
   // Controls Hiding Timer — também no toque (celular não tem mousemove)
   const resetHideTimer = useCallback(() => {
@@ -1166,24 +1212,49 @@ export function IptvPlayer({
         />
       )}
 
-      {/* Error Fallback Screen */}
+      {/* Error Fallback Screen / Screen Limit Overlaid */}
       {state === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-30 animate-fade-in">
-          <div className="rounded-full bg-rose-500/10 p-4 border border-rose-500/20 mb-4 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
-            <RefreshCw className="h-8 w-8 text-rose-400" />
-          </div>
-          <h3 className="text-lg font-bold text-white">Sinal indisponível no momento</h3>
-          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            Não foi possível estabilizar a transmissão desta fonte. Tente reconectar.
-          </p>
-          <button
-            type="button"
-            onClick={handleManualRetry}
-            className="mt-5 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-6 py-3 text-xs font-extrabold text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Tentar Novamente
-          </button>
+          {screenLimitError ? (
+            <>
+              <div className="rounded-full bg-amber-500/10 p-4 border border-amber-500/30 mb-4 shadow-[0_0_25px_rgba(245,158,11,0.3)]">
+                <Tv className="h-8 w-8 text-amber-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Limite de 2 Telas Simultâneas</h3>
+              <p className="mt-2 max-w-sm text-xs text-muted-foreground leading-relaxed">
+                Seu plano permite até <strong className="text-white">2 telas conectadas ao mesmo tempo</strong>. Para assistir aqui, pause ou feche a reprodução em outro dispositivo.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setScreenLimitError(false);
+                  handleManualRetry();
+                }}
+                className="mt-5 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-3 text-xs font-black text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Tentar Conectar Novamente
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="rounded-full bg-rose-500/10 p-4 border border-rose-500/20 mb-4 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                <RefreshCw className="h-8 w-8 text-rose-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Sinal indisponível no momento</h3>
+              <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                Não foi possível estabilizar a transmissão desta fonte. Tente reconectar.
+              </p>
+              <button
+                type="button"
+                onClick={handleManualRetry}
+                className="mt-5 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-6 py-3 text-xs font-extrabold text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Tentar Novamente
+              </button>
+            </>
+          )}
         </div>
       )}
 

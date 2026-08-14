@@ -48,6 +48,42 @@ const nextConfig = {
   },
 
   async headers() {
+    /**
+     * CSP deliberadamente PARCIAL.
+     *
+     * Falta `script-src` e `style-src` de propósito: o Next injeta script e
+     * estilo em linha em toda página, então travar essas duas exigiria nonce
+     * por requisição — mudança grande, e num app que já está frágil em
+     * produção o risco de deixar a tela em branco supera o ganho.
+     *
+     * As diretivas abaixo são as de melhor relação proteção/risco, e nenhuma
+     * delas depende de como o Next monta a página:
+     *
+     * - `frame-ancestors`: bloqueia clickjacking (versão moderna do
+     *   X-Frame-Options, que fica junto para navegador antigo).
+     * - `base-uri`: impede que um `<base>` injetado reescreva o destino de
+     *   TODOS os caminhos relativos da página, inclusive os do player.
+     * - `form-action`: impede que um formulário injetado poste a senha do
+     *   assinante em servidor de terceiro.
+     * - `object-src`: mata `<embed>` e `<object>`, que não são usados aqui e
+     *   só servem de vetor.
+     *
+     * `img-src` aceita qualquer origem porque a arte dos canais vem dos hosts
+     * do provedor, que mudam sem aviso. `frame-src` libera o YouTube por causa
+     * dos trailers em Dicas. `media-src` é só a própria origem: todo vídeo
+     * passa pela proxy (ver Manual do Player, §5).
+     */
+    const csp = [
+      "default-src 'self'",
+      "img-src 'self' data: blob: https: http:",
+      "media-src 'self' blob:",
+      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; ");
+
     return [
       {
         source: "/:path*",
@@ -59,7 +95,21 @@ const nextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self)",
           },
-
+          { key: "Content-Security-Policy", value: csp },
+          /**
+           * HSTS: o navegador passa a recusar http neste domínio.
+           *
+           * Fecha o downgrade que o cookie `secure` sozinho não cobre — a
+           * PRIMEIRA requisição, antes de qualquer cookie existir.
+           *
+           * Sem `preload` de propósito: entrar na lista embutida dos
+           * navegadores é praticamente irreversível, e este domínio ainda está
+           * em mudança de infraestrutura.
+           */
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
         ],
       },
       {

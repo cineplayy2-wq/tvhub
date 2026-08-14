@@ -30,8 +30,17 @@ const BLOCKED_HOSTNAMES = new Set([
   "odoo_mydb",
 ]);
 
-/** Faixas IPv4 que nunca devem ser alcançadas a partir do proxy. */
-function isPrivateIpv4(host: string): boolean {
+/**
+ * Faixas IPv4 que nunca devem ser alcançadas a partir do proxy.
+ *
+ * Exportada porque a checagem do NOME não basta. Validar só o texto da URL
+ * barra `http://10.0.0.5`, mas não barra `http://interno.exemplo.com` que
+ * RESOLVE para 10.0.0.5 — e não barra rebinding, onde a primeira resolução
+ * devolve um endereço público e a segunda, no momento de conectar, devolve um
+ * privado. A defesa completa exige olhar o endereço RESOLVIDO, e é isso que o
+ * `lookup` da proxy faz com esta função.
+ */
+export function isPrivateIpv4(host: string): boolean {
   const parts = host.split(".").map(Number);
   if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
     return false;
@@ -45,6 +54,27 @@ function isPrivateIpv4(host: string): boolean {
     (a === 169 && b === 254) || // link-local / metadados de cloud
     a === 0
   );
+}
+
+/** IPv6 que não pode ser alcançado: loopback, link-local e uso único local. */
+export function isPrivateIpv6(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    h === "::1" ||
+    h === "::" ||
+    h.startsWith("fe80") ||
+    h.startsWith("fc") ||
+    h.startsWith("fd") ||
+    // IPv4 mapeado em IPv6 (::ffff:10.0.0.5) contorna a checagem v4 crua
+    (h.startsWith("::ffff:") && isPrivateIpv4(h.slice(7)))
+  );
+}
+
+/** Um endereço JÁ RESOLVIDO pode ser alcançado pela proxy? */
+export function enderecoResolvidoEhPermitido(address: string, family: number): boolean {
+  if (!address) return false;
+  if (family === 6) return !isPrivateIpv6(address);
+  return !isPrivateIpv4(address);
 }
 
 export function assertPublicStreamUrl(raw: string): URL {

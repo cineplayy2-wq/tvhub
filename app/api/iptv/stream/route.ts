@@ -11,8 +11,15 @@ import {
   paresDoCatalogo,
   reescreverCredencial,
 } from "@/lib/iptv/credentials";
+import {
+  checkUserScreensLimit,
+  allocatePoolLine,
+} from "@/lib/iptv/pool-service";
 import { reconcileContentRange } from "@/lib/iptv/range";
-import { assertPublicStreamUrl } from "@/lib/iptv/ssrf-guard";
+import {
+  assertPublicStreamUrl,
+  enderecoResolvidoEhPermitido,
+} from "@/lib/iptv/ssrf-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 3600;
@@ -61,6 +68,32 @@ function responderLookup(
   querLista: boolean,
 ) {
   const cb = callback as (e: NodeJS.ErrnoException | null, a: unknown, f?: number) => void;
+
+  /**
+   * Última barreira de SSRF: o endereço RESOLVIDO.
+   *
+   * `assertPublicStreamUrl` valida o texto da URL, o que barra
+   * `http://10.0.0.5` mas não barra `http://interno.exemplo.com` apontando
+   * para o mesmo lugar — e não barra rebinding, onde a primeira resolução
+   * devolve um IP público e a segunda, no instante de conectar, devolve um
+   * privado.
+   *
+   * Aqui é o ponto exato onde o nome já virou endereço e o socket ainda não
+   * conectou. Bloqueando neste lugar, a rede interna da VPS (o Odoo em
+   * produção, o Postgres, o Redis, os metadados do provedor de nuvem) fica
+   * inalcançável mesmo para uma URL que passou por todas as checagens
+   * anteriores.
+   */
+  if (!erro && address && !enderecoResolvidoEhPermitido(address, family)) {
+    const bloqueio = Object.assign(
+      new Error(`Destino resolvido para rede privada: ${address}`),
+      { code: "EACCES" },
+    ) as NodeJS.ErrnoException;
+    if (querLista) cb(bloqueio, []);
+    else cb(bloqueio, "", family);
+    return;
+  }
+
   if (querLista) cb(erro, erro ? [] : [{ address, family }]);
   else cb(erro, address, family);
 }
