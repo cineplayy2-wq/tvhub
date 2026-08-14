@@ -150,22 +150,19 @@ houve auditoria inteira feita sobre uma base 25 commits atrasada.
 
 Terminou? **Acrescente a entrada no diário.** Principalmente se deu errado.
 
-## 10. Mexeu no player ou na proxy de vídeo? Leia o Manual do Player antes.
+## 11. Mexeu em login, sessão, credencial ou rota de API? Leia o Diário de Segurança.
 
-**[docs/MANUAL-DO-PLAYER.md](MANUAL-DO-PLAYER.md)** — obrigatório antes de
-tocar em:
+**[docs/SEGURANCA.md](SEGURANCA.md)** — obrigatório antes de tocar em
+autenticação, sessões, `lib/iptv/credentials.ts`, `lib/iptv/pool-service.ts`,
+qualquer `route.ts` ou qualquer server action.
 
-- `components/iptv/iptv-player.tsx`
-- `app/api/iptv/stream/route.ts`
-- `lib/iptv/media-kind.ts`
+Ele guarda as dez invariantes que, se quebradas, reabrem uma brecha que já
+existiu neste código — entre elas: **senha se confere, nunca se sobrescreve**;
+**toda mutação por id do cliente leva `userId` no `where`**; **nenhum segredo
+com valor padrão**. Cada uma nasceu de uma falha real encontrada aqui, e a mais
+grave permitia entrar na conta de qualquer pessoa pelo formulário de login.
 
-Ele é diário de bordo: guarda o sintoma, a causa e a correção de tudo que já
-quebrou a reprodução, **e o que já foi tentado e deu errado**. Duas mudanças
-que pareciam melhorias óbvias estão lá marcadas como revertidas, com o motivo.
-Sem ler, a chance de reintroduzir uma delas é alta.
-
-Terminou de mexer? **Acrescente a entrada no diário.** Principalmente se deu
-errado — é o que tem mais valor lá dentro.
+Tem uma seção **⛔ ABERTO** no topo. Confira antes de subir qualquer coisa.
 
 ---
 

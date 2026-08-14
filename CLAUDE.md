@@ -21,7 +21,19 @@ motivo técnico. Sem ler, a chance de reintroduzir uma é alta.
 
 **Depois de mexer no player, acrescente a entrada no diário.** Principalmente
 quando der errado: é o que tem mais valor no documento. O formato da entrada
-está no topo do manual.
+está no topo do manual. Nunca marque uma correção como confirmada sem uso real
+confirmando.
+
+**[docs/SEGURANCA.md](docs/SEGURANCA.md)** — **obrigatório** antes de tocar em
+autenticação, sessões, credenciais, qualquer `route.ts` ou server action.
+
+São dez invariantes que, quebradas, reabrem uma brecha que já existiu aqui —
+entre elas **senha se confere, nunca se sobrescreve** e **toda mutação por id
+do cliente leva `userId` no `where`**. A mais grave permitia entrar na conta de
+qualquer pessoa, incluindo o admin, pelo formulário de login.
+
+O documento tem uma seção **⛔ ABERTO** no topo, com brechas cuja correção está
+na árvore de trabalho mas ainda não em commit. Confira antes de subir.
 
 ## Verificação antes do PR
 
