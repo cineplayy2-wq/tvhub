@@ -3,9 +3,15 @@
 # Convive com as stacks já existentes (odoo, postgres, redis, traefik, portainer)
 # nesta VPS. Nada aqui toca nelas: nomes, volumes e rede interna são próprios.
 #
-# Limites de memória são obrigatórios, não opcionais: a VPS tem ~830 MB livres e
-# roda um ERP em produção. Sem limite, um pico do Node aciona o OOM killer,
-# que escolhe a vítima pelo consumo — e a vítima provável seria o Odoo.
+# DIMENSIONAMENTO: VPS DEDICADA DE 24 GB.
+#
+# Os limites abaixo foram redimensionados. Os antigos (app 320M, Postgres
+# 256M, Redis 64M) vinham da VPS compartilhada com um Odoo, onde sobravam
+# ~830 MB para tudo. Mantidos numa maquina dedicada, eles nao protegem nada e
+# so estrangulam: a sincronizacao da M3U estourava o heap de 240 MB e o Redis
+# de 32 MB com noeviction passava a RECUSAR escrita em vez de despejar.
+#
+# Orcamento atual: app 3 x 4G = 12G | Postgres 4G | Redis 2.5G | ~5G de folga.
 #
 # Todas as variáveis ${...} vêm de /opt/tvhub/.env na VPS. Esse arquivo NÃO
 # está no Git e nunca deve estar: é o único lugar onde moram as senhas de
@@ -27,11 +33,34 @@ services:
       - tvhub-pgdata:/var/lib/postgresql/data
     networks:
       - tvhub-internal
+    # -----------------------------------------------------------------
+    # Tuning do Postgres para a VPS dedicada.
+    #
+    # O padrão do container é `shared_buffers=128MB` e `work_mem=4MB`, que foi
+    # desenhado para caber em qualquer lugar. Com 150 mil canais e as consultas
+    # deste app (busca por nome com ILIKE, agrupamento por categoria), 4MB de
+    # work_mem faz cada ordenação transbordar para disco — e disco é onde a
+    # lentidão vira timeout, e timeout vira container reiniciando.
+    command: >
+      postgres
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c work_mem=32MB
+      -c maintenance_work_mem=512MB
+      -c max_connections=100
+      -c random_page_cost=1.1
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
     deploy:
       replicas: 1
       resources:
         limits:
-          memory: 256M
+          # Era 256M — dimensionado para a VPS antiga de 830 MB dividida com um
+          # Odoo. Numa máquina dedicada de 24 GB isso é o gargalo mais caro que
+          # existe: o Postgres passa a vida despejando cache e lendo do disco.
+          memory: 4G
+        reservations:
+          memory: 1G
       restart_policy:
         # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
         # reprovado, o processo sai com código 0. Com on-failure isso é lido
@@ -48,11 +77,28 @@ services:
     # appendonly: as sessões de reprodução sobrevivem a restart do container.
     # maxmemory-policy noeviction: a trava de 2 telas não pode ter chave
     # despejada por pressão de memória — isso liberaria telas extras em silêncio.
+    # -----------------------------------------------------------------
+    # `noeviction` com 32 MB era uma bomba-relógio.
+    #
+    # A política está certa: a trava de telas não pode ter chave despejada em
+    # silêncio. Mas o TETO estava absurdamente baixo, e é o MESMO Redis que
+    # guarda o cache do TMDB (JSON de metadados, TTL de 24h), os contadores de
+    # rate limit e as curtidas. Trinta e dois megabytes enchem em horas.
+    #
+    # E `noeviction` cheio não descarta nada: ele passa a RECUSAR toda escrita
+    # com OOM. A partir daí o app quebra em cascata sem nada aparecer nos logs
+    # do Postgres nem do Node — cache que não grava, rate limit que não conta,
+    # sessão que não registra.
+    #
+    # 2 GB é folga real para o volume deste catálogo, e a política continua
+    # protegendo a trava de telas.
     command: >
       redis-server
       --appendonly yes
-      --maxmemory 32mb
+      --maxmemory 2gb
       --maxmemory-policy noeviction
+      --save 900 1
+      --save 300 10
     volumes:
       - tvhub-redisdata:/data
     networks:
@@ -61,7 +107,9 @@ services:
       replicas: 1
       resources:
         limits:
-          memory: 64M
+          memory: 2560M
+        reservations:
+          memory: 512M
       restart_policy:
         # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
         # reprovado, o processo sai com código 0. Com on-failure isso é lido
@@ -91,27 +139,42 @@ services:
     #
     # Canal ao vivo em MPEG-TS bruto mantém UMA conexão por horas e não termina
     # sozinho. Nesse caso o corte aos 100s é inevitável e o player reconecta.
-    # Aumentar este número não resolve isso — só estica o tempo em que dois
-    # containers de 320 MB dividem a RAM da VPS.
+    # Aumentar este numero nao resolve isso -- so estica o tempo em que a
+    # replica antiga e a nova convivem consumindo memoria.
     stop_grace_period: 120s
 
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      # Teto de heap ABAIXO do limite do container (320M).
+      # Teto de heap ABAIXO do limite do container (ver `limits.memory`).
+      #
       # Sem isto o V8 dimensiona o heap pela RAM da máquina, não pelo limite do
       # cgroup: ele adia a coleta achando que tem folga, encosta no limite do
       # container e o processo morre com "heap out of memory" em vez de
-      # simplesmente coletar. Os ~80 MB de diferença são para o que vive fora
-      # do heap (buffers, engine do Prisma, pilha nativa).
-      NODE_OPTIONS: "--max-old-space-size=240"
+      # simplesmente coletar. A diferença é para o que vive fora do heap
+      # (buffers de vídeo, engine do Prisma, pilha nativa).
+      #
+      # Era 240 MB contra um container de 320 MB. A sincronização da M3U
+      # carrega dezenas de milhares de canais e já rodava encostada nesse teto
+      # — o `sync-service.ts` tem comentário registrando que o processo chegou
+      # a 316 MiB de 320 MiB. Numa máquina dedicada, esse aperto não tem razão
+      # de existir e é a explicação mais provável para o container reiniciar
+      # sozinho sem nenhum cliente conectado.
+      #
+      # A folga de 1 GB entre heap e limite é grande de propósito: cada
+      # espectador é um fluxo de vídeo passando por buffers FORA do heap.
+      NODE_OPTIONS: "--max-old-space-size=3072"
+      # Fila de conexões do Prisma. Com 5, dez requisições simultâneas já
+      # ficavam esperando conexão — e sob carga isso vira timeout em cascata.
+      # O Postgres agora aceita 100; 25 por réplica deixa margem para o pool
+      # do Prisma, as migrations e uma conexão administrativa.
       # Nomes QUALIFICADOS da stack (tvhub_*), nunca os curtos.
       # O app precisa estar em `minha_rede` para o Traefik alcançá-lo, e nessa
       # rede já existem serviços chamados `postgres` e `redis` de outra stack.
       # Com o nome curto, o DNS do Swarm resolve para o banco alheio: foi o que
       # aconteceu aqui, e só não virou corrupção de dados porque a senha diferia.
-      DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public&connection_limit=5
+      DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public&connection_limit=25
       DIRECT_DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public
       REDIS_URL: redis://tvhub_redis:6379
       AUTH_SECRET: ${TVHUB_AUTH_SECRET}
@@ -154,10 +217,37 @@ services:
       - minha_rede
 
     deploy:
-      replicas: 1
+      # -----------------------------------------------------------------
+      # RÉPLICAS SÃO A ALAVANCA DE ESCALA. Não é a RAM.
+      # -----------------------------------------------------------------
+      #
+      # O Node roda JavaScript em UMA thread. O `/api/iptv/stream` empurra o
+      # vídeo de todos os espectadores por essa thread única: cada pedaço que
+      # chega do provedor passa pelo event loop antes de sair para o
+      # assinante. Com uma réplica, todo o tráfego de vídeo do produto disputa
+      # um núcleo — e quando esse núcleo satura, não trava um canal, travam
+      # TODOS ao mesmo tempo.
+      #
+      # Aumentar memória não resolve isso. Réplicas resolvem: o Swarm
+      # distribui as conexões entre elas e cada uma usa um núcleo.
+      #
+      # 3 é o ponto de partida para uma máquina de 24 GB. Ajuste por
+      # TVHUB_REPLICAS no /opt/tvhub/.env — a regra prática é uma réplica por
+      # núcleo disponível, menos um reservado para Postgres e sistema.
+      #
+      # O que é seguro replicar: o estado compartilhado (trava de telas,
+      # sessões, rate limit) vive no Redis, não na memória do processo. Os
+      # caches em memória (DNS, formato de fonte, host morto) passam a existir
+      # um por réplica — isso só reduz taxa de acerto, não gera divergência.
+      replicas: ${TVHUB_REPLICAS:-3}
       resources:
         limits:
-          memory: 320M
+          # Era 320M, dimensionado para a VPS antiga compartilhada com um Odoo.
+          # 4G por réplica × 3 = 12 GB, deixando 12 GB para Postgres, Redis e
+          # sistema numa máquina de 24 GB.
+          memory: 4G
+        reservations:
+          memory: 512M
 
       # ---------------------------------------------------------------
       # O CORAÇÃO DO DEPLOY SEM QUEDA
@@ -165,16 +255,18 @@ services:
       update_config:
         # start-first é a linha mais importante deste arquivo.
         #
-        # O padrão do Swarm é stop-first: ele DERRUBA a task antiga e só então
-        # sobe a nova. Com replicas: 1 isso significa que o site fica fora do ar
-        # durante todo o boot do Next — era a queda de todo deploy.
+        # O padrao do Swarm e stop-first: ele DERRUBA a task antiga e so entao
+        # sobe a nova. Com replica unica isso significa o site fora do ar
+        # durante todo o boot do Next -- era a queda de todo deploy. Com
+        # varias replicas o buraco e menor, mas continua cortando quem estava
+        # sendo atendido pela task derrubada.
         #
         # Com start-first a task nova sobe em paralelo, passa no healthcheck, e
         # só depois disso a antiga recebe SIGTERM e começa a drenar.
         #
-        # Custo: durante a troca existem dois containers de 320 MB ao mesmo
-        # tempo (640 MB). A VPS tem ~830 MB livres, então cabe — mas é por isso
-        # que o limite de 320M acima não pode subir sem antes medir a folga.
+        # Custo: durante a troca existe uma replica a MAIS no ar. Com 3
+        # replicas de 4G, o pico e de 16G contra os 24G da maquina -- cabe,
+        # mas e o numero a refazer antes de aumentar replicas ou memoria.
         order: start-first
         parallelism: 1
         # Só conta como "atualizado" depois de 90s saudável. Um crash-loop que
