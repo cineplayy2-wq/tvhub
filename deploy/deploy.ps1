@@ -15,7 +15,7 @@
 
 param(
   [switch]$SkipBuild,
-  [string]$VpsHost = "170.238.45.225",
+  [string]$VpsHost = "169.58.179.6",
   [string]$KeyPath = "$env:USERPROFILE\.ssh\tvhub_vps"
 )
 
