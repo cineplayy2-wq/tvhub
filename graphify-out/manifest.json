@@ -7,77 +7,77 @@
   "app/(app)/assistir/[id]/page.tsx": {
     "mtime": 1786355809.5896506,
     "ast_hash": "3854430d37546d8a069fdebb1de25b1a",
-    "semantic_hash": ""
+    "semantic_hash": "3854430d37546d8a069fdebb1de25b1a"
   },
   "app/(app)/busca/page.tsx": {
     "mtime": 1786355809.5896506,
     "ast_hash": "e9e7147f9dc421f261829c0cc0bef24a",
-    "semantic_hash": ""
+    "semantic_hash": "e9e7147f9dc421f261829c0cc0bef24a"
   },
   "app/(app)/inicio/page.tsx": {
-    "mtime": 1786355809.5936067,
-    "ast_hash": "1be24cd35ea72b405a7dfd9e85df2496",
-    "semantic_hash": ""
+    "mtime": 1786544908.9967916,
+    "ast_hash": "aa3f115921e6129fbefa03334071f058",
+    "semantic_hash": "aa3f115921e6129fbefa03334071f058"
   },
   "app/(app)/layout.tsx": {
     "mtime": 1786355096.5256307,
     "ast_hash": "c2b8edff6aa5abe24b0ce4fcf390cb1e",
-    "semantic_hash": ""
+    "semantic_hash": "c2b8edff6aa5abe24b0ce4fcf390cb1e"
   },
   "app/(app)/minha-lista/page.tsx": {
     "mtime": 1786355809.5951195,
     "ast_hash": "006289e23b51ddd66730f754be73f5c2",
-    "semantic_hash": ""
+    "semantic_hash": "006289e23b51ddd66730f754be73f5c2"
   },
   "app/(app)/perfis/page.tsx": {
     "mtime": 1786355809.5961323,
     "ast_hash": "601de7a76347dcd1a4bd93e8c2a219e1",
-    "semantic_hash": ""
+    "semantic_hash": "601de7a76347dcd1a4bd93e8c2a219e1"
   },
   "app/(app)/titulo/[slug]/page.tsx": {
     "mtime": 1786355809.5988672,
     "ast_hash": "2bfcae21cd7d9b3556a50d4f950652de",
-    "semantic_hash": ""
+    "semantic_hash": "2bfcae21cd7d9b3556a50d4f950652de"
   },
   "app/(app)/tv/[groupSlug]/page.tsx": {
-    "mtime": 1786350029.6263998,
-    "ast_hash": "57fc4cdc94d1500b84547e8ec4bc51d6",
-    "semantic_hash": ""
+    "mtime": 1786545670.797393,
+    "ast_hash": "6a54ba87eca8a0ca880c24ddc870aeab",
+    "semantic_hash": "6a54ba87eca8a0ca880c24ddc870aeab"
   },
   "app/(app)/tv/assistir/[channelId]/page.tsx": {
-    "mtime": 1786454331.655913,
-    "ast_hash": "7eda80c3647f464ceefc46abc4294c0d",
-    "semantic_hash": ""
+    "mtime": 1786552353.7966363,
+    "ast_hash": "369ad93d7a47596fdb54f1345adb8417",
+    "semantic_hash": "369ad93d7a47596fdb54f1345adb8417"
   },
   "app/(app)/tv/busca/page.tsx": {
     "mtime": 1786349951.6512394,
     "ast_hash": "238e5f63d3364752e51d326897ce8d20",
-    "semantic_hash": ""
+    "semantic_hash": "238e5f63d3364752e51d326897ce8d20"
   },
   "app/(app)/tv/layout.tsx": {
     "mtime": 1786448614.0003028,
     "ast_hash": "ea22e5548afc5241b1b43b4389b500e1",
-    "semantic_hash": ""
+    "semantic_hash": "ea22e5548afc5241b1b43b4389b500e1"
   },
   "app/(app)/tv/page.tsx": {
     "mtime": 1786448614.0032945,
     "ast_hash": "0d0bbaf012c4277370368fe02975ad35",
-    "semantic_hash": ""
+    "semantic_hash": "0d0bbaf012c4277370368fe02975ad35"
   },
   "app/(app)/tv/serie/[seriesName]/page.tsx": {
     "mtime": 1786402144.2336836,
     "ast_hash": "00cb1616a8bb9507e188197b822327f2",
-    "semantic_hash": ""
+    "semantic_hash": "00cb1616a8bb9507e188197b822327f2"
   },
   "app/(app)/tv/serie/[seriesName]/season-tabs.tsx": {
     "mtime": 1786326640.7818382,
     "ast_hash": "28ddf97559d02ba466ffdfa242422a5a",
-    "semantic_hash": ""
+    "semantic_hash": "28ddf97559d02ba466ffdfa242422a5a"
   },
   "app/(auth)/cadastro/page.tsx": {
     "mtime": 1786355809.600868,
     "ast_hash": "a15bf6e5107e8f30a78942fd82959530",
-    "semantic_hash": ""
+    "semantic_hash": "a15bf6e5107e8f30a78942fd82959530"
   },
   "app/(auth)/layout.tsx": {
     "mtime": 1786152485.0535457,
@@ -87,7 +87,7 @@
   "app/(auth)/login/page.tsx": {
     "mtime": 1786355809.602383,
     "ast_hash": "0fb3a9f75a6219dcfe71772550abfc1d",
-    "semantic_hash": ""
+    "semantic_hash": "0fb3a9f75a6219dcfe71772550abfc1d"
   },
   "app/(marketing)/layout.tsx": {
     "mtime": 1786152420.8576744,
@@ -107,12 +107,12 @@
   "app/actions/auth.ts": {
     "mtime": 1786382368.2474515,
     "ast_hash": "e7a656e933bbda89557fd698fc60e2b2",
-    "semantic_hash": ""
+    "semantic_hash": "e7a656e933bbda89557fd698fc60e2b2"
   },
   "app/actions/iptv.ts": {
-    "mtime": 1786451086.0631175,
-    "ast_hash": "ba304979a3f4e13d3954565e7993ac26",
-    "semantic_hash": ""
+    "mtime": 1786545792.5885475,
+    "ast_hash": "e6da9c85c817af99b808a89edab64684",
+    "semantic_hash": "e6da9c85c817af99b808a89edab64684"
   },
   "app/actions/playback.ts": {
     "mtime": 1786236794.4988053,
@@ -122,7 +122,7 @@
   "app/actions/profiles.ts": {
     "mtime": 1786374564.9414377,
     "ast_hash": "7fd6afa842b4aa4bc8fc922e8d2aade9",
-    "semantic_hash": ""
+    "semantic_hash": "7fd6afa842b4aa4bc8fc922e8d2aade9"
   },
   "app/actions/watchlist.ts": {
     "mtime": 1786236647.805823,
@@ -130,9 +130,9 @@
     "semantic_hash": "0ee7a49eaea9cdcaa59a61fb384625b4"
   },
   "app/admin/clientes/[id]/page.tsx": {
-    "mtime": 1786324523.03829,
-    "ast_hash": "67b766e8a6e26e5056c036dadf3ff59e",
-    "semantic_hash": ""
+    "mtime": 1786544572.1590753,
+    "ast_hash": "e661a196a7d5d4dd8d4fc39658faecc0",
+    "semantic_hash": "e661a196a7d5d4dd8d4fc39658faecc0"
   },
   "app/admin/clientes/page.tsx": {
     "mtime": 1786154344.3040705,
@@ -155,9 +155,9 @@
     "semantic_hash": "9913eb8e0167fed4c5e97c2135d5189c"
   },
   "app/admin/iptv/[userId]/page.tsx": {
-    "mtime": 1786451106.8486564,
-    "ast_hash": "374de240616c9b17d0232b0e28c8ead7",
-    "semantic_hash": ""
+    "mtime": 1786545810.4489274,
+    "ast_hash": "9d2fd29c513214af8c26e884067d83b9",
+    "semantic_hash": "9d2fd29c513214af8c26e884067d83b9"
   },
   "app/admin/iptv/page.tsx": {
     "mtime": 1786239711.3199759,
@@ -167,12 +167,12 @@
   "app/admin/layout.tsx": {
     "mtime": 1786355809.604403,
     "ast_hash": "111f366982124c53ebbd87b1c96dcb01",
-    "semantic_hash": ""
+    "semantic_hash": "111f366982124c53ebbd87b1c96dcb01"
   },
   "app/admin/page.tsx": {
     "mtime": 1786324511.6231816,
     "ast_hash": "fe67e0db3dfb8529401b3d004b47e14e",
-    "semantic_hash": ""
+    "semantic_hash": "fe67e0db3dfb8529401b3d004b47e14e"
   },
   "app/api/admin/tmdb/route.ts": {
     "mtime": 1786196331.8179252,
@@ -200,19 +200,19 @@
     "semantic_hash": "67f35eb83b8035e413d88c0a645d7785"
   },
   "app/api/iptv/stream/route.ts": {
-    "mtime": 1786465990.2790318,
-    "ast_hash": "55feb74ee8cb866725931c801dbb84d6",
-    "semantic_hash": ""
+    "mtime": 1786620347.3931823,
+    "ast_hash": "a2f20beecf96a353d4787bcdbe0d71bc",
+    "semantic_hash": "a2f20beecf96a353d4787bcdbe0d71bc"
   },
   "app/api/iptv/sync/route.ts": {
     "mtime": 1786451069.7247286,
     "ast_hash": "87f54b1a226763e4057dc6a28e614a3f",
-    "semantic_hash": ""
+    "semantic_hash": "87f54b1a226763e4057dc6a28e614a3f"
   },
   "app/layout.tsx": {
     "mtime": 1786389372.3018255,
     "ast_hash": "b2bc9f8e4a982393962f4c585434b7ce",
-    "semantic_hash": ""
+    "semantic_hash": "b2bc9f8e4a982393962f4c585434b7ce"
   },
   "auth.config.ts": {
     "mtime": 1786239694.9998338,
@@ -227,7 +227,7 @@
   "components/admin/admin-sidebar.tsx": {
     "mtime": 1786363944.7430325,
     "ast_hash": "3ef1d8eb740dd31216ef7a13e23a065f",
-    "semantic_hash": ""
+    "semantic_hash": "3ef1d8eb740dd31216ef7a13e23a065f"
   },
   "components/admin/block-user-button.tsx": {
     "mtime": 1786154227.5202382,
@@ -257,7 +257,7 @@
   "components/admin/iptv/m3u-form.tsx": {
     "mtime": 1786450331.4746532,
     "ast_hash": "f0904fcb511523ceef17ee40326ab2cf",
-    "semantic_hash": ""
+    "semantic_hash": "f0904fcb511523ceef17ee40326ab2cf"
   },
   "components/admin/iptv/m3u-sync-status.tsx": {
     "mtime": 1786239698.1756237,
@@ -302,12 +302,12 @@
   "components/auth/auth-shell.tsx": {
     "mtime": 1786383033.4681556,
     "ast_hash": "9723e760db5744d9b6a474365396f447",
-    "semantic_hash": ""
+    "semantic_hash": "9723e760db5744d9b6a474365396f447"
   },
   "components/auth/login-form.tsx": {
     "mtime": 1786374588.4571557,
     "ast_hash": "3f606b924a5716147032a714605ae8d5",
-    "semantic_hash": ""
+    "semantic_hash": "3f606b924a5716147032a714605ae8d5"
   },
   "components/auth/register-form.tsx": {
     "mtime": 1786153474.9150977,
@@ -317,7 +317,7 @@
   "components/catalog/app-header.tsx": {
     "mtime": 1786354773.0432703,
     "ast_hash": "a14b75439a2e98cab6084f2bb7fffd1d",
-    "semantic_hash": ""
+    "semantic_hash": "a14b75439a2e98cab6084f2bb7fffd1d"
   },
   "components/catalog/catalog-row.tsx": {
     "mtime": 1786236502.8376489,
@@ -335,9 +335,9 @@
     "semantic_hash": "79fa142e00ee8f92cba7f68e9475d471"
   },
   "components/catalog/title-card.tsx": {
-    "mtime": 1786236477.415688,
-    "ast_hash": "7d4e5d065743ceaf803604b675cb9699",
-    "semantic_hash": "7d4e5d065743ceaf803604b675cb9699"
+    "mtime": 1786544931.0626185,
+    "ast_hash": "2fa73abcc7ab24cbb6cfab9dbb95e009",
+    "semantic_hash": "2fa73abcc7ab24cbb6cfab9dbb95e009"
   },
   "components/catalog/watchlist-button.tsx": {
     "mtime": 1786236633.2965236,
@@ -347,12 +347,12 @@
   "components/iptv/favorite-button.tsx": {
     "mtime": 1786326454.4575028,
     "ast_hash": "24bfe734c304332a86928dd8c0d6c5bd",
-    "semantic_hash": ""
+    "semantic_hash": "24bfe734c304332a86928dd8c0d6c5bd"
   },
   "components/iptv/iptv-player.tsx": {
-    "mtime": 1786473199.192065,
-    "ast_hash": "175f181b8a6ff7207e479176a20c48b6",
-    "semantic_hash": ""
+    "mtime": 1786620618.1615357,
+    "ast_hash": "2f285f2e798653f422875a8fa1eb76f1",
+    "semantic_hash": "2f285f2e798653f422875a8fa1eb76f1"
   },
   "components/iptv/quality-badge.tsx": {
     "mtime": 1786239681.7058408,
@@ -367,12 +367,12 @@
   "components/marketing/faq.tsx": {
     "mtime": 1786329116.9825354,
     "ast_hash": "83921fec42a44188d75e9d3eceb97687",
-    "semantic_hash": ""
+    "semantic_hash": "83921fec42a44188d75e9d3eceb97687"
   },
   "components/marketing/features.tsx": {
     "mtime": 1786354773.0442786,
     "ast_hash": "2a8333c5251b3bcba862cba5c8d42b90",
-    "semantic_hash": ""
+    "semantic_hash": "2a8333c5251b3bcba862cba5c8d42b90"
   },
   "components/marketing/final-cta.tsx": {
     "mtime": 1786195130.036289,
@@ -392,7 +392,7 @@
   "components/marketing/manifesto.tsx": {
     "mtime": 1786354773.0452833,
     "ast_hash": "392c952e15778c3a933d75841aa10e6d",
-    "semantic_hash": ""
+    "semantic_hash": "392c952e15778c3a933d75841aa10e6d"
   },
   "components/marketing/pricing.tsx": {
     "mtime": 1786195037.0370219,
@@ -412,7 +412,7 @@
   "components/marketing/site-header.tsx": {
     "mtime": 1786354773.0468755,
     "ast_hash": "ea20c6a43641af1455412852b9928bff",
-    "semantic_hash": ""
+    "semantic_hash": "ea20c6a43641af1455412852b9928bff"
   },
   "components/marketing/stats.tsx": {
     "mtime": 1786194944.1156573,
@@ -425,9 +425,9 @@
     "semantic_hash": "e9603d6853ab32283f4d4f6656ca1eca"
   },
   "components/player/video-player.tsx": {
-    "mtime": 1786236779.0689504,
-    "ast_hash": "8b8003dca9e86e701be29256a4b2c11a",
-    "semantic_hash": "8b8003dca9e86e701be29256a4b2c11a"
+    "mtime": 1786558501.8914158,
+    "ast_hash": "76a0b691ac2291f014261c5bfd2c1292",
+    "semantic_hash": "76a0b691ac2291f014261c5bfd2c1292"
   },
   "components/profile/pin-dialog.tsx": {
     "mtime": 1786153507.9220784,
@@ -442,17 +442,17 @@
   "components/profile/profile-form-modal.tsx": {
     "mtime": 1786363732.1088102,
     "ast_hash": "89f036dc2967be42fa743045fac7a253",
-    "semantic_hash": ""
+    "semantic_hash": "89f036dc2967be42fa743045fac7a253"
   },
   "components/profile/profile-grid.tsx": {
     "mtime": 1786363722.7059796,
     "ast_hash": "a83a9fccb322bfcee913c34ce961daec",
-    "semantic_hash": ""
+    "semantic_hash": "a83a9fccb322bfcee913c34ce961daec"
   },
   "components/shared/logo.tsx": {
     "mtime": 1786362374.5302465,
     "ast_hash": "b1cedf04b91de5730d24ee76e0a48489",
-    "semantic_hash": ""
+    "semantic_hash": "b1cedf04b91de5730d24ee76e0a48489"
   },
   "components/ui/accordion.tsx": {
     "mtime": 1786152279.7631555,
@@ -467,17 +467,17 @@
   "components/ui/button.tsx": {
     "mtime": 1786370544.3388653,
     "ast_hash": "258615aa3b0754b60538124733f95607",
-    "semantic_hash": ""
+    "semantic_hash": "258615aa3b0754b60538124733f95607"
   },
   "components/ui/form-error.tsx": {
     "mtime": 1786365894.278051,
     "ast_hash": "1df6f44665ef351ea64ac12d0e083d29",
-    "semantic_hash": ""
+    "semantic_hash": "1df6f44665ef351ea64ac12d0e083d29"
   },
   "components/ui/input.tsx": {
     "mtime": 1786370529.2812886,
     "ast_hash": "9adbfc33abce88bedc163b83a36ac269",
-    "semantic_hash": ""
+    "semantic_hash": "9adbfc33abce88bedc163b83a36ac269"
   },
   "components/ui/modal.tsx": {
     "mtime": 1786193743.5457702,
@@ -505,9 +505,9 @@
     "semantic_hash": "18fe0c055a871ea96060c907783f00d9"
   },
   "deploy/deploy.ps1": {
-    "mtime": 1786479280.0884833,
-    "ast_hash": "d59282f6030c6dc8c7d4ffce6343175b",
-    "semantic_hash": ""
+    "mtime": 1786498157.0799098,
+    "ast_hash": "4b42484d0f651773e809d53973782116",
+    "semantic_hash": "4b42484d0f651773e809d53973782116"
   },
   "lib/audit.ts": {
     "mtime": 1786154054.4977026,
@@ -532,22 +532,22 @@
   "lib/constants.ts": {
     "mtime": 1786354792.0885382,
     "ast_hash": "8fa37dc2f3121b163214e816aa03469a",
-    "semantic_hash": ""
+    "semantic_hash": "8fa37dc2f3121b163214e816aa03469a"
   },
   "lib/iptv/category-detector.ts": {
-    "mtime": 1786313250.4195006,
-    "ast_hash": "ffbcb8018b4a94d5e32922ca876518c8",
-    "semantic_hash": ""
+    "mtime": 1786543259.9168656,
+    "ast_hash": "47ef2f92b18e0b9b8bf25b3c8b3003c4",
+    "semantic_hash": "47ef2f92b18e0b9b8bf25b3c8b3003c4"
   },
   "lib/iptv/m3u-parser.ts": {
     "mtime": 1786474435.956338,
     "ast_hash": "4a5c0d77dbcf5bc83e189e2870f58a24",
-    "semantic_hash": ""
+    "semantic_hash": "4a5c0d77dbcf5bc83e189e2870f58a24"
   },
   "lib/iptv/sync-service.ts": {
-    "mtime": 1786475202.2613664,
-    "ast_hash": "77b33d4b1c11eb2a4c3fd06e02a0cdf9",
-    "semantic_hash": ""
+    "mtime": 1786547861.67346,
+    "ast_hash": "28dde6ab0896ce54d845ac33a96a7f4c",
+    "semantic_hash": "28dde6ab0896ce54d845ac33a96a7f4c"
   },
   "lib/iptv/xtream-client.ts": {
     "mtime": 1786282599.0011694,
@@ -565,14 +565,14 @@
     "semantic_hash": "90e0f1aff90ef0a6d89e3d51adcc9999"
   },
   "lib/queries/admin.ts": {
-    "mtime": 1786324505.928754,
-    "ast_hash": "fdd500dd83932b740e63d3a0b466eb22",
-    "semantic_hash": ""
+    "mtime": 1786544619.9533653,
+    "ast_hash": "e4ff7ad8f70d16cb13492058ef08684d",
+    "semantic_hash": "e4ff7ad8f70d16cb13492058ef08684d"
   },
   "lib/queries/browse.ts": {
     "mtime": 1786388278.5554078,
     "ast_hash": "431f90c90a7dce948ebeb3497b2ea1c2",
-    "semantic_hash": ""
+    "semantic_hash": "431f90c90a7dce948ebeb3497b2ea1c2"
   },
   "lib/queries/catalog.ts": {
     "mtime": 1786195229.8593526,
@@ -580,14 +580,14 @@
     "semantic_hash": "2dcb9c725caaf02a627bb4f84b72629f"
   },
   "lib/queries/iptv.ts": {
-    "mtime": 1786473668.2950766,
-    "ast_hash": "64fecc649dbf28c189b5d4d8a295f841",
-    "semantic_hash": ""
+    "mtime": 1786581430.67081,
+    "ast_hash": "301bba8f932d05b969758b44f7195f5f",
+    "semantic_hash": "301bba8f932d05b969758b44f7195f5f"
   },
   "lib/queries/plans.ts": {
     "mtime": 1786328974.355665,
     "ast_hash": "2004a3c067cd54152e048f5e8ed091fd",
-    "semantic_hash": ""
+    "semantic_hash": "2004a3c067cd54152e048f5e8ed091fd"
   },
   "lib/queries/subscription.ts": {
     "mtime": 1786153442.8468885,
@@ -600,9 +600,9 @@
     "semantic_hash": "835da1bf3eb4f6c56dd0548e072ddca5"
   },
   "lib/redis.ts": {
-    "mtime": 1786196300.3689387,
-    "ast_hash": "f29b4051a5e1a48022ab1718d07cc1c6",
-    "semantic_hash": "f29b4051a5e1a48022ab1718d07cc1c6"
+    "mtime": 1786558501.720637,
+    "ast_hash": "2116a8f256159dd3fd3bd63889616e64",
+    "semantic_hash": "2116a8f256159dd3fd3bd63889616e64"
   },
   "lib/storage/provider.ts": {
     "mtime": 1786154067.4957352,
@@ -612,12 +612,12 @@
   "lib/tmdb/client.ts": {
     "mtime": 1786349793.719025,
     "ast_hash": "73bf38578179b2f79620d49ebc5989fd",
-    "semantic_hash": ""
+    "semantic_hash": "73bf38578179b2f79620d49ebc5989fd"
   },
   "lib/utils.ts": {
     "mtime": 1786400752.5067813,
     "ast_hash": "ca88b9c3c4fec892c46427cd262ac3f6",
-    "semantic_hash": ""
+    "semantic_hash": "ca88b9c3c4fec892c46427cd262ac3f6"
   },
   "lib/validations/admin.ts": {
     "mtime": 1786196396.8247995,
@@ -627,12 +627,12 @@
   "lib/validations/auth.ts": {
     "mtime": 1786374572.121313,
     "ast_hash": "1a81f085287e6539fdc02cfb019df58c",
-    "semantic_hash": ""
+    "semantic_hash": "1a81f085287e6539fdc02cfb019df58c"
   },
   "lib/validations/iptv.ts": {
     "mtime": 1786450243.1204114,
     "ast_hash": "0bbf6547c1330a7892407946eedea83c",
-    "semantic_hash": ""
+    "semantic_hash": "0bbf6547c1330a7892407946eedea83c"
   },
   "lib/validations/profile.ts": {
     "mtime": 1786153387.711096,
@@ -647,12 +647,12 @@
   "next.config.js": {
     "mtime": 1786390368.4966447,
     "ast_hash": "1b20a6272798ea4233f8e5b331e9c303",
-    "semantic_hash": ""
+    "semantic_hash": "1b20a6272798ea4233f8e5b331e9c303"
   },
   "package.json": {
     "mtime": 1786389255.363716,
     "ast_hash": "1ece994a0d7974bc0e0fd56ebbae7704",
-    "semantic_hash": ""
+    "semantic_hash": "1ece994a0d7974bc0e0fd56ebbae7704"
   },
   "postcss.config.js": {
     "mtime": 1786149898.983368,
@@ -682,7 +682,7 @@
   "prisma/seed.ts": {
     "mtime": 1786328962.6498876,
     "ast_hash": "32364ec2edf31e9c0620b7ee357c3e4c",
-    "semantic_hash": ""
+    "semantic_hash": "32364ec2edf31e9c0620b7ee357c3e4c"
   },
   "scratch/import-m3u-vps.js": {
     "mtime": 1786286830.618351,
@@ -702,7 +702,7 @@
   "tailwind.config.ts": {
     "mtime": 1786354773.0232012,
     "ast_hash": "06630a79b3dc27ff4fcd2134a90b68b6",
-    "semantic_hash": ""
+    "semantic_hash": "06630a79b3dc27ff4fcd2134a90b68b6"
   },
   "tsconfig.json": {
     "mtime": 1786151372.6584418,
@@ -732,327 +732,327 @@
   ".claude/launch.json": {
     "mtime": 1786474227.1257234,
     "ast_hash": "497980c9dd7576e746e862298afd8b66",
-    "semantic_hash": ""
+    "semantic_hash": "497980c9dd7576e746e862298afd8b66"
   },
   "app/(app)/tv/dicas/page.tsx": {
     "mtime": 1786355047.4487028,
     "ast_hash": "0612c1477d96f4d25a6b7aa0a3148d7f",
-    "semantic_hash": ""
+    "semantic_hash": "0612c1477d96f4d25a6b7aa0a3148d7f"
   },
   "app/(app)/tv/kids/page.tsx": {
     "mtime": 1786383314.417248,
     "ast_hash": "20359e97b7b4941d651f586fab31a234",
-    "semantic_hash": ""
+    "semantic_hash": "20359e97b7b4941d651f586fab31a234"
   },
   "app/(app)/tv/live/page.tsx": {
     "mtime": 1786350029.617746,
     "ast_hash": "90e5b536986e606f6325e50760ab39d0",
-    "semantic_hash": ""
+    "semantic_hash": "90e5b536986e606f6325e50760ab39d0"
   },
   "app/(app)/tv/loading.tsx": {
     "mtime": 1786352098.6556158,
     "ast_hash": "659be1e2bcb444193d923de5d64ba1df",
-    "semantic_hash": ""
+    "semantic_hash": "659be1e2bcb444193d923de5d64ba1df"
   },
   "app/(app)/tv/movies/page.tsx": {
     "mtime": 1786402198.8113208,
     "ast_hash": "6f4ee3410ec14ca8c748ac7ad2f9b765",
-    "semantic_hash": ""
+    "semantic_hash": "6f4ee3410ec14ca8c748ac7ad2f9b765"
   },
   "app/(app)/tv/novelas/page.tsx": {
     "mtime": 1786402274.4017599,
     "ast_hash": "1475d13cbede84525f3223b581cd710d",
-    "semantic_hash": ""
+    "semantic_hash": "1475d13cbede84525f3223b581cd710d"
   },
   "app/(app)/tv/series/page.tsx": {
     "mtime": 1786387289.5985496,
     "ast_hash": "1ae942d6deb9f584165604f1a0b36c99",
-    "semantic_hash": ""
+    "semantic_hash": "1ae942d6deb9f584165604f1a0b36c99"
   },
   "app/(app)/tv/sports/page.tsx": {
     "mtime": 1786362422.4402187,
     "ast_hash": "189987f7643f99ec0a6bd23f5509213d",
-    "semantic_hash": ""
+    "semantic_hash": "189987f7643f99ec0a6bd23f5509213d"
   },
   "app/admin/auditoria/page.tsx": {
     "mtime": 1786363974.5393708,
     "ast_hash": "c7e016449fa458a41b02a4bed206b6dc",
-    "semantic_hash": ""
+    "semantic_hash": "c7e016449fa458a41b02a4bed206b6dc"
   },
   "app/admin/configuracoes/page.tsx": {
-    "mtime": 1786363954.9717388,
-    "ast_hash": "578f6cf0ee035ff8045dd44d16284c45",
-    "semantic_hash": ""
+    "mtime": 1786494931.9124742,
+    "ast_hash": "670d32f5219537c8d6c6e4448a48a692",
+    "semantic_hash": "670d32f5219537c8d6c6e4448a48a692"
   },
   "app/admin/planos/page.tsx": {
-    "mtime": 1786364016.26165,
-    "ast_hash": "edc5de5f41349886b26c6fa61c96ab1a",
-    "semantic_hash": ""
+    "mtime": 1786544726.6782165,
+    "ast_hash": "466c3349f4a49153bdc80d87d4bbaa09",
+    "semantic_hash": "466c3349f4a49153bdc80d87d4bbaa09"
   },
   "app/api/ai/assistant/route.ts": {
     "mtime": 1786317508.6058528,
     "ast_hash": "8c4a55c5a8d0ec10951a854f2362b940",
-    "semantic_hash": ""
+    "semantic_hash": "8c4a55c5a8d0ec10951a854f2362b940"
   },
   "app/api/iptv/progress/route.ts": {
-    "mtime": 1786353395.1944191,
-    "ast_hash": "d880e35a798c3a5221022183a7675053",
-    "semantic_hash": ""
+    "mtime": 1786544840.7086043,
+    "ast_hash": "6b339256b42972e308881f1558a0b274",
+    "semantic_hash": "6b339256b42972e308881f1558a0b274"
   },
   "app/api/ready/route.ts": {
     "mtime": 1786474372.1433997,
     "ast_hash": "14ca3b8756fb6c861008f519799706d8",
-    "semantic_hash": ""
+    "semantic_hash": "14ca3b8756fb6c861008f519799706d8"
   },
   "app/error.tsx": {
     "mtime": 1786402852.2835784,
     "ast_hash": "61eb91fab5c8f5665ff0296daf5b5fd3",
-    "semantic_hash": ""
+    "semantic_hash": "61eb91fab5c8f5665ff0296daf5b5fd3"
   },
   "app/not-found.tsx": {
     "mtime": 1786402848.7974944,
     "ast_hash": "a87feea5f2c97d6e38767edf3d735079",
-    "semantic_hash": ""
+    "semantic_hash": "a87feea5f2c97d6e38767edf3d735079"
   },
   "components/admin/iptv/relink-backup-button.tsx": {
     "mtime": 1786451096.7645464,
     "ast_hash": "034c9f7050a3986d87199b271f504899",
-    "semantic_hash": ""
+    "semantic_hash": "034c9f7050a3986d87199b271f504899"
   },
   "components/ai/cine-ai-widget.tsx": {
     "mtime": 1786317457.7360978,
     "ast_hash": "6c133c2250ebf37e6864ec157a7065fe",
-    "semantic_hash": ""
+    "semantic_hash": "6c133c2250ebf37e6864ec157a7065fe"
   },
   "components/iptv/app-topbar.tsx": {
-    "mtime": 1786427816.3831398,
-    "ast_hash": "d51468e64f156e196b3f245533366336",
-    "semantic_hash": ""
+    "mtime": 1786581562.6632628,
+    "ast_hash": "84ee32a551d21769addacc04cd959358",
+    "semantic_hash": "84ee32a551d21769addacc04cd959358"
   },
   "components/iptv/artwork.tsx": {
     "mtime": 1786389371.9023154,
     "ast_hash": "1e549f409d4fc51c934fd3c3e2d97a4a",
-    "semantic_hash": ""
+    "semantic_hash": "1e549f409d4fc51c934fd3c3e2d97a4a"
   },
   "components/iptv/cast-modal.tsx": {
     "mtime": 1786362377.7565722,
     "ast_hash": "8b4770081c421439af25a1a75ff8269b",
-    "semantic_hash": ""
+    "semantic_hash": "8b4770081c421439af25a1a75ff8269b"
   },
   "components/iptv/category-tiles.tsx": {
     "mtime": 1786324455.9441104,
     "ast_hash": "c19b5d4078bd7b967bea5b3605208e69",
-    "semantic_hash": ""
+    "semantic_hash": "c19b5d4078bd7b967bea5b3605208e69"
   },
   "components/iptv/continue-watching-carousel.tsx": {
     "mtime": 1786353400.6262884,
     "ast_hash": "5cca74a5df4706e48b27310e643ce4c6",
-    "semantic_hash": ""
+    "semantic_hash": "5cca74a5df4706e48b27310e643ce4c6"
   },
   "components/iptv/continue-watching-rail.tsx": {
     "mtime": 1786385631.6611521,
     "ast_hash": "4a3fe4c543cb17798d855e21f6e31555",
-    "semantic_hash": ""
+    "semantic_hash": "4a3fe4c543cb17798d855e21f6e31555"
   },
   "components/iptv/device-tier-provider.tsx": {
     "mtime": 1786389351.2413745,
     "ast_hash": "901fe044bb27e7c92ff4e03d78b1b6e1",
-    "semantic_hash": ""
+    "semantic_hash": "901fe044bb27e7c92ff4e03d78b1b6e1"
   },
   "components/iptv/filter-bar.tsx": {
     "mtime": 1786386445.282519,
     "ast_hash": "57d3012671192aefca8980729cf7f6b9",
-    "semantic_hash": ""
+    "semantic_hash": "57d3012671192aefca8980729cf7f6b9"
   },
   "components/iptv/filter-chips.tsx": {
     "mtime": 1786324528.4716692,
     "ast_hash": "1886ad659d4295303722aa535c29d38c",
-    "semantic_hash": ""
+    "semantic_hash": "1886ad659d4295303722aa535c29d38c"
   },
   "components/iptv/kids-card.tsx": {
     "mtime": 1786326623.0707366,
     "ast_hash": "dd9f3ce31ab5d9323b69fe25227bed35",
-    "semantic_hash": ""
+    "semantic_hash": "dd9f3ce31ab5d9323b69fe25227bed35"
   },
   "components/iptv/pill-nav.tsx": {
     "mtime": 1786389301.9456983,
     "ast_hash": "55946c5384dc75ddc45656a0184b6410",
-    "semantic_hash": ""
+    "semantic_hash": "55946c5384dc75ddc45656a0184b6410"
   },
   "components/iptv/playlist-state.tsx": {
     "mtime": 1786370485.7620604,
     "ast_hash": "4e5c98802f49f83c1d3640da1da293d7",
-    "semantic_hash": ""
+    "semantic_hash": "4e5c98802f49f83c1d3640da1da293d7"
   },
   "components/iptv/poster-card.tsx": {
     "mtime": 1786400761.577037,
     "ast_hash": "b460b9d7fcbcf0d33aa4423a04131641",
-    "semantic_hash": ""
+    "semantic_hash": "b460b9d7fcbcf0d33aa4423a04131641"
   },
   "components/iptv/rail.tsx": {
     "mtime": 1786389301.9431808,
     "ast_hash": "0b12119f03edd9e8c1919d137ce44fe0",
-    "semantic_hash": ""
+    "semantic_hash": "0b12119f03edd9e8c1919d137ce44fe0"
   },
   "components/iptv/rank-card.tsx": {
     "mtime": 1786326623.0697324,
     "ast_hash": "1a227370fab3104c103989c71e3f6f9a",
-    "semantic_hash": ""
+    "semantic_hash": "1a227370fab3104c103989c71e3f6f9a"
   },
   "components/iptv/report-modal.tsx": {
     "mtime": 1786362388.7871466,
     "ast_hash": "2e4ee556881766234729b323424092b5",
-    "semantic_hash": ""
+    "semantic_hash": "2e4ee556881766234729b323424092b5"
   },
   "components/iptv/section.tsx": {
     "mtime": 1786355276.1579394,
     "ast_hash": "095832b2d512fd6eb67ac9f8f3302047",
-    "semantic_hash": ""
+    "semantic_hash": "095832b2d512fd6eb67ac9f8f3302047"
   },
   "components/iptv/showcase-hero.tsx": {
     "mtime": 1786448494.0004742,
     "ast_hash": "2ab1de9689d71f3333d88cf9514f48f4",
-    "semantic_hash": ""
+    "semantic_hash": "2ab1de9689d71f3333d88cf9514f48f4"
   },
   "components/iptv/side-nav.tsx": {
-    "mtime": 1786449195.6666853,
-    "ast_hash": "411cd68da39c6125ade7963d3a5a501b",
-    "semantic_hash": ""
+    "mtime": 1786581522.7657022,
+    "ast_hash": "2d6a18e3003b11704b5e3ae0b57a0080",
+    "semantic_hash": "2d6a18e3003b11704b5e3ae0b57a0080"
   },
   "components/iptv/skeletons.tsx": {
     "mtime": 1786327005.8347335,
     "ast_hash": "0cdbfc747a1c17ad4c3fdabf0e0ea7d7",
-    "semantic_hash": ""
+    "semantic_hash": "0cdbfc747a1c17ad4c3fdabf0e0ea7d7"
   },
   "components/iptv/status-chip.tsx": {
     "mtime": 1786349905.1799552,
     "ast_hash": "1154f495e39d83c7280dad2f0d3d2c36",
-    "semantic_hash": ""
+    "semantic_hash": "1154f495e39d83c7280dad2f0d3d2c36"
   },
   "components/iptv/tab-bar.tsx": {
-    "mtime": 1786389301.9492404,
-    "ast_hash": "bcefdaab0c2292f1436be72efc601131",
-    "semantic_hash": ""
+    "mtime": 1786581572.6359906,
+    "ast_hash": "627fcf8fbbbb141aa2ebffd84a6bddec",
+    "semantic_hash": "627fcf8fbbbb141aa2ebffd84a6bddec"
   },
   "components/iptv/tile-card.tsx": {
     "mtime": 1786400769.14899,
     "ast_hash": "41ac4f56f6f4bc392bffc96ab10c9230",
-    "semantic_hash": ""
+    "semantic_hash": "41ac4f56f6f4bc392bffc96ab10c9230"
   },
   "components/iptv/tv-nav.tsx": {
     "mtime": 1786375240.7875931,
     "ast_hash": "92296a440583847d5b16e79f48ee1050",
-    "semantic_hash": ""
+    "semantic_hash": "92296a440583847d5b16e79f48ee1050"
   },
   "components/profile/user-profile-menu.tsx": {
     "mtime": 1786363768.1734738,
     "ast_hash": "90c5c53ab977f761215b81102d4bfca8",
-    "semantic_hash": ""
+    "semantic_hash": "90c5c53ab977f761215b81102d4bfca8"
   },
   "lib/ai/client.ts": {
-    "mtime": 1786354773.049404,
-    "ast_hash": "25430acc81496badb985dc7c6b44d366",
-    "semantic_hash": ""
+    "mtime": 1786494854.7483475,
+    "ast_hash": "9bc30c703b0499007f3d898e91eeacd1",
+    "semantic_hash": "9bc30c703b0499007f3d898e91eeacd1"
   },
   "lib/ai/smart-recommender.ts": {
-    "mtime": 1786323338.0538914,
-    "ast_hash": "f78599fb6c3c8544d2ea1efe2d131968",
-    "semantic_hash": ""
+    "mtime": 1786494921.1114318,
+    "ast_hash": "54327eb39984051f5aea19478e872b3e",
+    "semantic_hash": "54327eb39984051f5aea19478e872b3e"
   },
   "lib/cache.ts": {
     "mtime": 1786328480.793404,
     "ast_hash": "63319624f6486f832077e081d737312e",
-    "semantic_hash": ""
+    "semantic_hash": "63319624f6486f832077e081d737312e"
   },
   "lib/email.ts": {
     "mtime": 1786383024.112204,
     "ast_hash": "12ba8c5a40a7ea8a3e309a6d8400ad5a",
-    "semantic_hash": ""
+    "semantic_hash": "12ba8c5a40a7ea8a3e309a6d8400ad5a"
   },
   "lib/geo.ts": {
     "mtime": 1786304725.2762165,
     "ast_hash": "73759b8de67bfc6c26347cdfd14a59e3",
-    "semantic_hash": ""
+    "semantic_hash": "73759b8de67bfc6c26347cdfd14a59e3"
   },
   "lib/iptv/clean-name.ts": {
     "mtime": 1786304697.5941517,
     "ast_hash": "07a2460e11167776cc7b3a440deb95a6",
-    "semantic_hash": ""
+    "semantic_hash": "07a2460e11167776cc7b3a440deb95a6"
   },
   "lib/iptv/epg.ts": {
     "mtime": 1786450445.9149628,
     "ast_hash": "3bcc0ab14d672f4c56c94d6636ac0292",
-    "semantic_hash": ""
+    "semantic_hash": "3bcc0ab14d672f4c56c94d6636ac0292"
   },
   "lib/iptv/range.ts": {
     "mtime": 1786352578.7042818,
     "ast_hash": "0774a83ec9d15cf9b37623165db16415",
-    "semantic_hash": ""
+    "semantic_hash": "0774a83ec9d15cf9b37623165db16415"
   },
   "lib/iptv/ssrf-guard.ts": {
     "mtime": 1786304028.412583,
     "ast_hash": "ade8fe4310cbc19123acc66103e94f63",
-    "semantic_hash": ""
+    "semantic_hash": "ade8fe4310cbc19123acc66103e94f63"
   },
   "lib/iptv/watch-progress-service.ts": {
-    "mtime": 1786400743.2220316,
-    "ast_hash": "6db902ea3046fcd25b6e61d074685e74",
-    "semantic_hash": ""
+    "mtime": 1786544831.5043678,
+    "ast_hash": "9621e550a4639fb8a42b720d90c2d997",
+    "semantic_hash": "9621e550a4639fb8a42b720d90c2d997"
   },
   "lib/playback/connection.ts": {
     "mtime": 1786351976.0644436,
     "ast_hash": "bfd43c2f530f8ca848fee512b15235ab",
-    "semantic_hash": ""
+    "semantic_hash": "bfd43c2f530f8ca848fee512b15235ab"
   },
   "lib/playback/device.ts": {
     "mtime": 1786389332.6695783,
     "ast_hash": "819b7c8516f440dd6b89f1a8fe88bd6a",
-    "semantic_hash": ""
+    "semantic_hash": "819b7c8516f440dd6b89f1a8fe88bd6a"
   },
   "lib/playback/observe.ts": {
     "mtime": 1786389279.2305942,
     "ast_hash": "c1c475c720d107b4c969beb92f69d007",
-    "semantic_hash": ""
+    "semantic_hash": "c1c475c720d107b4c969beb92f69d007"
   },
   "lib/queries/discover.ts": {
     "mtime": 1786326908.7616763,
     "ast_hash": "0967e899271544ebad106be9ca940528",
-    "semantic_hash": ""
+    "semantic_hash": "0967e899271544ebad106be9ca940528"
   },
   "lib/queries/filters.ts": {
     "mtime": 1786386410.3733559,
     "ast_hash": "1e2467133f57ab4700022860b2d3c9ee",
-    "semantic_hash": ""
+    "semantic_hash": "1e2467133f57ab4700022860b2d3c9ee"
   },
   "lib/queries/kids.ts": {
     "mtime": 1786324687.458082,
     "ast_hash": "7b9a9bf62b34b7032ed929c7a9990ed1",
-    "semantic_hash": ""
+    "semantic_hash": "7b9a9bf62b34b7032ed929c7a9990ed1"
   },
   "lib/weather.ts": {
     "mtime": 1786349884.3358335,
     "ast_hash": "9ec27d87aefd5d74c4721838d855250f",
-    "semantic_hash": ""
+    "semantic_hash": "9ec27d87aefd5d74c4721838d855250f"
   },
   "prisma/migrations/20260809120000_tabelas_iptv/migration.sql": {
     "mtime": 1786475648.5832882,
     "ast_hash": "4758f748d62dbf5bdf0fde4269623712",
-    "semantic_hash": ""
+    "semantic_hash": "4758f748d62dbf5bdf0fde4269623712"
   },
   "prisma/migrations/20260810_watchprogress_iptv/migration.sql": {
     "mtime": 1786388473.0650742,
     "ast_hash": "a6535b3ad1bcf903acc8d7f0e1418a76",
-    "semantic_hash": ""
+    "semantic_hash": "a6535b3ad1bcf903acc8d7f0e1418a76"
   },
   "prisma/migrations/20260811180000_corrige_watchprogress/migration.sql": {
     "mtime": 1786475432.682631,
     "ast_hash": "dd885f6c128f8b0642238709d3466723",
-    "semantic_hash": ""
+    "semantic_hash": "dd885f6c128f8b0642238709d3466723"
   },
   "server-entry.js": {
     "mtime": 1786474366.5723898,
     "ast_hash": "7b40d27b53e87f76b09ee2f5731f74a9",
-    "semantic_hash": ""
+    "semantic_hash": "7b40d27b53e87f76b09ee2f5731f74a9"
   },
   ".github/workflows/ci.yml": {
     "mtime": 1786474702.2205994,
@@ -1123,5 +1123,50 @@
     "mtime": 1786354880.7931473,
     "ast_hash": "76e2d4ce48ca2f666d5bf3d41975b11c",
     "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1786494030.5898278,
+    "ast_hash": "82c53f0fc9f3ebbae29461d9e1c34318",
+    "semantic_hash": "82c53f0fc9f3ebbae29461d9e1c34318"
+  },
+  "app/(app)/tv/assistir/[channelId]/detalhes.tsx": {
+    "mtime": 1786552331.9545355,
+    "ast_hash": "234a9b49570838754a830f678b915299",
+    "semantic_hash": "234a9b49570838754a830f678b915299"
+  },
+  "app/actions/planos.ts": {
+    "mtime": 1786544519.4614415,
+    "ast_hash": "1126df3a2f710a67a1752a623df2d9dd",
+    "semantic_hash": "1126df3a2f710a67a1752a623df2d9dd"
+  },
+  "components/admin/iptv/modulo-adulto.tsx": {
+    "mtime": 1786545783.4180646,
+    "ast_hash": "609a53feb7857752210e0a898d114302",
+    "semantic_hash": "609a53feb7857752210e0a898d114302"
+  },
+  "components/admin/plano-do-cliente.tsx": {
+    "mtime": 1786544537.1310322,
+    "ast_hash": "d695499147b189d72e38ce95ea313c30",
+    "semantic_hash": "d695499147b189d72e38ce95ea313c30"
+  },
+  "components/admin/plano-form.tsx": {
+    "mtime": 1786544842.0690923,
+    "ast_hash": "09b7d5436337939c70829744adb59765",
+    "semantic_hash": "09b7d5436337939c70829744adb59765"
+  },
+  "lib/iptv/recommendations-service.ts": {
+    "mtime": 1786544852.572826,
+    "ast_hash": "4e68846d0af990af8ab467cdb1aad22c",
+    "semantic_hash": "4e68846d0af990af8ab467cdb1aad22c"
+  },
+  "prisma/migrations/20260812120000_modulo_adulto/migration.sql": {
+    "mtime": 1786545767.1827314,
+    "ast_hash": "c886356e49d13f890b293fa00de94aee",
+    "semantic_hash": "c886356e49d13f890b293fa00de94aee"
+  },
+  "prisma/migrations/20260812143000_v4_watchprogress_tmdb/migration.sql": {
+    "mtime": 1786555652.1480882,
+    "ast_hash": "d5c84fd3782932bccc80556396bea1f2",
+    "semantic_hash": "d5c84fd3782932bccc80556396bea1f2"
   }
 }

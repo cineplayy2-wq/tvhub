@@ -18,6 +18,8 @@ import {
   type ShowcaseItem,
 } from "@/lib/queries/discover";
 import { getPlaylistChannels, getViewablePlaylist } from "@/lib/queries/iptv";
+import { ContinueWatchingRail } from "@/components/iptv/continue-watching-rail";
+import { getContinueWatchingList } from "@/lib/iptv/watch-progress-service";
 import {
   getTmdbNowPlaying,
   getTmdbPopular,
@@ -58,7 +60,7 @@ export default async function MoviesHubPage({
 
   const selectedSubGroup = subGroups.find((group) => group.slug === searchParams.sub);
 
-  const [result, releases, trending, acclaimed, popular] = await Promise.all([
+  const [result, releases, trending, acclaimed, popular, continueWatching] = await Promise.all([
     getPlaylistChannels({
       playlistId,
       category: "movies",
@@ -101,6 +103,9 @@ export default async function MoviesHubPage({
           }),
         )
       : ([] as ShowcaseItem[]),
+    profileId && isBrowsing
+      ? getContinueWatchingList(playlistId, profileId, 12, "movies")
+      : Promise.resolve([]),
   ]);
 
   // A grade paginada ainda passa pelo TMDB para ganhar pôster e nota; só as
@@ -176,6 +181,15 @@ export default async function MoviesHubPage({
           <FilterBar groups={FILTER_GROUPS} counts={filterCounts} />
         </div>
       </div>
+
+      {/* CONTINUAR ASSISTINDO FILMES (VOD SOMENTE FILMES) */}
+      {continueWatching.length > 0 && (
+        <ContinueWatchingRail
+          items={continueWatching}
+          title="Continuar Assistindo Filmes"
+          subtitle="Continue seus filmes de onde parou"
+        />
+      )}
 
       {isBrowsing && (
         <div className="space-y-12 pb-4">

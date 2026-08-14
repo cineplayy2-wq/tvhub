@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MapPin, Radio, Search } from "lucide-react";
 
 import { CategoryTiles } from "@/components/iptv/category-tiles";
+import { ContinueWatchingRail } from "@/components/iptv/continue-watching-rail";
 import { Rail } from "@/components/iptv/rail";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { TileCard } from "@/components/iptv/tile-card";
@@ -10,6 +11,7 @@ import { EmptyPlaylist } from "@/components/iptv/playlist-state";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { detectRegion, regionSearchTerms, STATE_NAMES } from "@/lib/geo";
 import { CATEGORY_LABELS } from "@/lib/iptv/category-detector";
+import { getContinueWatchingList } from "@/lib/iptv/watch-progress-service";
 import {
   getLiveCategoryOverview,
   getLiveChannelsByCategory,
@@ -53,10 +55,13 @@ export default async function LiveChannelsPage({
   const page = Math.max(1, Number(searchParams.page) || 1);
   const isFiltered = Boolean(searchParams.cat || searchParams.q);
 
-  const [overview, stateChannels, openChannels] = await Promise.all([
+  const [overview, stateChannels, openChannels, recentLiveChannels] = await Promise.all([
     getLiveCategoryOverview(playlistId),
     region ? getStateChannels(playlistId, regionSearchTerms(region), 18) : [],
     getRegionalChannels(playlistId, 18),
+    profileId && !isFiltered
+      ? getContinueWatchingList(playlistId, profileId, 12, "live")
+      : Promise.resolve([]),
   ]);
 
   // Modo filtrado carrega uma grade paginada; modo vitrine carrega as trilhas.
@@ -121,6 +126,15 @@ export default async function LiveChannelsPage({
           </form>
         </div>
       </div>
+
+      {/* CANAIS RECENTES (SEM BARRA DE PORCENTAGEM) */}
+      {recentLiveChannels.length > 0 && (
+        <ContinueWatchingRail
+          items={recentLiveChannels}
+          title="Canais Recentes"
+          subtitle="Canais ao vivo sintonizados recentemente"
+        />
+      )}
 
       {/* Navegação visual de categorias */}
       <div className="pt-8">

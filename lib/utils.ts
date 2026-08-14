@@ -98,9 +98,11 @@ export function cleanMediaTitle(rawName: string): string {
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2000}-\u{206F}\u{2100}-\u{214F}]/gu, "")
     .replace(/[⚽|✔️|★|✨|🔞|❌|⛹|🍿|📺|💬|📡|🎭|🎬|✝️|🎵|🎥|📰|🧸|⚡|🥊|🏆|🏎️|🏀|💖|🐾]/g, "")
     .replace(/\[.*?\]|\(.*?\)/g, "")
-    .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H265|UHD|HDR|BLURAY|WEB-DL|WEBDL)\b/gi, "")
+    .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H\.?265|UHD|HDR|60FPS|50FPS|BLURAY|WEB-DL|WEBDL)\b/gi, "")
     .replace(/\b(DUBLADO|LEGENDADO|DUB|LEG|DUBL|LEGEN|LEG\/DUB)\b/gi, "")
-    .replace(/^[-:|/\s]+|[-:|/\s]+$/g, "")
+    .replace(/\b(OPCAO\s*\d+|OPÇÃO\s*\d+|BACKUP|RESERVA|ALT)\b/gi, "")
+    .replace(/[¹²³⁴\d]+\s*$/g, "")
+    .replace(/^[-:|/\s~]+|[-:|/\s~]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -110,12 +112,6 @@ export function cleanMediaTitle(rawName: string): string {
 /**
  * Limpa títulos de séries removendo marcações de Temporada/Episódio
  * (S01E01, T1 E2, 1x01, EP12).
- *
- * O `\b` na frente do grupo não é enfeite. Sem ele, a alternativa `EP?…\d+`
- * casava com o "e" de qualquer palavra seguida de número, e o `.*` do fim
- * comia o resto do título: "The 100" virava "Th", "Rebelde 2022" virava
- * "Rebeld". Como esta função também alimenta a deduplicação, o nome truncado
- * ia parar na tela e ainda fundia séries diferentes que colidissem no toco.
  */
 export function cleanSeriesTitle(rawName: string): string {
   let cleaned = cleanMediaTitle(rawName);
@@ -194,7 +190,7 @@ export async function mapWithConcurrency<T, R>(
   return results;
 }
 
-/** Agrupa séries eliminando duplicatas de episódios avulsos (S01E01, T1E2) em um único card de Série */
+/** Agrupa canais e séries eliminando duplicatas de variantes (SD, HD, FHD, 4K, servidores) em um único card */
 export function dedupeChannels<T extends { name: string; id: string; streamUrl?: string; group?: { category?: string | null } | null }>(channels: T[]): T[] {
   const seen = new Set<string>();
   const result: T[] = [];
@@ -202,7 +198,12 @@ export function dedupeChannels<T extends { name: string; id: string; streamUrl?:
   for (const item of channels) {
     const isSeries = item.group?.category === "series" || (item.streamUrl && item.streamUrl.includes("/series/")) || /\bS\d+E\d+\b/i.test(item.name);
     const cleanName = isSeries ? cleanSeriesTitle(item.name) : cleanMediaTitle(item.name);
-    const cleanKey = cleanName.toLowerCase();
+    const cleanKey = cleanName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
 
     if (!cleanKey) continue;
     if (!seen.has(cleanKey)) {

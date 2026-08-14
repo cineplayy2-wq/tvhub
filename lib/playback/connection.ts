@@ -144,28 +144,26 @@ export function bufferPlanFor(profile: ConnectionProfile): BufferPlan {
   switch (profile) {
     case "poor":
       return {
-        stashInitialSize: 1536 * 1024,
-        colchaoSegundos: 10,
-        latenciaMaximaSegundos: 20,
+        stashInitialSize: 2048 * 1024,
+        colchaoSegundos: 20,
+        latenciaMaximaSegundos: 40,
         vodBufferSeconds: 60,
         label: "Conexão lenta — acumulando mais vídeo para não travar",
       };
     case "fair":
       return {
-        stashInitialSize: 768 * 1024,
-        colchaoSegundos: 8,
-        latenciaMaximaSegundos: 16,
-        vodBufferSeconds: 30,
+        stashInitialSize: 1024 * 1024,
+        colchaoSegundos: 18,
+        latenciaMaximaSegundos: 35,
+        vodBufferSeconds: 45,
         label: "Ajustando à sua conexão",
       };
     default:
       return {
-        // 384 KB é o padrão da própria mpegts.js, calibrado pelo autor da
-        // biblioteca. O player usava 16 KB, vinte e quatro vezes menos.
-        stashInitialSize: 384 * 1024,
-        colchaoSegundos: 6,
-        latenciaMaximaSegundos: 12,
-        vodBufferSeconds: 20,
+        stashInitialSize: 768 * 1024,
+        colchaoSegundos: 15,
+        latenciaMaximaSegundos: 30,
+        vodBufferSeconds: 30,
         label: "Carregando",
       };
   }

@@ -9,7 +9,9 @@ import { Rail } from "@/components/iptv/rail";
 import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { getActiveProfile, requireUser } from "@/lib/auth/session";
+import { ContinueWatchingRail } from "@/components/iptv/continue-watching-rail";
+import { getContinueWatchingList } from "@/lib/iptv/watch-progress-service";
 import {
   FILTER_GROUPS,
   findFilterOption,
@@ -40,13 +42,17 @@ export default async function SeriesHubPage({
   searchParams: { q?: string; page?: string; sub?: string; f?: string };
 }) {
   const user = await requireUser();
-  const playlist = await getViewablePlaylist(user.id);
+  const [playlist, profile] = await Promise.all([
+    getViewablePlaylist(user.id),
+    getActiveProfile(user.id),
+  ]);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
   if (playlist.lockedCategories.includes("series")) notFound();
 
   const playlistId = playlist.id;
+  const profileId = profile?.id ?? null;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const activeFilters = (searchParams.f ?? "").split(",").filter(Boolean);
   const isBrowsing =
@@ -60,7 +66,7 @@ export default async function SeriesHubPage({
 
   const selectedSubGroup = subGroups.find((group) => group.slug === searchParams.sub);
 
-  const [allSeries, novelas, airing, popular, trending, acclaimed] = await Promise.all([
+  const [allSeries, novelas, airing, popular, trending, acclaimed, continueWatching] = await Promise.all([
     getSeriesList(playlistId, selectedSubGroup?.id),
     isBrowsing ? getNovelasList(playlistId, 18) : [],
     isBrowsing
@@ -95,6 +101,9 @@ export default async function SeriesHubPage({
           }),
         )
       : ([] as ShowcaseItem[]),
+    profileId && isBrowsing
+      ? getContinueWatchingList(playlistId, profileId, 12, "series")
+      : Promise.resolve([]),
   ]);
 
   // O catálogo de séries é agrupado por título, então o filtro é aplicado
@@ -186,6 +195,15 @@ export default async function SeriesHubPage({
           <FilterBar groups={FILTER_GROUPS} counts={filterCounts} />
         </div>
       </div>
+
+      {/* CONTINUAR ASSISTINDO SÉRIES (VOD SOMENTE SÉRIES) */}
+      {continueWatching.length > 0 && (
+        <ContinueWatchingRail
+          items={continueWatching}
+          title="Continuar Assistindo Séries"
+          subtitle="Continue seus episódios de onde parou"
+        />
+      )}
 
       {isBrowsing && (
         <div className="space-y-12 pb-4">

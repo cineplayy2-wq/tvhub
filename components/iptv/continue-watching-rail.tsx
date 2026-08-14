@@ -19,8 +19,12 @@ function formatMinutesLeft(positionSeconds: number, durationSeconds: number): st
 
 export function ContinueWatchingRail({
   items,
+  title = "Continuar Assistindo",
+  subtitle = "Continue de onde você parou no seu perfil",
 }: {
   items: ContinueWatchingItem[];
+  title?: string;
+  subtitle?: string;
 }) {
   if (!items || items.length === 0) return null;
 
@@ -33,10 +37,10 @@ export function ContinueWatchingRail({
           </div>
           <div>
             <h2 className="text-xl font-extrabold tracking-tight text-foreground md:text-2xl flex items-center gap-2">
-              Continuar Assistindo
+              {title}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Continue de onde você parou no seu perfil
+              {subtitle}
             </p>
           </div>
         </div>
@@ -44,6 +48,7 @@ export function ContinueWatchingRail({
 
       <Rail itemClassName="w-[180px] sm:w-[220px] md:w-[260px]">
         {items.map((item) => {
+          const isLive = item.category === "live" || !item.durationSeconds || item.durationSeconds <= 0;
           const percent = item.progressPercent;
           const minutesLeft = formatMinutesLeft(item.positionSeconds, item.durationSeconds);
 
@@ -73,27 +78,34 @@ export function ContinueWatchingRail({
                   </div>
                 </div>
 
-                {/* Badge de Vezes Assistido ("Assistido 3x") */}
-                {item.watchCount > 1 && (
+                {/* Badge Ao Vivo ou Badge de Vezes Assistido */}
+                {isLive ? (
+                  <span className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5 rounded-full bg-rose-600/90 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-lg backdrop-blur-md">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    AO VIVO
+                  </span>
+                ) : item.watchCount > 1 ? (
                   <span className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/80 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-300 backdrop-blur-md shadow-lg">
                     <Sparkles className="h-3 w-3 text-amber-400 fill-amber-400" />
                     Assistido {item.watchCount}x
                   </span>
-                )}
+                ) : null}
 
-                {/* Barra de Progresso com % */}
-                <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-6">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-white mb-1.5 drop-shadow-sm">
-                    <span className="text-primary-light font-extrabold">{percent}% concluído</span>
-                    {minutesLeft && <span className="text-white/80">{minutesLeft}</span>}
+                {/* Barra de Progresso com % (SOMENTE para Filmes e Séries / VOD) */}
+                {!isLive && (
+                  <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-6">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-white mb-1.5 drop-shadow-sm">
+                      <span className="text-primary-light font-extrabold">{percent}% concluído</span>
+                      {minutesLeft && <span className="text-white/80">{minutesLeft}</span>}
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary via-violet-500 to-indigo-400 shadow-[0_0_10px_rgba(108,29,255,0.9)] transition-all duration-300"
+                        style={{ width: `${Math.max(4, percent)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary via-violet-500 to-indigo-400 shadow-[0_0_10px_rgba(108,29,255,0.9)] transition-all duration-300"
-                      style={{ width: `${Math.max(4, percent)}%` }}
-                    />
-                  </div>
-                </div>
+                )}
               </Link>
 
               {/* Nome do Conteúdo */}

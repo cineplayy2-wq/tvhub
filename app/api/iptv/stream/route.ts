@@ -457,8 +457,11 @@ async function peekUpstream(
     const chunks: Buffer[] = [];
     let totalRead = 0;
     let resolved = false;
+    let idleTimer: NodeJS.Timeout | null = null;
+    const contentLength = Number(stream.headers["content-length"]) || 0;
 
     function cleanup() {
+      if (idleTimer) clearTimeout(idleTimer);
       stream.removeListener("data", onData);
       stream.removeListener("end", onEnd);
       stream.removeListener("error", onError);
@@ -480,10 +483,14 @@ async function peekUpstream(
       const textSample = currentBuffer.toString("utf-8", 0, Math.min(currentBuffer.length, 512));
 
       if (textSample.trim().startsWith("#EXTM3U")) {
-        if (totalRead < 262144 && !stream.complete) {
+        if (contentLength > 0 && totalRead >= contentLength) {
+          finish(true, currentBuffer.toString("utf-8"));
           return;
         }
-        finish(true, currentBuffer.toString("utf-8"));
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          finish(true, Buffer.concat(chunks).toString("utf-8"));
+        }, 20);
         return;
       }
 
@@ -554,13 +561,7 @@ export async function GET(request: NextRequest) {
     urlPedido = targetUrl;
   } else {
     const reescrita = reescreverCredencial(targetUrl, viewer);
-    if (!reescrita) {
-      return new NextResponse(
-        "Não foi possível usar a linha deste cliente neste endereço.",
-        { status: 403 },
-      );
-    }
-    urlPedido = reescrita;
+    urlPedido = reescrita || targetUrl;
   }
 
   try {
@@ -837,21 +838,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let finalNodeStream: http.IncomingMessage | PassThrough = upstreamResponse;
+    const webStream = new ReadableStream({
+      start(controller) {
+        if (peekResult.peekBuffer && peekResult.peekBuffer.length > 0) {
+          controller.enqueue(new Uint8Array(peekResult.peekBuffer));
+        }
 
-    if (peekResult.peekBuffer && peekResult.peekBuffer.length > 0) {
-      const pass = new PassThrough();
-      pass.on("error", () => {});
-      upstreamResponse.on("error", () => {});
-      pass.write(peekResult.peekBuffer);
-      upstreamResponse.resume();
-      upstreamResponse.pipe(pass);
-      finalNodeStream = pass;
-    } else {
-      upstreamResponse.on("error", () => {});
-    }
+        upstreamResponse.on("data", (chunk: Buffer) => {
+          try {
+            controller.enqueue(new Uint8Array(chunk));
+          } catch {}
+        });
 
-    const webStream = Readable.toWeb(finalNodeStream) as ReadableStream;
+        upstreamResponse.on("end", () => {
+          try {
+            controller.close();
+          } catch {}
+        });
+
+        upstreamResponse.on("error", (err) => {
+          try {
+            controller.error(err);
+          } catch {}
+        });
+
+        upstreamResponse.resume();
+      },
+      cancel() {
+        encerrarUpstream();
+      },
+    });
 
     return new NextResponse(webStream, {
       status: statusCode,

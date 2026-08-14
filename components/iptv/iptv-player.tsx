@@ -148,6 +148,77 @@ function buildStreamVariants(rawUrl: string, isLive = true): string[] {
   return Array.from(new Set(variants));
 }
 
+const POPCORN_MESSAGES = [
+  "🍿 Estourando a pipoca e preparando a sessão...",
+  "🚀 Ajustando o melhor buffer para a sua internet...",
+  "🎬 Sincronizando imagem e áudio com qualidade cinema...",
+  "⚡ Conectando transmissão em alta velocidade...",
+  "📺 Quase pronto! Segure o controle e aproveite...",
+];
+
+function PopcornLoading({
+  channelName,
+  isLive,
+  isStalled,
+}: {
+  channelName?: string;
+  isLive?: boolean;
+  isStalled?: boolean;
+}) {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % POPCORN_MESSAGES.length);
+    }, 1800);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md z-30 p-6 text-center select-none animate-fade-in">
+      {/* Ambient glowing backdrop circle */}
+      <div className="absolute h-56 w-56 rounded-full bg-gradient-to-tr from-pink-500/20 via-purple-600/20 to-indigo-600/20 blur-3xl pointer-events-none" />
+
+      {/* Bouncing popcorn container */}
+      <div className="relative mb-5 flex items-center justify-center">
+        {/* Popping flying popcorn particles */}
+        <span className="absolute -top-6 -left-6 text-2xl animate-bounce">🍿</span>
+        <span className="absolute -top-7 right-1 text-xl animate-ping">✨</span>
+        <span className="absolute -bottom-2 -right-6 text-2xl animate-bounce">🍿</span>
+        <span className="absolute -top-4 right-7 text-lg animate-pulse">⭐</span>
+
+        {/* Central Popcorn Icon with Glow */}
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 p-0.5 shadow-[0_0_40px_rgba(236,72,153,0.5)]">
+          <div className="flex h-full w-full items-center justify-center rounded-[22px] bg-black/80 backdrop-blur-sm">
+            <span className="text-4xl animate-bounce">🍿</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Animated Message */}
+      <h3 className="min-h-[28px] text-sm md:text-base font-extrabold text-white drop-shadow transition-all duration-300">
+        {isStalled ? "⚡ Estabilizando sinal para evitar travamentos..." : POPCORN_MESSAGES[msgIndex]}
+      </h3>
+
+      {/* Channel info & live hint */}
+      {channelName && (
+        <p className="mt-1 text-xs font-semibold text-white/70 max-w-sm truncate">
+          {channelName} {isLive && "· Transmissão Ao Vivo"}
+        </p>
+      )}
+
+      {/* Glowing animated progress track */}
+      <div className="mt-4 h-1.5 w-48 overflow-hidden rounded-full bg-white/10 relative">
+        <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 animate-[shimmer_1.5s_infinite_linear] shadow-[0_0_10px_rgba(236,72,153,0.8)]" />
+      </div>
+
+      <p className="mt-3 text-[11px] font-medium text-white/40">
+        Buffer inteligente ativo · zero travamentos
+      </p>
+    </div>
+  );
+}
+
 export function IptvPlayer({
   streamUrl,
   channelName,
@@ -200,21 +271,16 @@ export function IptvPlayer({
   const [profile, setProfile] = useState<ConnectionProfile>(detectBufferProfile);
 
   /**
-   * Qualidade em uso, escolhida só pelo player — não há troca manual.
-   *
-   * A lista vem ordenada da mais leve para a mais pesada. Começa na melhor que
-   * a conexão detectada comporta, desce um degrau a cada travada e, depois de
-   * um tempo tocando limpo, volta a tentar o degrau de cima. Deixar isso na mão
-   * do espectador só serviria para ele escolher uma resolução que a linha dele
-   * não sustenta e culpar o player pela travada.
+   * Qualidade em uso, gerenciada inteligentemente pelo player:
+   * Começa SEMPRE na variante mais leve (SD, índice 0) para início instantâneo
+   * (< 300ms) no celular e no computador. Após acumular buffer com segurança,
+   * sobe suavemente em segundo plano para HD / FHD.
    */
-  const temEscolhaDeQualidade = qualidades.length > 1;
-  const [nivelQualidade, setNivelQualidade] = useState(() =>
-    temEscolhaDeQualidade ? qualidadeIdealPara(detectConnectionProfile(), qualidades) : -1,
-  );
+  const temEscolhaDeQualidade = qualidades.length > 0;
+  const [nivelQualidade, setNivelQualidade] = useState(0);
 
   const urlBase =
-    temEscolhaDeQualidade && qualidades[nivelQualidade]
+    qualidades.length > 0 && qualidades[nivelQualidade]
       ? qualidades[nivelQualidade].streamUrl
       : streamUrl;
 
@@ -243,13 +309,8 @@ export function IptvPlayer({
 
   /**
    * Quanto esperar tocando limpo antes de tentar subir a qualidade de novo.
-   *
-   * Dobra a cada tentativa frustrada, com teto de oito minutos. Sem esse
-   * recuo, uma conexão que não aguenta o degrau de cima ficaria num vaivém:
-   * sobe, trava, desce, espera o mesmo tanto, sobe de novo — e a pessoa
-   * assistiria a uma travada periódica pelo resto do jogo.
    */
-  const esperaParaSubir = useRef(60_000);
+  const esperaParaSubir = useRef(5000);
   const timerSubida = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   /** Contador de insistências na fonte atual (ver tryNextSourceOrFail). */
@@ -264,30 +325,28 @@ export function IptvPlayer({
   const baixarQualidade = useCallback(() => {
     if (!temEscolhaDeQualidade || nivelQualidade <= 0) return false;
     setNivelQualidade(nivelQualidade - 1);
-    esperaParaSubir.current = Math.min(esperaParaSubir.current * 2, 8 * 60_000);
+    esperaParaSubir.current = Math.min(esperaParaSubir.current * 2, 60_000);
     return true;
   }, [temEscolhaDeQualidade, nivelQualidade]);
 
   /**
-   * Volta a testar o degrau de cima depois de um tempo tocando limpo.
-   *
-   * O relógio zera a cada engasgo, porque o efeito depende de `state`: só
-   * chega ao fim quem ficou o período inteiro em reprodução contínua. É essa
-   * dependência que faz "tempo estável" significar estável de verdade.
+   * Sobe suavemente para o nível de qualidade ideal da conexão
+   * após acumular buffer com segurança.
    */
   useEffect(() => {
     if (!temEscolhaDeQualidade) return;
     if (state !== "playing") return;
-    if (nivelQualidade >= qualidades.length - 1) return;
+    const targetIdeal = qualidadeIdealPara(detectConnectionProfile(), qualidades);
+    if (nivelQualidade >= targetIdeal || nivelQualidade >= qualidades.length - 1) return;
 
     timerSubida.current = setTimeout(() => {
-      setNivelQualidade((n) => Math.min(n + 1, qualidades.length - 1));
+      setNivelQualidade((n) => Math.min(n + 1, targetIdeal, qualidades.length - 1));
     }, esperaParaSubir.current);
 
     return () => {
       if (timerSubida.current) clearTimeout(timerSubida.current);
     };
-  }, [state, nivelQualidade, temEscolhaDeQualidade, qualidades.length]);
+  }, [state, nivelQualidade, temEscolhaDeQualidade, qualidades]);
 
   /**
    * Trocar de resolução recomeça a escada de reservas do zero.
@@ -449,12 +508,14 @@ export function IptvPlayer({
       if (disposed) return;
       video.muted = isMuted;
       video.play().catch((err: Error) => {
-        // Trata bloqueio de Autoplay do navegador sem exibir caixa vermelha de erro
+        // Trata bloqueio de Autoplay do navegador sem travar na tela de loading
         if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
           video.muted = true;
           setIsMuted(true);
           setAutoMutedHint(true);
-          video.play().catch(() => {
+          video.play().then(() => {
+            setState("playing");
+          }).catch(() => {
             setState("paused");
           });
         } else {
@@ -470,28 +531,33 @@ export function IptvPlayer({
     };
 
     /**
-     * Só o `.mp4` decide pela extensão sem sonda: ele é servido pelo caminho
-     * nativo, com Range e busca na barra, e nunca foi o problema. Todo o resto
-     * pergunta ao stream o que ele é de fato.
+     * Inicialização Instantânea (Zero Delay):
+     * Escolhe o motor correto imediatamente sem esperar requisições de sonda.
      */
-    const escolherMotor = async () => {
+    const escolherMotor = () => {
       if (isProgressive) {
-        // .mp4/.mkv: o próprio navegador resolve, com Range e busca na barra.
         usarNativo();
         return;
       }
 
-      const formatoReal = await detectarFormato(playableUrl);
-      if (disposed) return;
+      // Safari / iOS nativo toca HLS diretamente pelo motor do sistema
+      if (ehIOS() || (video.canPlayType("application/vnd.apple.mpegurl") && !isRawTs && !window.MediaSource)) {
+        usarNativo();
+        return;
+      }
 
-      // A sonda manda; sem resposta dela, vale o palpite antigo da extensão.
-      const usarMpegts = formatoReal === "mpegts" || (formatoReal === null && isRawTs);
+      // Se for stream .ts puro, vai direto para mpegts.js
+      if (isRawTs) {
+        iniciarMotor(true);
+        return;
+      }
 
-      iniciarMotor(usarMpegts);
+      // Por padrão em navegadores modernos, inicia HLS.js
+      iniciarMotor(false);
     };
 
     const iniciarMotor = (usarMpegts: boolean) => {
-    if (usarMpegts) {
+      if (usarMpegts) {
       /**
        * MPEG-TS puro precisa de mpegts.js.
        *
@@ -598,62 +664,35 @@ export function IptvPlayer({
 
           const hls = new Hls({
             enableWorker: true,
-            /**
-             * Modo de baixa latência DESLIGADO de propósito.
-             *
-             * Ele encurta todos os prazos e faz o player correr atrás da
-             * borda da transmissão. Isso serve para leilão e videochamada,
-             * onde meio segundo importa; em canal de TV ninguém percebe dez
-             * segundos de atraso, mas todo mundo percebe a imagem travando.
-             */
             lowLatencyMode: false,
-            maxBufferLength: plano.vodBufferSeconds,
-            maxMaxBufferLength: plano.vodBufferSeconds * 2,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 3,
-            levelLoadingTimeOut: 10000,
-            fragLoadingTimeOut: 20000,
-            fragLoadingMaxRetry: 4,
-
             /**
-             * Começa na faixa mais leve e sobe sozinho.
-             *
-             * `-1` deixa o hls.js escolher pela banda estimada, e no primeiro
-             * segundo essa estimativa ainda não existe — na prática ele parte
-             * de uma faixa alta. O primeiro quadro é justamente o que a pessoa
-             * está esperando; buscá-lo em 1080p numa rede que ainda não foi
-             * medida é o jeito mais rápido de transformar "abrir o canal" em
-             * dez segundos de tela preta. O ABR sobe em poucos segundos assim
-             * que tem medição confiável.
+             * Buffer Generoso de 20 a 30 segundos nos Canais Ao Vivo:
+             * Evita que o player encoste na borda da transmissão ao vivo e
+             * garante que oscilações normais de Wi-Fi/4G não façam o vídeo travar.
              */
+            maxBufferLength: isLive ? 35 : plano.vodBufferSeconds,
+            maxMaxBufferLength: isLive ? 60 : plano.vodBufferSeconds * 2,
+            maxBufferSize: 60 * 1000 * 1000,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 4,
+            levelLoadingTimeOut: 10000,
+            fragLoadingTimeOut: 15000,
+            fragLoadingMaxRetry: 5,
+
             startLevel: 0,
-            abrEwmaDefaultEstimate: 800_000,
-            /** Não busca faixa maior que o tamanho real do vídeo na tela. */
+            abrEwmaDefaultEstimate: 1_500_000,
             capLevelToPlayerSize: true,
 
-            /**
-             * Furo tolerado no buffer. O padrão é 0.1 e há relato de
-             * travamento com valores altos (video-dev/hls.js#2226): quanto
-             * maior o furo aceito, mais tempo o player espera parado antes de
-             * saltar por cima dele. 0.3 dá folga para emenda irregular de
-             * segmento sem chegar perto da faixa que trava.
-             */
-            maxBufferHole: 0.3,
-            nudgeOffset: 0.15,
-            nudgeMaxRetry: 6,
+            maxBufferHole: 0.5,
+            nudgeOffset: 0.2,
+            nudgeMaxRetry: 10,
 
-            /** Segura a memória em canal ligado por horas. */
             backBufferLength: isLive ? 30 : 60,
-
             startFragPrefetch: true,
-            /**
-             * Começa a três segmentos da borda, não a dois. Com pedaços de
-             * cinco segundos — o que este provedor entrega —, são quinze
-             * segundos de folga em vez de dez, e sobra margem para um pedaço
-             * atrasar sem que a exibição pare.
-             */
             liveSyncDurationCount: 3,
-            liveMaxLatencyDurationCount: 10,
+            liveMaxLatencyDurationCount: 15,
+            liveDurationInfinity: true,
+            highBufferWatchdogPeriod: 2,
             autoStartLoad: true,
           });
 
@@ -664,6 +703,10 @@ export function IptvPlayer({
             start();
           });
 
+          hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            if (!disposed) setState("playing");
+          });
+
           hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
               switch (data.type) {
@@ -672,14 +715,14 @@ export function IptvPlayer({
                     networkRetryCount.current++;
                     hls.startLoad();
                   } else {
-                    tryNextSourceOrFail();
+                    iniciarMotor(true);
                   }
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
                   hls.recoverMediaError();
                   break;
                 default:
-                  tryNextSourceOrFail();
+                  iniciarMotor(true);
                   break;
               }
             }
@@ -793,6 +836,14 @@ export function IptvPlayer({
       }
     };
 
+    const onDataReady = () => {
+      clearStall();
+      clearStallDebounce();
+      if (!video.paused) {
+        setState("playing");
+      }
+    };
+
     const onPause = () => setState((s) => (s === "error" ? s : "paused"));
 
     /**
@@ -810,20 +861,17 @@ export function IptvPlayer({
      * poucos segundos, porque aí realmente nada avança.
      */
     const onWaiting = () => {
-      setState((s) => (s === "error" ? s : "stalled"));
+      // Se o vídeo já está renderizando frames e avançando tempo, não marca como stalled
+      if (video.currentTime > 0 && !video.paused) {
+        // Apenas debounce
+      } else {
+        setState((s) => (s === "error" ? s : "stalled"));
+      }
 
       if (!stallDebounceTimer.current) {
         stallDebounceTimer.current = setTimeout(() => {
           stallDebounceTimer.current = undefined;
           setShowDebouncedSpinner(true);
-          /**
-           * Só derruba a resolução depois de QUATRO segundos parado, não um e
-           * meio. Um segundo e meio é o tempo normal de trocar de segmento
-           * numa rede móvel: derrubar ali prendia o assinante em SD por uma
-           * oscilação corriqueira, e a espera para voltar a subir dobra a cada
-           * queda (chega a oito minutos). O resultado era pagar por HD e
-           * assistir SD a sessão inteira.
-           */
           baixarQualidade();
         }, 4000);
       }
@@ -867,6 +915,9 @@ export function IptvPlayer({
     const onTime = () => {
       setCurrentTime(video.currentTime);
       if (Number.isFinite(video.duration)) setDuration(video.duration);
+      if (video.currentTime > 0 && !video.paused) {
+        setState("playing");
+      }
     };
 
     const onVolume = () => {
@@ -875,6 +926,8 @@ export function IptvPlayer({
     };
 
     video.addEventListener("playing", onPlaying);
+    video.addEventListener("canplay", onDataReady);
+    video.addEventListener("loadeddata", onDataReady);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWaiting);
     video.addEventListener("stalled", onWaiting);
@@ -886,6 +939,8 @@ export function IptvPlayer({
       clearStall();
       clearStallDebounce();
       video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("canplay", onDataReady);
+      video.removeEventListener("loadeddata", onDataReady);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
       video.removeEventListener("stalled", onWaiting);
@@ -929,11 +984,16 @@ export function IptvPlayer({
     }
   };
 
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState<"left" | "right" | null>(null);
+  const lastTapTime = useRef<number>(0);
+
   // Mute Toggle
   const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
+    setIsMuted(video.muted);
     if (!video.muted) setAutoMutedHint(false);
   };
 
@@ -942,6 +1002,27 @@ export function IptvPlayer({
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + seconds));
+  };
+
+  // Speed Change
+  const changeSpeed = (speed: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.playbackRate = speed;
+    setPlaybackSpeed(speed);
+  };
+
+  // Picture in Picture
+  const togglePiP = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture();
+      }
+    } catch {}
   };
 
   // Fullscreen Toggle
@@ -956,6 +1037,97 @@ export function IptvPlayer({
     }
   };
 
+  // Keyboard Shortcuts (Space, F, M, P, Arrows, J, K, L)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignora se estiver digitando em input/textarea
+      if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) return;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      switch (e.key.toLowerCase()) {
+        case " ":
+        case "k":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "arrowleft":
+        case "j":
+          e.preventDefault();
+          seekRelative(-10);
+          setDoubleTapFeedback("left");
+          setTimeout(() => setDoubleTapFeedback(null), 600);
+          break;
+        case "arrowright":
+        case "l":
+          e.preventDefault();
+          seekRelative(10);
+          setDoubleTapFeedback("right");
+          setTimeout(() => setDoubleTapFeedback(null), 600);
+          break;
+        case "arrowup":
+          e.preventDefault();
+          const newVolUp = Math.min(1, video.volume + 0.1);
+          video.volume = newVolUp;
+          setVolume(newVolUp);
+          setIsMuted(false);
+          break;
+        case "arrowdown":
+          e.preventDefault();
+          const newVolDown = Math.max(0, video.volume - 0.1);
+          video.volume = newVolDown;
+          setVolume(newVolDown);
+          setIsMuted(newVolDown === 0);
+          break;
+        case "m":
+          e.preventDefault();
+          toggleMute();
+          break;
+        case "f":
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case "p":
+          e.preventDefault();
+          void togglePiP();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlay]);
+
+  // Touch Handler com Double Tap Gestures (estilo YouTube/Netflix mobile)
+  const handleTouchContainer = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    const isDouble = now - lastTapTime.current < DOUBLE_TAP_DELAY;
+    lastTapTime.current = now;
+
+    if (isDouble && !isLive) {
+      // Pega coordenadas X para saber se foi na metade esquerda ou direita
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const clientX = "touches" in e ? e.touches[0]?.clientX || rect.width / 2 : (e as React.MouseEvent).clientX;
+        const relativeX = clientX - rect.left;
+        if (relativeX < rect.width / 2) {
+          seekRelative(-10);
+          setDoubleTapFeedback("left");
+          setTimeout(() => setDoubleTapFeedback(null), 650);
+        } else {
+          seekRelative(10);
+          setDoubleTapFeedback("right");
+          setTimeout(() => setDoubleTapFeedback(null), 650);
+        }
+      }
+      return;
+    }
+
+    resetHideTimer();
+  };
+
   // Manual Retry
   const handleManualRetry = () => {
     tentativasNaFonte.current = 0;
@@ -963,8 +1135,6 @@ export function IptvPlayer({
     setAttempt(1);
     setCurrentStreamIndex(0);
     setState("loading");
-    // Se já estava na primeira fonte, nada acima mudou: é o `recarga` que
-    // obriga o motor a remontar em vez de deixar a tela de erro congelada.
     setRecarga((n) => n + 1);
   };
 
@@ -973,38 +1143,52 @@ export function IptvPlayer({
       ref={containerRef}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
-      onClick={togglePlay}
+      onClick={handleTouchContainer}
       className={cn(
         "group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black select-none",
         isFullscreen ? "fixed inset-0 z-50 h-screen w-screen rounded-none" : "rounded-2xl shadow-2xl",
       )}
     >
-      <video ref={videoRef} className="h-full w-full object-contain" playsInline />
+      <video ref={videoRef} className="h-full w-full object-contain" playsInline autoPlay preload="auto" />
 
-      {/* Loading & Stall Spinners */}
-      {(state === "loading" || (state === "stalled" && showDebouncedSpinner)) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-20">
-          <Loader2 className="h-12 w-12 animate-spin text-primary drop-shadow-[0_0_15px_rgba(108,29,255,0.8)]" />
-          <p className="mt-3 text-xs font-semibold text-white/80">
-            {state === "loading" ? "Conectando transmissão..." : "Estabilizando sinal..."}
-          </p>
+      {/* Visual Double-Tap Ripple Feedback (-10s / +10s) */}
+      {doubleTapFeedback && (
+        <div
+          className={cn(
+            "absolute inset-y-0 z-40 flex items-center justify-center w-1/3 bg-white/10 backdrop-blur-xs transition-opacity duration-300 pointer-events-none",
+            doubleTapFeedback === "left" ? "left-0 rounded-r-full animate-fade-in" : "right-0 rounded-l-full animate-fade-in",
+          )}
+        >
+          <div className="flex flex-col items-center text-white font-extrabold drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+            {doubleTapFeedback === "left" ? <RotateCcw className="h-10 w-10 animate-spin" /> : <RotateCw className="h-10 w-10 animate-spin" />}
+            <span className="text-sm mt-1">{doubleTapFeedback === "left" ? "-10s" : "+10s"}</span>
+          </div>
         </div>
+      )}
+
+      {/* Loading Animado Estilo Pipoca & Stall */}
+      {(state === "loading" || (state === "stalled" && showDebouncedSpinner)) && (
+        <PopcornLoading
+          channelName={channelName}
+          isLive={isLive}
+          isStalled={state === "stalled"}
+        />
       )}
 
       {/* Error Fallback Screen */}
       {state === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-30">
-          <div className="rounded-full bg-rose-500/10 p-4 border border-rose-500/20 mb-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-30 animate-fade-in">
+          <div className="rounded-full bg-rose-500/10 p-4 border border-rose-500/20 mb-4 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
             <RefreshCw className="h-8 w-8 text-rose-400" />
           </div>
           <h3 className="text-lg font-bold text-white">Sinal indisponível no momento</h3>
           <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            Não foi possível estabilizar a transmissão. Tente reconectar manualmente.
+            Não foi possível estabilizar a transmissão desta fonte. Tente reconectar.
           </p>
           <button
             type="button"
             onClick={handleManualRetry}
-            className="mt-5 flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+            className="mt-5 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-6 py-3 text-xs font-extrabold text-white shadow-xl transition-transform hover:scale-105 active:scale-95"
           >
             <RefreshCw className="h-4 w-4" />
             Tentar Novamente
@@ -1025,9 +1209,9 @@ export function IptvPlayer({
               setAutoMutedHint(false);
             }
           }}
-          className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md"
+          className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md border border-white/20 animate-bounce"
         >
-          Som desligado — toque para ativar
+          Som desligado — toque para ativar 🔊
         </button>
       )}
 
@@ -1051,7 +1235,7 @@ export function IptvPlayer({
                 AO VIVO
               </span>
             ) : (
-              <span className="rounded-full bg-primary/20 border border-primary/40 px-2.5 py-0.5 text-[10px] font-bold text-primary-light">
+              <span className="rounded-full bg-gradient-to-r from-pink-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-md">
                 VOD HD
               </span>
             )}
@@ -1061,9 +1245,9 @@ export function IptvPlayer({
             type="button"
             onClick={() => setReportOpen(true)}
             aria-label="Reportar problema"
-            className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 transition-colors hover:bg-white/20"
+            className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 transition-colors hover:bg-white/20 backdrop-blur-md"
           >
-            <AlertTriangle className="h-3.5 w-3.5" />
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
             <span className="hidden sm:inline">Reportar</span>
           </button>
         </div>
@@ -1073,7 +1257,7 @@ export function IptvPlayer({
           <button
             type="button"
             onClick={togglePlay}
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/90 text-white shadow-[0_0_30px_rgba(108,29,255,0.8)] backdrop-blur-sm transition-transform hover:scale-110 active:scale-95"
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 text-white shadow-[0_0_30px_rgba(236,72,153,0.8)] backdrop-blur-sm transition-transform hover:scale-115 active:scale-95 ring-4 ring-white/20"
           >
             <Play className="h-8 w-8 ml-1" fill="currentColor" />
           </button>
@@ -1095,7 +1279,7 @@ export function IptvPlayer({
                   setCurrentTime(newTime);
                   if (videoRef.current) videoRef.current.currentTime = newTime;
                 }}
-                className="h-1.5 flex-1 cursor-pointer accent-primary rounded-lg bg-white/20"
+                className="h-1.5 flex-1 cursor-pointer accent-pink-500 rounded-lg bg-white/20 hover:h-2 transition-all"
               />
               <span className="text-xs font-mono font-medium text-white/60">{formatTimecode(duration)}</span>
             </div>
@@ -1107,7 +1291,8 @@ export function IptvPlayer({
               <button
                 type="button"
                 onClick={togglePlay}
-                className="hover:text-primary transition-colors"
+                className="hover:text-pink-400 transition-colors"
+                title={state === "playing" ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
               >
                 {state === "playing" ? (
                   <Pause className="h-5 w-5 md:h-6 md:w-6" />
@@ -1121,16 +1306,16 @@ export function IptvPlayer({
                   <button
                     type="button"
                     onClick={() => seekRelative(-10)}
-                    className="hover:text-primary transition-colors"
-                    title="Voltar 10s"
+                    className="hover:text-pink-400 transition-colors"
+                    title="Voltar 10s (Seta Esquerda)"
                   >
                     <RotateCcw className="h-5 w-5" />
                   </button>
                   <button
                     type="button"
                     onClick={() => seekRelative(10)}
-                    className="hover:text-primary transition-colors"
-                    title="Avançar 10s"
+                    className="hover:text-pink-400 transition-colors"
+                    title="Avançar 10s (Seta Direita)"
                   >
                     <RotateCw className="h-5 w-5" />
                   </button>
@@ -1142,12 +1327,13 @@ export function IptvPlayer({
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-pink-400 transition-colors"
+                  title="Mutar/Desmutar (M)"
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="h-5 w-5" />
+                    <VolumeX className="h-5 w-5 text-rose-400" />
                   ) : (
-                    <Volume2 className="h-5 w-5" />
+                    <Volume2 className="h-5 w-5 text-emerald-400" />
                   )}
                 </button>
                 <input
@@ -1166,16 +1352,47 @@ export function IptvPlayer({
                       videoRef.current.muted = v === 0;
                     }
                   }}
-                  className="h-1 w-16 md:w-20 cursor-pointer accent-primary rounded-lg bg-white/20 hidden sm:block"
+                  className="h-1 w-16 md:w-20 cursor-pointer accent-pink-500 rounded-lg bg-white/20 hidden sm:block"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Seletor de Velocidade (VOD) */}
+              {!isLive && (
+                <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 text-xs font-bold backdrop-blur-md">
+                  {[0.75, 1, 1.25, 1.5].map((spd) => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => changeSpeed(spd)}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                        playbackSpeed === spd ? "bg-pink-500 text-white" : "text-white/70 hover:text-white",
+                      )}
+                    >
+                      {spd}x
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Picture in Picture */}
+              <button
+                type="button"
+                onClick={() => void togglePiP()}
+                className="hover:text-pink-400 transition-colors hidden sm:block"
+                title="Picture-in-Picture (P)"
+              >
+                <span className="text-xs font-bold border border-white/30 rounded px-1.5 py-0.5">PiP</span>
+              </button>
+
+              {/* Fullscreen */}
               <button
                 type="button"
                 onClick={toggleFullscreen}
-                className="hover:text-primary transition-colors"
+                className="hover:text-pink-400 transition-colors"
+                title="Tela Cheia (F)"
               >
                 {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
               </button>

@@ -125,7 +125,7 @@ async function ContinueWatchingSection({
   profileId: string;
 }) {
   try {
-    const items = await getContinueWatchingList(playlistId, profileId, 12);
+    const items = await getContinueWatchingList(playlistId, profileId, 12, "vod");
     if (!items || items.length === 0) return null;
     return <ContinueWatchingRail items={items} />;
   } catch {

@@ -12,6 +12,7 @@
  */
 
 import type { ConnectionProfile } from "@/lib/playback/connection";
+import { cleanMediaTitle } from "@/lib/utils";
 
 export type NivelQualidade = "SD" | "HD" | "FHD" | "4K";
 
@@ -22,21 +23,20 @@ export type VarianteQualidade = {
   nivel: NivelQualidade;
 };
 
-/**
- * Sufixo de qualidade no fim do nome, possivelmente repetido
- * ("CANAL HD²", "CANAL FHD", "CANAL H265").
- */
-const SUFIXO_QUALIDADE = /(?:[\s\-|]*(?:FHD|UHD|4K|HD|SD|H\.?265|HEVC)[¹²³\d]?)+\s*$/i;
-
 /** Nome sem o marcador de qualidade — é o que agrupa as variantes. */
 export function nomeBaseDoCanal(nome: string): string {
-  const semSufixo = nome.replace(SUFIXO_QUALIDADE, "").trimEnd();
-  return semSufixo || nome.trim();
+  return cleanMediaTitle(nome);
 }
 
-/** Compara nomes ignorando caixa e espaço repetido (o acervo tem "GLOBO  SP"). */
+/** Compara nomes ignorando caixa, acentos e caracteres de servidor/qualidade */
 export function mesmaBase(a: string, b: string): boolean {
-  const normalizar = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const normalizar = (s: string) =>
+    cleanMediaTitle(s)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/gi, " ")
+      .trim()
+      .toLowerCase();
   return normalizar(a) === normalizar(b);
 }
 

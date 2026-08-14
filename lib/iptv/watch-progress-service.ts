@@ -115,14 +115,18 @@ export async function saveWatchProgress({
   }
 }
 
+export type ContinueWatchingFilter = "all" | "vod" | "movies" | "series" | "live";
+
 /**
  * Retorna a lista de itens "Continuar Assistindo" para o perfil logado.
  * Tenta casar primeiro por channelId direto, depois por itemKey na playlist ativa.
+ * Permite filtrar por categoria ("vod", "movies", "series", "live").
  */
 export async function getContinueWatchingList(
   playlistId: string,
   profileId: string,
   limit = 12,
+  filter: ContinueWatchingFilter = "all",
 ): Promise<ContinueWatchingItem[]> {
   if (!profileId || !playlistId) return [];
 
@@ -134,7 +138,7 @@ export async function getContinueWatchingList(
         positionSeconds: { gt: MIN_POSITION_SECONDS },
       },
       orderBy: { lastWatched: "desc" },
-      take: limit * 2,
+      take: limit * 3,
       select: {
         itemKey: true,
         channelId: true,
@@ -189,8 +193,35 @@ export async function getContinueWatchingList(
 
       if (!channel) continue;
 
+      const isVodMovie =
+        channel.group?.category === "movies" ||
+        channel.streamUrl.includes("/movie/") ||
+        (!channel.streamUrl.includes("/series/") && /\.(mp4|mkv|avi|webm)/i.test(channel.streamUrl));
+
+      const isVodSeries =
+        channel.group?.category === "series" ||
+        channel.streamUrl.includes("/series/") ||
+        /(?:S|T)\d+\s*(?:E|X)\d+/i.test(channel.name);
+
+      const isLive =
+        !isVodMovie &&
+        !isVodSeries &&
+        (channel.group?.category === "live" ||
+          channel.streamUrl.includes("/live/") ||
+          channel.streamUrl.endsWith(".m3u8") ||
+          channel.streamUrl.endsWith(".ts") ||
+          record.durationSeconds <= 0);
+
+      const computedCategory = isLive ? "live" : isVodSeries ? "series" : "movies";
+
+      // Filtro por tipo de conteúdo
+      if (filter === "vod" && isLive) continue;
+      if (filter === "live" && !isLive) continue;
+      if (filter === "movies" && !isVodMovie) continue;
+      if (filter === "series" && !isVodSeries) continue;
+
       const percent =
-        record.durationSeconds > 0
+        !isLive && record.durationSeconds > 0
           ? Math.min(100, Math.round((record.positionSeconds / record.durationSeconds) * 100))
           : 0;
 
@@ -202,12 +233,11 @@ export async function getContinueWatchingList(
         positionSeconds: record.positionSeconds,
         durationSeconds: record.durationSeconds,
         progressPercent: percent,
-        remainingSeconds: Math.max(0, record.durationSeconds - record.positionSeconds),
-        category: channel.group?.category ?? "movies",
+        remainingSeconds: isLive ? 0 : Math.max(0, record.durationSeconds - record.positionSeconds),
+        category: computedCategory,
         lastWatched: record.lastWatched,
         watchCount: record.watchCount,
-        isSeries:
-          channel.streamUrl.includes("/series/") || channel.group?.category === "series",
+        isSeries: isVodSeries,
       });
     }
 

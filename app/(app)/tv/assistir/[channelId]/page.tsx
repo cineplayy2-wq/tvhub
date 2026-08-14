@@ -1,13 +1,14 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Home } from "lucide-react";
 
-import { BackButton } from "@/components/iptv/back-button";
 import { IptvPlayer } from "@/components/iptv/iptv-player";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { credencialDoUsuario } from "@/lib/iptv/credentials";
 import { getChannelById, getQualityVariants } from "@/lib/queries/iptv";
 import { prisma } from "@/lib/prisma";
-import { cleanMediaTitle, slugify } from "@/lib/utils";
+import { cleanMediaTitle, cleanSeriesTitle, slugify } from "@/lib/utils";
 
 import { DetalhesDoConteudo, DetalhesEsqueleto } from "./detalhes";
 
@@ -121,6 +122,29 @@ export default async function WatchChannelPage({
     channel.streamUrl.includes("/movie/") ||
     channel.streamUrl.includes("/series/");
 
+  const isSeries =
+    channel.group?.category === "series" ||
+    channel.streamUrl.includes("/series/") ||
+    /(?:S|T)\d+\s*(?:E|X)\d+/i.test(channel.name);
+
+  const seriesNameClean = cleanSeriesTitle(channel.name);
+
+  const isMovie =
+    channel.group?.category === "movies" ||
+    channel.streamUrl.includes("/movie/");
+
+  const backHref = isSeries && seriesNameClean
+    ? `/tv/serie/${encodeURIComponent(seriesNameClean)}`
+    : isMovie
+    ? "/tv/movies"
+    : "/tv/live";
+
+  const backLabel = isSeries
+    ? "Episódios"
+    : isMovie
+    ? "Filmes"
+    : "Canais";
+
   // Só canal ao vivo vem repetido por qualidade; filme e episódio são únicos.
   const qualidades = isVod
     ? []
@@ -129,15 +153,19 @@ export default async function WatchChannelPage({
   return (
     <div className="min-h-screen bg-black text-foreground">
       <div className="absolute left-4 top-4 z-40">
-        <BackButton
-          fallbackHref={channel.group ? `/tv/${channel.group.slug}` : "/tv"}
-        />
+        <Link
+          href={backHref}
+          aria-label="Voltar"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md transition-all hover:bg-black/90 hover:scale-110 active:scale-95 shadow-lg border border-white/10"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
       </div>
 
       <div className="relative aspect-video w-full bg-black shadow-2xl">
         {linhaIptv ? (
           <IptvPlayer
-            streamUrl={channel.streamUrl}
+            streamUrl={qualidades.length > 0 ? qualidades[0].streamUrl : channel.streamUrl}
             channelName={channel.name}
             channelId={channel.id}
             isLive={!isVod}

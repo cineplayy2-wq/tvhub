@@ -332,7 +332,8 @@ export async function getPlaylistChannels({
     cached(totalCacheKey, TTL.playlist, () => prisma.m3uChannel.count({ where })),
   ]);
 
-  const items = await annotateFavorites(rawItems, profileId);
+  const dedupedItems = dedupeChannels(rawItems);
+  const items = await annotateFavorites(dedupedItems, profileId);
 
   return {
     items,
@@ -728,19 +729,25 @@ export async function getQualityVariants(
   const base = nomeBaseDoCanal(channelName);
   if (!base) return [];
 
+  const palavras = base.split(/\s+/).filter(Boolean);
+  const prefixo = palavras.slice(0, Math.min(2, palavras.length)).join(" ");
+
   const candidatos = await prisma.m3uChannel.findMany({
     where: {
       playlistId,
       isActive: true,
-      name: { startsWith: base, mode: "insensitive" },
+      OR: [
+        { name: { contains: prefixo, mode: "insensitive" } },
+        { name: { contains: base, mode: "insensitive" } },
+      ],
     },
     select: { id: true, name: true, quality: true, streamUrl: true },
     orderBy: [{ relevanceScore: "desc" }, { sortOrder: "asc" }],
-    take: 40,
+    take: 60,
   });
 
   const irmas = candidatos
-    .filter((c) => mesmaBase(nomeBaseDoCanal(c.name), base))
+    .filter((c) => mesmaBase(c.name, base))
     .map((c) => ({
       id: c.id,
       name: c.name,
@@ -748,9 +755,7 @@ export async function getQualityVariants(
       nivel: nivelDe(c.quality, c.name),
     }));
 
-  // Uma sozinha não é escolha: o seletor só faz sentido com alternativa real.
-  const porNivel = umaPorNivel(irmas);
-  return porNivel.length > 1 ? porNivel : [];
+  return umaPorNivel(irmas);
 }
 
 export type SeriesListItem = {
@@ -879,5 +884,5 @@ export async function getLiveCategoryOverview(playlistId: string) {
 }
 
 export async function getLiveChannelsByCategory(playlistId: string, category: string, limit = 18) {
-  return getChannelsByCategory(playlistId, "live", limit);
+  return getChannelsByCategory(playlistId, category, limit);
 }
