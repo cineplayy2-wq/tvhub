@@ -353,7 +353,15 @@ export async function getPlaylistChannels({
 
 export async function getFeaturedChannels(playlistId: string, limit = 10) {
   const items = await prisma.m3uChannel.findMany({
-    where: { playlistId, isActive: true, group: { category: { not: "adult" }, isHidden: false } },
+    where: {
+      playlistId,
+      isActive: true,
+      group: { category: { not: "adult" }, isHidden: false },
+      NOT: [
+        { streamUrl: { contains: "/movie/" } },
+        { streamUrl: { contains: "/series/" } },
+      ],
+    },
     orderBy: { relevanceScore: "desc" },
     take: limit * 4,
     select: {
@@ -383,6 +391,10 @@ export async function getRegionalChannels(playlistId: string, limit = 18) {
       playlistId,
       isActive: true,
       group: { isHidden: false, category: { not: "adult" } },
+      NOT: [
+        { streamUrl: { contains: "/movie/" } },
+        { streamUrl: { contains: "/series/" } },
+      ],
       OR: [
         { name: { contains: "GLOBO", mode: "insensitive" } },
         { name: { contains: "SBT", mode: "insensitive" } },
@@ -425,6 +437,10 @@ export async function getStateChannels(
       playlistId,
       isActive: true,
       group: { isHidden: false, category: { not: "adult" } },
+      NOT: [
+        { streamUrl: { contains: "/movie/" } },
+        { streamUrl: { contains: "/series/" } },
+      ],
       OR: stateTerms.map((term) => ({
         name: { contains: term, mode: "insensitive" },
       })),

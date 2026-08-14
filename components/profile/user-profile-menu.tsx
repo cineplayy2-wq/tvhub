@@ -195,6 +195,15 @@ export function UserProfileMenu({
               {/* Outros Atalhos */}
               <div className="border-t border-white/[0.08] pt-2 space-y-1">
                 <Link
+                  href="/conta"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-surface-elevated"
+                >
+                  <User className="h-4 w-4 text-primary" />
+                  <span>Minha Conta & Senha</span>
+                </Link>
+
+                <Link
                   href="/perfis"
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"

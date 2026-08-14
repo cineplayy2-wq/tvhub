@@ -55,3 +55,6 @@ Thumbs.db
 # Snapshots datados que o graphify guarda a cada rebuild. O histórico do grafo
 # já é o histórico do Git — versionar os dois duplica megabytes por commit.
 /graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
+# Scripts operacionais locais (carregam IP e caminho de chave da VPS)
+/*.py

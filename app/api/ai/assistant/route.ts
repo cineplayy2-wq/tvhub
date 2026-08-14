@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { askCineAiAssistant } from "@/lib/ai/client";
+import { CorpoGrandeDemais, lerJsonLimitado, sanitizarParaLlm } from "@/lib/http-guard";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +14,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { prompt } = await req.json();
-    if (!prompt || typeof prompt !== "string") {
+    /**
+     * Rate limit por usuário — esta rota gasta DINHEIRO.
+     *
+     * Cada chamada vira uma requisição paga à DeepSeek. Sem teto, uma sessão
+     * autenticada em laço esvazia o crédito da conta em minutos; não precisa
+     * nem de má-fé, um retry mal escrito no cliente faz o mesmo. Vinte por
+     * hora cobre uso humano com folga.
+     */
+    const limite = await rateLimit("ai", user.id, 20, 60 * 60);
+    if (!limite.allowed) {
+      return NextResponse.json(
+        {
+          message: "Você fez muitas perguntas seguidas. Tente de novo em alguns minutos.",
+          recommendations: [],
+        },
+        { status: 429, headers: { "Retry-After": String(limite.retryAfterSeconds) } },
+      );
+    }
+
+    let corpo: { prompt?: unknown };
+    try {
+      corpo = await lerJsonLimitado<{ prompt?: unknown }>(req);
+    } catch (erro) {
+      const status = erro instanceof CorpoGrandeDemais ? 413 : 400;
+      return NextResponse.json({ error: "Requisição inválida" }, { status });
+    }
+
+    const prompt =
+      typeof corpo.prompt === "string" ? sanitizarParaLlm(corpo.prompt) : "";
+    if (!prompt) {
       return NextResponse.json({ error: "Pergunta inválida" }, { status: 400 });
     }
 

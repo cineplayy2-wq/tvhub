@@ -1,9 +1,36 @@
 import nodemailer from "nodemailer";
 
-const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-const smtpUser = (process.env.SMTP_USER || "cineplayy7@gmail.com").trim();
-const smtpPass = (process.env.SMTP_PASS || "hmty avjv yvru ebom").replace(/\s+/g, "");
-const smtpFrom = process.env.SMTP_FROM || `HUBFLIX <${smtpUser}>`;
+/**
+ * Credencial de SMTP vem SÓ do ambiente.
+ *
+ * Havia aqui uma senha de aplicativo do Gmail em texto puro, como valor
+ * padrão, num arquivo versionado. Bastava o repositório vazar por um instante
+ * — ou um colaborador com acesso de leitura — para a conta de e-mail do
+ * produto ficar nas mãos de terceiros: envio de e-mail em nome da marca,
+ * leitura da caixa e, por tabela, recuperação de senha de qualquer serviço
+ * ligado àquele endereço.
+ *
+ * Sem as variáveis, o envio não acontece e o chamador trata a falha. É melhor
+ * que um OTP não sair do que ele sair por uma credencial que já vazou.
+ */
+const smtpHost = process.env.SMTP_HOST?.trim() || "";
+const smtpUser = process.env.SMTP_USER?.trim() || "";
+const smtpPass = process.env.SMTP_PASS?.replace(/\s+/g, "") || "";
+const smtpFrom = process.env.SMTP_FROM?.trim() || (smtpUser ? `HUBFLIX <${smtpUser}>` : "");
+
+export function isSmtpConfigured() {
+  return Boolean(smtpHost && smtpUser && smtpPass);
+}
+
+/** Neutraliza markup em texto que veio do usuário e vai para dentro do HTML. */
+function escaparHtml(valor: string) {
+  return valor
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function createTransporter(port: number, secure: boolean) {
   return nodemailer.createTransport({
@@ -17,14 +44,38 @@ function createTransporter(port: number, secure: boolean) {
     connectionTimeout: 8000,
     greetingTimeout: 5000,
     socketTimeout: 8000,
+    /**
+     * Certificado do servidor de e-mail é verificado.
+     *
+     * Estava em `rejectUnauthorized: false`, o que aceita qualquer certificado
+     * — inclusive o de quem estiver no meio do caminho. Como é por esta
+     * conexão que passam os códigos de acesso (OTP), um intermediário lia o
+     * código antes do assinante.
+     */
     tls: {
-      rejectUnauthorized: false,
+      rejectUnauthorized: true,
+      minVersion: "TLSv1.2",
     },
   });
 }
 
 export async function sendOtpEmail(toEmail: string, code: string, userName?: string | null) {
-  const greeting = userName ? `Olá, ${userName}!` : "Olá!";
+  if (!isSmtpConfigured()) {
+    // Não tenta conectar sem credencial: o nodemailer levaria oito segundos
+    // de timeout para chegar na mesma conclusão, segurando a requisição.
+    console.error("[email] SMTP_HOST/SMTP_USER/SMTP_PASS ausentes — OTP não enviado");
+    throw new Error("Serviço de e-mail indisponível");
+  }
+
+  /**
+   * O nome vem do cadastro, ou seja, do usuário — e entra em HTML.
+   *
+   * Sem escapar, um nome como `<img src=x onerror=...>` viraria markup dentro
+   * do e-mail. Cliente de e-mail moderno bloqueia script, mas ainda dá para
+   * injetar link e imagem e transformar um OTP legítimo em phishing com a
+   * marca certa.
+   */
+  const greeting = userName ? `Olá, ${escaparHtml(userName)}!` : "Olá!";
 
   const html = `
     <!DOCTYPE html>

@@ -874,9 +874,15 @@ export async function GET(request: NextRequest) {
       headers: responseHeaders,
     });
   } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Erro interno no proxy de stream";
-    console.error("[stream-proxy]", msg);
-    return new NextResponse(msg, { status: 502 });
+    /**
+     * O detalhe vai para o log, nunca para o cliente.
+     *
+     * A mensagem crua entregava o nome do host do provedor, o código de erro
+     * do Node e, em falha de banco, trecho da consulta. Para quem está
+     * sondando, isso é mapa: revela a infraestrutura do provedor por trás do
+     * proxy — que é justamente o que o proxy existe para esconder.
+     */
+    console.error("[stream-proxy]", error);
+    return new NextResponse("Não foi possível abrir a transmissão.", { status: 502 });
   }
 }
