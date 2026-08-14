@@ -27,7 +27,7 @@ import {
   escalate,
   type ConnectionProfile,
 } from "@/lib/playback/connection";
-import { cn, formatTimecode } from "@/lib/utils";
+import { cleanMediaTitle, cn, formatTimecode } from "@/lib/utils";
 
 type PlayerState = "loading" | "playing" | "paused" | "stalled" | "error";
 
@@ -54,9 +54,9 @@ const MAX_TENTATIVAS_MESMA_FONTE = 2;
  * abandonar um stream que ia funcionar.
  */
 const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
-  good: 8000,
-  fair: 12000,
-  poor: 18000,
+  good: 16000,
+  fair: 24000,
+  poor: 32000,
 };
 
 
@@ -203,7 +203,7 @@ function PopcornLoading({
       {/* Channel info & live hint */}
       {channelName && (
         <p className="mt-1 text-xs font-semibold text-white/70 max-w-sm truncate">
-          {channelName} {isLive && "· Transmissão Ao Vivo"}
+          {cleanMediaTitle(channelName)} {isLive && "· Transmissão Ao Vivo"}
         </p>
       )}
 
@@ -514,21 +514,30 @@ export function IptvPlayer({
     const start = () => {
       if (disposed) return;
       video.muted = isMuted;
-      video.play().catch((err: Error) => {
-        // Trata bloqueio de Autoplay do navegador sem travar na tela de loading
-        if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
-          video.muted = true;
-          setIsMuted(true);
-          setAutoMutedHint(true);
-          video.play().then(() => {
-            setState("playing");
-          }).catch(() => {
-            setState("paused");
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            if (!disposed) setState("playing");
+          })
+          .catch((err: Error) => {
+            if (disposed) return;
+            // Trata bloqueio de Autoplay do navegador sem travar na tela de loading
+            if (err.name === "NotAllowedError" || err.message?.includes("interact")) {
+              video.muted = true;
+              setIsMuted(true);
+              setAutoMutedHint(true);
+              video
+                .play()
+                .then(() => {
+                  if (!disposed) setState("playing");
+                })
+                .catch(() => {
+                  if (!disposed) setState("paused");
+                });
+            }
           });
-        } else {
-          tryNextSourceOrFail();
-        }
-      });
+      }
     };
 
     const usarNativo = () => {
@@ -981,7 +990,7 @@ export function IptvPlayer({
   }, [channelName, channelId]);
 
   // Play/Pause Toggle
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -989,7 +998,7 @@ export function IptvPlayer({
     } else {
       video.pause();
     }
-  };
+  }, []);
 
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [doubleTapFeedback, setDoubleTapFeedback] = useState<"left" | "right" | null>(null);
@@ -1234,7 +1243,7 @@ export function IptvPlayer({
         <div className="flex items-center justify-between text-white">
           <div className="flex items-center gap-3">
             <span className="text-sm md:text-base font-extrabold drop-shadow-md truncate max-w-[200px] md:max-w-[500px]">
-              {channelName}
+              {cleanMediaTitle(channelName)}
             </span>
             {isLive ? (
               <span className="flex items-center gap-1.5 rounded-full bg-rose-600/90 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-[0_0_10px_rgba(225,29,72,0.6)]">
@@ -1243,7 +1252,7 @@ export function IptvPlayer({
               </span>
             ) : (
               <span className="rounded-full bg-gradient-to-r from-pink-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-md">
-                VOD HD
+                VOD
               </span>
             )}
           </div>

@@ -355,7 +355,7 @@ export async function getFeaturedChannels(playlistId: string, limit = 10) {
   const items = await prisma.m3uChannel.findMany({
     where: { playlistId, isActive: true, group: { category: { not: "adult" }, isHidden: false } },
     orderBy: { relevanceScore: "desc" },
-    take: limit,
+    take: limit * 4,
     select: {
       id: true,
       name: true,
@@ -374,7 +374,7 @@ export async function getFeaturedChannels(playlistId: string, limit = 10) {
     },
   });
 
-  return dedupeChannels(items);
+  return agruparVariantes(items).slice(0, limit);
 }
 
 export async function getRegionalChannels(playlistId: string, limit = 18) {
@@ -391,7 +391,7 @@ export async function getRegionalChannels(playlistId: string, limit = 18) {
       ],
     },
     orderBy: { relevanceScore: "desc" },
-    take: limit * 2,
+    take: limit * 4,
     select: {
       id: true,
       name: true,
@@ -410,7 +410,7 @@ export async function getRegionalChannels(playlistId: string, limit = 18) {
     },
   });
 
-  return dedupeChannels(items).slice(0, limit);
+  return agruparVariantes(items).slice(0, limit);
 }
 
 export async function getStateChannels(
@@ -430,7 +430,7 @@ export async function getStateChannels(
       })),
     },
     orderBy: { relevanceScore: "desc" },
-    take: limit * 2,
+    take: limit * 4,
     select: {
       id: true,
       name: true,
@@ -449,7 +449,7 @@ export async function getStateChannels(
     },
   });
 
-  return dedupeChannels(items).slice(0, limit);
+  return agruparVariantes(items).slice(0, limit);
 }
 
 export async function getNovelasList(

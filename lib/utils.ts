@@ -97,11 +97,13 @@ export function cleanMediaTitle(rawName: string): string {
   let cleaned = rawName
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2000}-\u{206F}\u{2100}-\u{214F}]/gu, "")
     .replace(/[⚽|✔️|★|✨|🔞|❌|⛹|🍿|📺|💬|📡|🎭|🎬|✝️|🎵|🎥|📰|🧸|⚡|🥊|🏆|🏎️|🏀|💖|🐾]/g, "")
+    .replace(/\[\s*(?:4K|FHD|HD|SD|UHD|HEVC|H\.?265|H\.?264|FULL\s*HD|ULTRA\s*HD|DUBLADO|LEGENDADO|DUB|LEG|L|D|AO\s*VIVO)\s*\]/gi, "")
+    .replace(/\(\s*(?:4K|FHD|HD|SD|UHD|HEVC|H\.?265|H\.?264|FULL\s*HD|ULTRA\s*HD|DUBLADO|LEGENDADO|DUB|LEG|L|D|AO\s*VIVO)\s*\)/gi, "")
     .replace(/\b(FULL\s*HD|ULTRA\s*HD|WEB[\s.-]?DL|BLU[\s-]?RAY|H[\s.]?26[45])\b/gi, "")
     .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H\.?265|UHD|HDR|60FPS|50FPS|BLURAY|WEBDL)\b/gi, "")
     .replace(/\b(DUBLADO|LEGENDADO|DUB|LEG|DUBL|LEGEN|LEG\/DUB)\b/gi, "")
     .replace(/\b(OPCAO\s*\d+|OPÇÃO\s*\d+|BACKUP|RESERVA|ALT)\b/gi, "")
-    .replace(/[¹²³⁴\d]+\s*$/g, "")
+    .replace(/[¹²³⁴⁵⁶⁷⁸⁹\d]+\s*$/g, "")
     .replace(/^[-:|/\s~]+|[-:|/\s~]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();

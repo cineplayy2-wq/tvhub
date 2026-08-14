@@ -158,14 +158,6 @@ export default async function LiveChannelsPage({
         />
       ) : (
         <div className="mt-12 space-y-12">
-          {recentLiveChannels.length > 0 && (
-            <ContinueWatchingRail
-              items={recentLiveChannels}
-              title="Canais Recentes"
-              subtitle="Canais que você assistiu recentemente"
-            />
-          )}
-
           {stateChannels.length > 0 && region && (
             <section>
               <SectionHeader
