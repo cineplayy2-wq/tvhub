@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, Film, LayoutDashboard, Radio, Settings, ShieldCheck, Users } from "lucide-react";
+import { CreditCard, Film, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Sparkles } from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/conteudo", label: "Conteúdo", icon: Film },
   { href: "/admin/iptv", label: "IPTV / M3U", icon: Radio },
   { href: "/admin/planos", label: "Planos & Preços", icon: CreditCard },
+  { href: "/admin/quiz", label: "Quiz & Campanha", icon: Sparkles },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
   { href: "/admin/auditoria", label: "Auditoria & Logs", icon: ShieldCheck },
 ];

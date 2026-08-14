@@ -57,16 +57,22 @@ export function Hero({ fromPriceCents, titleCount }: HeroProps) {
           nunca estoura no celular, nunca fica tímido no monitor grande.
           overflow-hidden + y no filho: cada linha "sobe de dentro" da anterior.
         */}
+        {/*
+          A promessa mudou de "chega de anúncio" para "pare de pagar cinco
+          assinaturas". A primeira é uma reclamação; a segunda é a dor que faz
+          a pessoa tirar o cartão do bolso — e é a que sustenta a calculadora
+          logo abaixo, que transforma o argumento em conta.
+        */}
         <h1 className="mt-6">
           <span className="sr-only">
-            Chega de pagar para ver anúncio.
+            Cinco assinaturas. Uma fatura só.
           </span>
 
           <span aria-hidden className="block">
             {[
-              { text: "Chega de", tone: "text-foreground" },
-              { text: "pagar para", tone: "text-foreground" },
-              { text: "ver anúncio", tone: "text-primary" },
+              { text: "Cinco", tone: "text-foreground" },
+              { text: "assinaturas.", tone: "text-foreground" },
+              { text: "Uma fatura.", tone: "text-accent" },
             ].map((line) => (
               // overflow-hidden no pai + y no filho: cada linha sobe de dentro
               // da anterior, em vez de simplesmente aparecer
@@ -87,10 +93,11 @@ export function Hero({ fromPriceCents, titleCount }: HeroProps) {
             variants={rise}
             className="max-w-lg text-balance text-base leading-relaxed text-muted sm:text-lg"
           >
-            {titleCount > 0 ? `${titleCount} títulos` : "Catálogo completo"} em
-            Full HD, <span className="text-foreground">2 telas ao mesmo tempo</span>{" "}
-            e nenhuma propaganda — em todos os planos. Você paga no PIX, sem
-            cartão salvo e sem débito automático.
+            Filmes, séries, canais ao vivo e esporte
+            {titleCount > 0 ? ` — ${titleCount} títulos` : ""}, no mesmo lugar,
+            em Full HD. <span className="text-foreground">2 telas ao mesmo tempo</span>,
+            zero anúncio, e você paga no PIX: sem cartão salvo, sem débito
+            automático, sem fidelidade.
           </motion.p>
 
           <motion.div variants={rise} className="flex flex-col gap-4">
@@ -108,12 +115,15 @@ export function Hero({ fromPriceCents, titleCount }: HeroProps) {
                   aria-hidden
                 />
               </Link>
+              {/* Aponta para a calculadora, não para a tabela de preço.
+                  Preço sozinho é objeção; preço ao lado do que a pessoa já
+                  gasta é argumento. */}
               <Link
-                href="#planos"
+                href="#economia"
                 className={buttonVariants({ variant: "outline", size: "lg" })}
               >
                 <Play className="h-4 w-4" aria-hidden />
-                Ver preços
+                Ver quanto eu economizo
               </Link>
             </div>
 

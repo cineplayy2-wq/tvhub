@@ -8,6 +8,7 @@ import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Manifesto } from "@/components/marketing/manifesto";
 import { Pricing } from "@/components/marketing/pricing";
+import { SavingsCalculator } from "@/components/marketing/savings-calculator";
 import { Showcase } from "@/components/marketing/showcase";
 import { Stats } from "@/components/marketing/stats";
 import { Ticker } from "@/components/marketing/ticker";
@@ -61,6 +62,7 @@ export default async function LandingPage() {
       <AnnouncementBar label="Cancele quando quiser · Sem fidelidade" />
       <Hero fromPriceCents={fromPriceCents} titleCount={titleCount} />
       <Ticker items={TICKER_ITEMS} variant="accent" />
+      <SavingsCalculator fromPriceCents={fromPriceCents} />
       <Showcase titles={titles} />
       <Manifesto />
       <Features />

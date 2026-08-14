@@ -584,18 +584,21 @@ model StreamSession {
 // ==========================================================
 
 model IptvLine {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   label      String
   serverUrl  String
   username   String
   password   String
-  maxScreens Int      @default(2)
-  isActive   Boolean  @default(true)
+  maxScreens Int       @default(2)
+  isActive   Boolean   @default(true)
   notes      String?
+  m3uUrl     String?   @db.Text
+  expiresAt  DateTime?
+  statusInfo String?
 
   lastUsedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   sessions   StreamSession[]
 
@@ -824,4 +827,24 @@ model M3uChannel {
   @@index([playlistId, nameKey])
   @@index([name])
   @@index([playlistId, tmdbSyncedAt])
+}
+
+/// Resposta do quiz de campanha (landing pública, sem sessão).
+///
+/// Serve para duas coisas: lista de contatos aquecidos e leitura de qual dor
+/// mais aparece — que é o que deve virar o título do próximo criativo.
+///
+/// `email` é único: refazer o quiz atualiza a resposta em vez de duplicar a
+/// pessoa, porque contato repetido estraga a métrica e o disparo.
+model QuizLead {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// { perfil, gasto, telas } — chaves validadas na server action.
+  respostas    Json
+  /// Origem da campanha (utm_source), quando a landing recebe.
+  origem       String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
+
+  @@index([criadoEm])
 }
