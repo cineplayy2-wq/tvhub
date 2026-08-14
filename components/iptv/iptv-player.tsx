@@ -85,18 +85,7 @@ function buildStreamVariants(rawUrl: string, isLive = true): string[] {
   if (!rawUrl) return [];
   const isProgressive = /\.(mp4|mkv|avi|webm)/i.test(rawUrl);
 
-  /**
-   * Filme e série NÃO tinham variante nenhuma: `return [rawUrl]` significa uma
-   * fonte só, sem segunda chance. No iPhone, um título `.mkv` batia no
-   * `<video>`, era recusado pelo container, e o failover não tinha para onde
-   * ir — é o "nem abre".
-   *
-   * O painel Xtream serve o mesmo id em mais de um container, então trocar a
-   * extensão costuma devolver o mesmo filme num formato que o aparelho aceita.
-   * No iOS a versão `.mp4` vai na FRENTE, porque ali o `.mkv` é recusa certa e
-   * tentá-lo primeiro só gasta um ciclo de failover na cara do assinante.
-   */
-  if (isProgressive) {
+  if (isProgressive || !isLive) {
     const semSuporte = /\.(mkv|avi)(\?|$)/i;
     if (!semSuporte.test(rawUrl)) return [rawUrl];
 
@@ -106,43 +95,25 @@ function buildStreamVariants(rawUrl: string, isLive = true): string[] {
     );
   }
 
-  /**
-   * VOD gravado com a extensão errada — conserto em tempo de reprodução.
-   *
-   * O `xtream-client.ts` montava toda URL de filme e episódio com `.m3u8`
-   * fixo, ignorando o `container_extension` que o painel informa. Painel
-   * Xtream serve VOD como ARQUIVO (`/movie/user/senha/<id>.mp4`), não como
-   * HLS: pedir `.m3u8` devolve 404 na maioria dos painéis, ou um TS remuxado
-   * sem duração e sem busca na barra.
-   *
-   * O `xtream-client.ts` já foi corrigido, mas as 150 mil linhas gravadas
-   * continuam com `.m3u8` até a próxima sincronização. Aqui as alternativas
-   * corretas entram na FRENTE, então filme e série voltam a tocar sem
-   * depender de ressincronizar o catálogo inteiro.
-   */
-  const ehVod = /\/(movie|series)\//i.test(rawUrl);
-  if (ehVod && /\.m3u8(\?|$)/i.test(rawUrl)) {
+  // Se já for Xtream /live/
+  if (rawUrl.includes("/live/")) {
     return Array.from(
       new Set([
-        rawUrl.replace(/\.m3u8(\?|$)/i, ".mp4$1"),
-        rawUrl.replace(/\.m3u8(\?|$)/i, ".mkv$1"),
         rawUrl,
+        rawUrl.replace("/live/", "/"),
+        rawUrl.replace(/\.ts$/i, ".m3u8"),
+        rawUrl.replace(/\.m3u8$/i, ".ts"),
       ]),
     );
   }
 
   const variants: string[] = [];
-
-  // A URL exata do provedor entra SEMPRE em primeiro lugar para reprodução instantânea
   variants.push(rawUrl);
 
   if (rawUrl.endsWith(".ts")) {
     variants.push(rawUrl.replace(/\.ts$/i, ".m3u8"));
   } else if (rawUrl.endsWith(".m3u8")) {
     variants.push(rawUrl.replace(/\.m3u8$/i, ".ts"));
-  } else {
-    variants.push(`${rawUrl}.ts`);
-    variants.push(`${rawUrl}.m3u8`);
   }
 
   return Array.from(new Set(variants));
@@ -284,10 +255,14 @@ export function IptvPlayer({
    * sobe suavemente em segundo plano para HD / FHD.
    */
   const temEscolhaDeQualidade = qualidades.length > 0;
-  const [nivelQualidade, setNivelQualidade] = useState(0);
+  const [nivelQualidade, setNivelQualidade] = useState(() => {
+    if (!qualidades || qualidades.length === 0) return 0;
+    const match = qualidades.findIndex((q) => q.streamUrl === streamUrl);
+    return match >= 0 ? match : 0;
+  });
 
   const urlBase =
-    qualidades.length > 0 && qualidades[nivelQualidade]
+    qualidades.length > 0 && qualidades[nivelQualidade]?.streamUrl
       ? qualidades[nivelQualidade].streamUrl
       : streamUrl;
 

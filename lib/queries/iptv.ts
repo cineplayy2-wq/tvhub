@@ -794,9 +794,17 @@ export async function getSeriesEpisodes(playlistId: string, seriesName: string) 
 export async function getQualityVariants(
   playlistId: string,
   channelName: string,
+  currentStreamUrl?: string,
 ): Promise<VarianteQualidade[]> {
   const base = nomeBaseDoCanal(channelName);
   if (!base) return [];
+
+  let currentHost = "";
+  if (currentStreamUrl) {
+    try {
+      currentHost = new URL(currentStreamUrl).hostname;
+    } catch {}
+  }
 
   const palavras = base.split(/\s+/).filter(Boolean);
   const prefixo = palavras.slice(0, Math.min(2, palavras.length)).join(" ");
@@ -805,6 +813,7 @@ export async function getQualityVariants(
     where: {
       playlistId,
       isActive: true,
+      ...(currentHost ? { streamUrl: { contains: currentHost } } : {}),
       OR: [
         { name: { contains: prefixo, mode: "insensitive" } },
         { name: { contains: base, mode: "insensitive" } },

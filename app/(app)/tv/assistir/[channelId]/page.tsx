@@ -159,7 +159,7 @@ export default async function WatchChannelPage({
   // Só canal ao vivo vem repetido por qualidade; filme e episódio são únicos.
   const qualidades = isVod
     ? []
-    : await getQualityVariants(channel.playlist.id, channel.name).catch(() => []);
+    : await getQualityVariants(channel.playlist.id, channel.name, channel.streamUrl).catch(() => []);
 
   let seriesEpisodes: Array<{
     id: string;
@@ -222,7 +222,7 @@ export default async function WatchChannelPage({
       <div className="relative aspect-video w-full bg-black shadow-2xl">
         {linhaIptv ? (
           <IptvPlayer
-            streamUrl={qualidades.length > 0 ? qualidades[0].streamUrl : channel.streamUrl}
+            streamUrl={channel.streamUrl}
             channelName={channel.name}
             channelId={channel.id}
             isLive={!isVod}
