@@ -31,7 +31,7 @@ export default async function RegisterPage({
           Já é assinante?{" "}
           <Link
             href="/login"
-            className="font-medium text-primary transition-colors hover:text-primary-hover"
+            className="font-medium text-accent transition-colors hover:text-primary-hover"
           >
             Entrar
           </Link>

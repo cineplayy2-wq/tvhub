@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { cached, TTL } from "@/lib/cache";
 import { prisma } from "@/lib/prisma";
 import type { TmdbSearchResult } from "@/lib/tmdb/client";
-import { tmdbImage } from "@/lib/tmdb/client";
+import { getTmdbPopular, getTmdbSimilarAndRecommended, getTmdbTopRated, tmdbImage } from "@/lib/tmdb/client";
 import { normalizeTitleKey, qualityRank, searchStemFor } from "@/lib/utils";
 
 /**
@@ -208,4 +208,62 @@ export function showcaseHref(item: ShowcaseItem) {
  */
 export function cachedRow<T>(key: string, build: () => Promise<T>): Promise<T> {
   return cached(`showcase:${key}`, TTL.showcase, build);
+}
+
+/**
+ * Recomendações personalizadas para o perfil com base no histórico ou populares.
+ */
+export async function getPersonalizedRecommendations(
+  playlistId: string,
+  profileId: string,
+  type: "movie" | "tv",
+  limit = 20,
+): Promise<ShowcaseItem[]> {
+  return cachedRow(`${playlistId}:recs:${profileId}:${type}`, async () => {
+    try {
+      const history = await prisma.watchProgress.findMany({
+        where: { profileId, positionSeconds: { gt: 30 } },
+        orderBy: { lastWatched: "desc" },
+        take: 4,
+        select: { tmdbId: true, itemKey: true, tmdbMediaType: true },
+      });
+
+      const candidateTmdbIds: number[] = history
+        .filter((h) => typeof h.tmdbId === "number" && (h.tmdbMediaType === type || !h.tmdbMediaType))
+        .map((h) => h.tmdbId as number);
+
+      let tmdbRecs: TmdbSearchResult[] = [];
+
+      for (const tmdbId of candidateTmdbIds.slice(0, 2)) {
+        try {
+          const recs = await getTmdbSimilarAndRecommended(tmdbId, type);
+          if (recs.length > 0) tmdbRecs.push(...recs);
+        } catch {}
+      }
+
+      if (tmdbRecs.length < 10) {
+        try {
+          const [popular, topRated] = await Promise.all([
+            getTmdbPopular(type),
+            getTmdbTopRated(type),
+          ]);
+          tmdbRecs.push(...popular, ...topRated);
+        } catch {}
+      }
+
+      const seen = new Set<number>();
+      const uniqueTmdb = tmdbRecs.filter((item) => {
+        if (seen.has(item.tmdbId)) return false;
+        seen.add(item.tmdbId);
+        return true;
+      });
+
+      return matchTmdbInPlaylist(playlistId, uniqueTmdb, {
+        limit,
+        preferType: type,
+      });
+    } catch {
+      return [];
+    }
+  });
 }

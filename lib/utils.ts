@@ -98,7 +98,15 @@ export function cleanMediaTitle(rawName: string): string {
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2000}-\u{206F}\u{2100}-\u{214F}]/gu, "")
     .replace(/[⚽|✔️|★|✨|🔞|❌|⛹|🍿|📺|💬|📡|🎭|🎬|✝️|🎵|🎥|📰|🧸|⚡|🥊|🏆|🏎️|🏀|💖|🐾]/g, "")
     .replace(/\[.*?\]|\(.*?\)/g, "")
+<<<<<<< HEAD
     .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H\.?265|UHD|HDR|60FPS|50FPS|BLURAY|WEB-DL|WEBDL)\b/gi, "")
+=======
+    // As formas COMPOSTAS têm que sair antes das simples. Tirando "HD" de
+    // "FULL HD" primeiro, sobra "FULL" pendurado no nome — era assim que
+    // "Band FULL HD" virava "Band FULL" na tela.
+    .replace(/\b(FULL\s*HD|ULTRA\s*HD|WEB[\s.-]?DL|BLU[\s-]?RAY|H[\s.]?26[45])\b/gi, "")
+    .replace(/\b(4K|FHD|HD|SD|720P|1080P|2160P|HEVC|H265|UHD|HDR|BLURAY|WEBDL)\b/gi, "")
+>>>>>>> fix/player-e-proxy-ponta-a-ponta
     .replace(/\b(DUBLADO|LEGENDADO|DUB|LEG|DUBL|LEGEN|LEG\/DUB)\b/gi, "")
     .replace(/\b(OPCAO\s*\d+|OPÇÃO\s*\d+|BACKUP|RESERVA|ALT)\b/gi, "")
     .replace(/[¹²³⁴\d]+\s*$/g, "")
@@ -188,6 +196,34 @@ export async function mapWithConcurrency<T, R>(
 
   await Promise.all(workers);
   return results;
+}
+
+/**
+ * Junta as variantes do mesmo canal num item só.
+ */
+export function agruparVariantes<
+  T extends { id: string; name: string; quality?: string | null },
+>(canais: T[]): T[] {
+  const porChave = new Map<string, { indice: number; melhor: T }>();
+
+  for (const canal of canais) {
+    const chave = cleanMediaTitle(canal.name).toLowerCase();
+    if (!chave) continue;
+
+    const existente = porChave.get(chave);
+    if (!existente) {
+      porChave.set(chave, { indice: porChave.size, melhor: canal });
+      continue;
+    }
+
+    if (qualityRank(canal.quality) > qualityRank(existente.melhor.quality)) {
+      existente.melhor = canal;
+    }
+  }
+
+  return [...porChave.values()]
+    .sort((a, b) => a.indice - b.indice)
+    .map(({ melhor }) => ({ ...melhor, name: cleanMediaTitle(melhor.name) }));
 }
 
 /** Agrupa canais e séries eliminando duplicatas de variantes (SD, HD, FHD, 4K, servidores) em um único card */

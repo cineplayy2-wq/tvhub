@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Film, Search } from "lucide-react";
 
+import { ArtworkBackfill } from "@/components/iptv/artwork-backfill";
+import { DismissableRecommendationsRail } from "@/components/iptv/dismissable-recommendations-rail";
 import { cleanGroupLabel, FilterChips } from "@/components/iptv/filter-chips";
 import { FilterBar } from "@/components/iptv/filter-bar";
 import { PosterCard } from "@/components/iptv/poster-card";
@@ -10,6 +12,10 @@ import { GUTTER, SectionHeader } from "@/components/iptv/section";
 import { ShowcaseHero, type HeroSlide } from "@/components/iptv/showcase-hero";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
+<<<<<<< HEAD
+=======
+import { getDismissedKeys, semDispensados } from "@/lib/queries/dismissed";
+>>>>>>> fix/player-e-proxy-ponta-a-ponta
 import { FILTER_GROUPS, filterWhere, getFilterCounts } from "@/lib/queries/filters";
 import {
   cachedRow,
@@ -36,17 +42,18 @@ export default async function MoviesHubPage({
   searchParams: { q?: string; page?: string; sub?: string; f?: string };
 }) {
   const user = await requireUser();
-  const [playlist, profile] = await Promise.all([
+  const [playlist, activeProfile] = await Promise.all([
     getViewablePlaylist(user.id),
-    getActiveProfile(user.id),
+    getActiveProfile(user.id).catch(() => null),
   ]);
+  const dismissed = await getDismissedKeys(activeProfile?.id);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
   if (playlist.lockedCategories.includes("movies")) notFound();
 
   const playlistId = playlist.id;
-  const profileId = profile?.id ?? null;
+  const profileId = activeProfile?.id ?? null;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const activeFilters = (searchParams.f ?? "").split(",").filter(Boolean);
   const isBrowsing =
@@ -138,10 +145,11 @@ export default async function MoviesHubPage({
 
   return (
     <div className="min-h-screen pb-24 pt-16">
+      <ArtworkBackfill />
       <div className={`${GUTTER} py-8`}>
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
               <Film className="h-3.5 w-3.5" />
               Cinema
             </p>
@@ -193,10 +201,10 @@ export default async function MoviesHubPage({
 
       {isBrowsing && (
         <div className="space-y-12 pb-4">
-          <Row title="Lançamentos" eyebrow="Novidades na sua lista" items={releases} badge="Novo" />
-          <Row title="Em alta esta semana" eyebrow="Mais buscados" items={trending} />
-          <Row title="Aclamados pela crítica" eyebrow="Nota alta" items={acclaimed} />
-          <Row title="Populares agora" eyebrow="O que todo mundo assiste" items={popular} />
+          <Row title="Lançamentos" eyebrow="Novidades na sua lista" items={releases} dismissed={dismissed} />
+          <Row title="Em alta esta semana" eyebrow="Mais buscados" items={trending} dismissed={dismissed} />
+          <Row title="Aclamados pela crítica" eyebrow="Nota alta" items={acclaimed} dismissed={dismissed} />
+          <Row title="Populares agora" eyebrow="O que todo mundo assiste" items={popular} dismissed={dismissed} />
         </div>
       )}
 
@@ -247,29 +255,30 @@ export default async function MoviesHubPage({
   );
 }
 
+/**
+ * Trilha de vitrine com "não me mostre mais isto".
+ *
+ * Recebe o conjunto de dispensadas já resolvido pela página: filtrar por
+ * trilha custaria uma consulta por seção para ler a mesma listinha.
+ *
+ * Dispensar mexe só nas sugestões. O título continua na grade paginada logo
+ * abaixo, na busca e no gênero — é a mesma página, dá para conferir na hora.
+ */
 function Row({
   title,
   eyebrow,
   items,
-  badge,
+  dismissed,
 }: {
   title: string;
   eyebrow: string;
   items: ShowcaseItem[];
-  badge?: string;
+  dismissed: Set<string>;
 }) {
-  if (items.length === 0) return null;
+  const visiveis = semDispensados(items, dismissed);
+  if (visiveis.length === 0) return null;
 
-  return (
-    <section>
-      <SectionHeader title={title} eyebrow={eyebrow} className={`${GUTTER} mb-4`} />
-      <Rail itemClassName="w-[112px] md:w-[140px]">
-        {items.map((item) => (
-          <PosterCard key={item.id} item={item} href={showcaseHref(item)} badge={badge} />
-        ))}
-      </Rail>
-    </section>
-  );
+  return <DismissableRecommendationsRail title={title} eyebrow={eyebrow} items={visiveis} />;
 }
 
 function Pagination({
@@ -335,7 +344,6 @@ function heroFrom(pool: Array<{ item: ShowcaseItem; label: string }>): HeroSlide
       rating: item.rating,
       year: item.year,
       label,
-      meta: item.quality ?? undefined,
       isFavorite: item.isFavorite,
       isSeries: item.isSeries,
     });

@@ -205,6 +205,7 @@ export async function getCustomer(id: string) {
         select: {
           id: true,
           name: true,
+          avatarUrl: true,
           isKids: true,
           maxAgeRating: true,
           pinHash: true,

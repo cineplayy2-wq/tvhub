@@ -1,0 +1,62 @@
+[
+  {
+    "id": "raposa",
+    "rotulo": "Raposa",
+    "src": "/avatars/raposa.svg"
+  },
+  {
+    "id": "gato",
+    "rotulo": "Gato",
+    "src": "/avatars/gato.svg"
+  },
+  {
+    "id": "panda",
+    "rotulo": "Panda",
+    "src": "/avatars/panda.svg"
+  },
+  {
+    "id": "coruja",
+    "rotulo": "Coruja",
+    "src": "/avatars/coruja.svg"
+  },
+  {
+    "id": "astronauta",
+    "rotulo": "Astronauta",
+    "src": "/avatars/astronauta.svg"
+  },
+  {
+    "id": "robo",
+    "rotulo": "Robô",
+    "src": "/avatars/robo.svg"
+  },
+  {
+    "id": "urso",
+    "rotulo": "Urso",
+    "src": "/avatars/urso.svg"
+  },
+  {
+    "id": "pinguim",
+    "rotulo": "Pinguim",
+    "src": "/avatars/pinguim.svg"
+  },
+  {
+    "id": "leao",
+    "rotulo": "Leão",
+    "src": "/avatars/leao.svg"
+  },
+  {
+    "id": "sapo",
+    "rotulo": "Sapo",
+    "src": "/avatars/sapo.svg"
+  },
+  {
+    "id": "dino",
+    "rotulo": "Dino",
+    "src": "/avatars/dino.svg"
+  },
+  {
+    "id": "alien",
+    "rotulo": "Alien",
+    "src": "/avatars/alien.svg"
+  }
+]

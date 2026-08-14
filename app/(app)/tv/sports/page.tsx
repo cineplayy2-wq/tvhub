@@ -57,6 +57,12 @@ const CHANNEL_SELECT = {
   quality: true,
   isFavorite: true,
   relevanceScore: true,
+  tmdbPosterUrl: true,
+  tmdbBackdropUrl: true,
+  tmdbRating: true,
+  tmdbYear: true,
+  tmdbOverview: true,
+  tmdbSyncedAt: true,
   group: { select: { name: true, slug: true, category: true } },
 };
 
@@ -161,7 +167,7 @@ export default async function SportsHubPage({
       <div className={`${GUTTER} py-8`}>
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
               <Trophy className="h-3.5 w-3.5" />
               Sinal Ao Vivo
             </p>

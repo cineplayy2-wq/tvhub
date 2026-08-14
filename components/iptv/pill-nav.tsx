@@ -49,7 +49,7 @@ export function PillNav({ items, className }: { items: PillItem[]; className?: s
       <div ref={listRef} className="relative flex w-max gap-2 py-2">
         <span
           aria-hidden
-          className="absolute top-2 h-[38px] rounded-full bg-primary shadow-[0_4px_16px_-6px_rgba(108,29,255,.8)] transition-[transform,width] duration-500 ease-smooth"
+          className="absolute top-2 h-[38px] rounded-full bg-primary shadow-[0_4px_16px_-6px_rgba(124,42,158,.8)] transition-[transform,width] duration-500 ease-smooth"
           style={
             blob
               ? { transform: `translateX(${blob.left}px)`, width: blob.width }

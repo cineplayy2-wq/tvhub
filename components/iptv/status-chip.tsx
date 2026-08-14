@@ -66,14 +66,14 @@ export function StatusChip({
 
       {place && (
         <span className="flex items-center gap-1.5 border-l border-white/[0.08] pl-2.5">
-          <MapPin className="h-3.5 w-3.5 text-primary" />
+          <MapPin className="h-3.5 w-3.5 text-accent" />
           {place}
         </span>
       )}
 
       {WeatherIcon && typeof temperatureC === "number" && (
         <span className="flex items-center gap-1.5 border-l border-white/[0.08] pl-2.5">
-          <WeatherIcon className="h-3.5 w-3.5 text-primary" />
+          <WeatherIcon className="h-3.5 w-3.5 text-accent" />
           <span className="tabular-nums text-foreground">{temperatureC}°</span>
         </span>
       )}

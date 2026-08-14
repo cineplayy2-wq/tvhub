@@ -71,6 +71,7 @@ const TABS: Tab[] = [
       </svg>
     ),
   },
+
   {
     href: "/tv/dicas",
     label: "Dicas",
@@ -137,7 +138,9 @@ export function TabBar() {
   // Cálculo direto no render: o useEffect antigo escondia a barra por um
   // frame a cada saída do player, e o usuário via a navegação "sumir".
   const hidden =
-    pathname.includes("/assistir/") || pathname.startsWith("/perfis");
+    pathname.includes("/assistir/") ||
+    pathname === "/tv/dicas" ||
+    pathname.startsWith("/perfis");
 
   const active = hidden ? 0 : activeIndex(pathname);
 
@@ -167,8 +170,9 @@ export function TabBar() {
       className={cn(
         "fixed left-1/2 z-40 h-16 w-[min(372px,calc(100%-26px))] -translate-x-1/2",
         "bottom-[calc(env(safe-area-inset-bottom)+18px)]",
-        "rounded-full border border-white/[0.08] bg-surface/90 px-1.5 shadow-card",
-        "supports-[backdrop-filter]:bg-surface/70 supports-[backdrop-filter]:backdrop-blur-xl",
+        "rounded-full border border-white/[0.12] bg-surface-elevated/95 px-1.5",
+        "shadow-[0_10px_36px_-8px_rgba(0,0,0,0.9)] ring-1 ring-black/40",
+        "supports-[backdrop-filter]:bg-surface-elevated/80 supports-[backdrop-filter]:backdrop-blur-xl",
         "md:hidden",
       )}
     >

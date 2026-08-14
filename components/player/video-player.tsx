@@ -394,9 +394,9 @@ export function VideoPlayer({
               if (videoRef.current) videoRef.current.currentTime = value;
             }}
             aria-label="Progresso"
-            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/25 accent-[#E8B44C] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#E8B44C]"
+            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/25 accent-primary [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#B569D2]"
             style={{
-              background: `linear-gradient(to right, #E8B44C ${percent}%, rgba(255,255,255,0.25) ${percent}%)`,
+              background: `linear-gradient(to right, #B569D2 ${percent}%, rgba(255,255,255,0.25) ${percent}%)`,
             }}
           />
 
@@ -451,7 +451,7 @@ export function VideoPlayer({
                   setMuted(false);
                 }}
                 aria-label="Volume"
-                className="h-1 w-0 cursor-pointer appearance-none rounded-full bg-white/25 accent-[#E8B44C] transition-all duration-300 group-hover/vol:w-20"
+                className="h-1 w-0 cursor-pointer appearance-none rounded-full bg-white/25 accent-primary transition-all duration-300 group-hover/vol:w-20"
               />
             </div>
 

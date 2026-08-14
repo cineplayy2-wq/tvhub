@@ -79,10 +79,14 @@ export function AppTopbar({
   user,
   profiles = [],
   activeProfile = null,
+  avatarUrl,
+  profileName,
 }: {
   user?: { email?: string | null; name?: string | null; role?: string } | null;
   profiles?: ProfileSummary[];
   activeProfile?: ProfileSummary | null;
+  avatarUrl?: string | null;
+  profileName?: string | null;
 }) {
   const pathname = usePathname();
   const [stuck, setStuck] = useState(false);
@@ -122,22 +126,22 @@ export function AppTopbar({
           {titleFor(pathname)}
         </h1>
 
-        {/* Coração — Minha lista / favoritos IPTV */}
-        <IconButton href="/tv/busca?favoritos=true" label="Minha lista">
+        {/* Favoritos com Coração */}
+        <IconButton href="/tv/busca?favoritos=true" label="Favoritos">
           <svg viewBox="0 0 24 24" aria-hidden>
-            <path d="M12 20.4 4.6 13A4.9 4.9 0 0 1 12 5.7 4.9 4.9 0 0 1 19.4 13z" />
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
         </IconButton>
 
-        {/* Lupa colada no perfil, os dois na ponta direita */}
+        {/* Busca ao lado dos Favoritos */}
         <Link
           href="/tv/busca"
           aria-label="Buscar"
           className={cn(
-            "grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full",
+            "grid h-[36px] w-[36px] shrink-0 place-items-center rounded-full",
             "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,.22)]",
             "transition-transform active:scale-[0.92]",
-            "[&_svg]:h-[19px] [&_svg]:w-[19px] [&_svg]:fill-none [&_svg]:stroke-current",
+            "[&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:fill-none [&_svg]:stroke-current",
             "[&_svg]:stroke-[2.1] [&_svg]:[stroke-linecap:round]",
           )}
         >
@@ -147,13 +151,43 @@ export function AppTopbar({
           </svg>
         </Link>
 
-        <div className="shrink-0">
-          <UserProfileMenu
-            user={user}
-            profiles={profiles}
-            activeProfile={activeProfile}
-          />
-        </div>
+        {/* Menu do Perfil com Avatar e Dropdown */}
+        {profiles.length > 0 ? (
+          <div className="shrink-0 ml-1">
+            <UserProfileMenu
+              user={user}
+              profiles={profiles}
+              activeProfile={activeProfile}
+            />
+          </div>
+        ) : (
+          <Link
+            href="/perfis"
+            aria-label={profileName ? `Perfil de ${profileName} — trocar` : "Trocar perfil"}
+            className="ml-1 flex h-[34px] w-[34px] shrink-0 overflow-hidden rounded-full shadow-md ring-2 ring-white/25 transition-transform active:scale-95"
+          >
+            {avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={avatarUrl}
+                alt={profileName ?? "Perfil"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="grid h-full w-full place-items-center bg-surface-elevated text-white">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-[18px] w-[18px] fill-none stroke-current stroke-[1.8]"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="8" r="3.6" />
+                  <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+                </svg>
+              </span>
+            )}
+          </Link>
+        )}
       </div>
     </header>
   );

@@ -1,80 +1,59 @@
-import { Baby } from "lucide-react";
+import { avatarDoPerfil } from "@/lib/profile/avatars";
 import { cn } from "@/lib/utils";
 
 /**
- * Paleta de fundos dos avatares. Todas foram escolhidas escuras o bastante
- * para a inicial branca manter contraste.
+ * Foto do perfil.
+ *
+ * Todo perfil tem imagem — não existe mais o quadrado colorido com a inicial.
+ * Quem foi criado antes da tela de escolha recebe um avatar estável derivado do
+ * próprio id (ver `avatarPadraoPara`): a foto nunca muda sozinha, porque é pela
+ * imagem que a pessoa reconhece o próprio perfil antes de ler o nome.
+ *
+ * Não usa `next/image` de propósito: são SVGs de ~1,4 KB servidos do próprio
+ * domínio, e passar isso pelo otimizador gastaria CPU da VPS para devolver um
+ * arquivo maior que o original.
  */
-const TINTS = [
-  "bg-[#2E3A4A]",
-  "bg-[#3A2E4A]",
-  "bg-[#2E4A3C]",
-  "bg-[#4A392E]",
-];
-
-/** Mesma cor para o mesmo perfil sempre — hash simples e determinístico. */
-function tintFor(id: string) {
-  let sum = 0;
-  for (let i = 0; i < id.length; i++) sum += id.charCodeAt(i);
-  return TINTS[sum % TINTS.length];
-}
-
 export function ProfileAvatar({
   id,
   name,
-  isKids,
   avatarUrl,
+  isKids,
   size = "md",
   className,
 }: {
   id: string;
   name: string;
-  isKids?: boolean;
   avatarUrl?: string | null;
-  size?: "sm" | "md" | "lg";
+  isKids?: boolean;
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
 }) {
   const sizes = {
-    sm: "h-9 w-9 text-sm rounded-md",
-    md: "h-16 w-16 text-xl rounded-lg",
-    lg: "h-28 w-28 text-4xl rounded-xl",
+    xs: "h-[34px] w-[34px]",
+    sm: "h-9 w-9",
+    md: "h-16 w-16",
+    lg: "h-28 w-28",
   };
 
-  if (avatarUrl) {
-    return (
-      <span
-        className={cn(
-          "relative block overflow-hidden",
-          sizes[size],
-          className,
-        )}
-        aria-hidden
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={avatarUrl}
-          alt=""
-          className="h-full w-full object-cover"
-        />
-      </span>
-    );
-  }
+  const src = avatarDoPerfil({ id, avatarUrl, isKids });
 
   return (
     <span
       className={cn(
-        "flex items-center justify-center font-semibold text-foreground",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full",
+        "bg-surface-elevated ring-1 ring-white/15",
         sizes[size],
-        tintFor(id),
         className,
       )}
-      aria-hidden
     >
-      {isKids ? (
-        <Baby className={size === "lg" ? "h-10 w-10" : "h-5 w-5"} strokeWidth={1.75} />
-      ) : (
-        name.charAt(0).toUpperCase()
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={name}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+      />
     </span>
   );
 }

@@ -96,11 +96,11 @@ export function ContinueWatchingCarousel({ items }: { items: ContinueWatchingIte
 
             {/* Title & Info */}
             <div className="p-3">
-              <h3 className="line-clamp-1 text-xs font-bold text-white transition-colors group-hover:text-primary">
+              <h3 className="line-clamp-1 text-xs font-bold text-white transition-colors group-hover:text-accent">
                 {item.cleanName}
               </h3>
               <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-white/60">
-                <RotateCcw className="h-3 w-3 text-primary" />
+                <RotateCcw className="h-3 w-3 text-accent" />
                 Parou em {item.progressPercent}%
               </span>
             </div>

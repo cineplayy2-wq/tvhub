@@ -65,11 +65,11 @@
   .hero-scrim {
     background-image: linear-gradient(
         90deg,
-        #0a0b0d 0%,
-        rgba(10, 11, 13, 0.85) 35%,
-        rgba(10, 11, 13, 0) 75%
+        #0C0A12 0%,
+        rgba(12, 10, 18, 0.85) 35%,
+        rgba(12, 10, 18, 0) 75%
       ),
-      linear-gradient(0deg, #0a0b0d 0%, rgba(10, 11, 13, 0) 45%);
+      linear-gradient(0deg, #0C0A12 0%, rgba(12, 10, 18, 0) 45%);
   }
 
   /* Vinheta cinematográfica sutil sobre o player e o hero */
@@ -92,20 +92,20 @@
 
   /* Texto vazado, para o número gigante das seções não competir com o título */
   .text-outline {
-    -webkit-text-stroke: 1px #3a3f49;
+    -webkit-text-stroke: 1px #3B3349;
     color: transparent;
   }
 
   /* Numeral do Top 10. Traço mais grosso e claro que o .text-outline comum:
-     atrás de um pôster iluminado, 1px em #3a3f49 simplesmente some. */
+     atrás de um pôster iluminado, 1px em #3B3349 simplesmente some. */
   .rank-numeral {
-    -webkit-text-stroke: 2px #59606d;
+    -webkit-text-stroke: 2px #4A4257;
     color: transparent;
     transition: -webkit-text-stroke-color 300ms ease;
   }
 
   .group:hover .rank-numeral {
-    -webkit-text-stroke-color: #e8b44c;
+    -webkit-text-stroke-color: #B569D2;
   }
 
   /* Barra de navegação: indica que há mais itens fora da área visível */
@@ -180,16 +180,16 @@
     background-image:
       linear-gradient(
         to right,
-        #0a0b0d 0%,
-        rgba(10, 11, 13, 0.92) 28%,
-        rgba(10, 11, 13, 0.55) 55%,
-        rgba(10, 11, 13, 0) 85%
+        #0C0A12 0%,
+        rgba(12, 10, 18, 0.92) 28%,
+        rgba(12, 10, 18, 0.55) 55%,
+        rgba(12, 10, 18, 0) 85%
       ),
       linear-gradient(
         to top,
-        #0a0b0d 0%,
-        rgba(10, 11, 13, 0.6) 22%,
-        rgba(10, 11, 13, 0) 60%
+        #0C0A12 0%,
+        rgba(12, 10, 18, 0.6) 22%,
+        rgba(12, 10, 18, 0) 60%
       );
   }
 
@@ -214,9 +214,9 @@
     @apply animate-shimmer bg-surface-hover;
     background-image: linear-gradient(
       90deg,
-      #1a1c21 0%,
-      #22252b 50%,
-      #1a1c21 100%
+      #16131D 0%,
+      #241F30 50%,
+      #16131D 100%
     );
     background-size: 200% 100%;
   }
@@ -258,7 +258,7 @@
 .tier-lite .glass,
 .tier-lite [class*="bg-surface/"],
 .tier-lite [class*="bg-background/"] {
-  background-color: #15151f !important;
+  background-color: #16131D !important;
 }
 
 /* content-visibility é ótimo onde existe e ignorado onde não existe;
@@ -281,13 +281,13 @@
    serve para um monitor a 50 cm. */
 @media (hover: none) and (pointer: coarse), (pointer: none) {
   :focus-visible {
-    outline: 3px solid #B15CFF;
+    outline: 3px solid #B569D2;
     outline-offset: 3px;
     border-radius: 8px;
   }
 }
 
 .tier-lite :focus-visible {
-  outline: 3px solid #B15CFF;
+  outline: 3px solid #B569D2;
   outline-offset: 3px;
 }

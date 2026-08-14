@@ -3,19 +3,23 @@ import { notFound } from "next/navigation";
 import { Play, Search, Sparkles, Star } from "lucide-react";
 
 import { Artwork } from "@/components/iptv/artwork";
-import { FranchiseBubble, KidsCard } from "@/components/iptv/kids-card";
+import { FranchiseBubble, KidsCard, type KidsCardData } from "@/components/iptv/kids-card";
 import { Rail } from "@/components/iptv/rail";
 import { GUTTER } from "@/components/iptv/section";
 import { EmptyPlaylist } from "@/components/iptv/playlist-state";
-import { requireUser } from "@/lib/auth/session";
+import { requireUser, getActiveProfile } from "@/lib/auth/session";
 import {
   FRANCHISES,
+  KIDS_AGE_BRACKETS,
   getFranchiseChannels,
+  getKidsByAgeBracket,
+  getKidsSmartRecommendations,
   getKidsCatalog,
   getKidsLiveChannels,
   getKidsMovies,
   getKidsSeries,
   type Franchise,
+  type KidsAgeBracket,
   type KidsChannel,
 } from "@/lib/queries/kids";
 import { getViewablePlaylist } from "@/lib/queries/iptv";
@@ -50,6 +54,7 @@ export default async function KidsHubPage({
 
     if (playlist.lockedCategories.includes("kids")) notFound();
 
+    const activeProfile = await getActiveProfile(user.id).catch(() => null);
     const playlistId = playlist.id;
     const page = Math.max(1, Number(searchParams.page) || 1);
     const activeFranchise = FRANCHISES.find((item) => item.key === searchParams.franquia);
@@ -61,40 +66,62 @@ export default async function KidsHubPage({
     let series: KidsChannel[] = [];
     let animations: ShowcaseItem[] = [];
     let shows: ShowcaseItem[] = [];
+    let smartRecommendations: KidsChannel[] = [];
+    let ageBracketsData: Array<{ bracket: KidsAgeBracket; channels: KidsChannel[] }> = [];
     let catalog: Awaited<ReturnType<typeof getKidsCatalog>> | null = null;
 
     try {
-      [franchises, liveChannels, movies, series, animations, shows, catalog] =
-        await Promise.all([
-          Promise.all(
-            FRANCHISES.map(async (franchise) => ({
-              franchise,
-              channels: await getFranchiseChannels(playlistId, franchise, 18).catch(() => []),
-            })),
-          ),
-          isBrowsing ? getKidsLiveChannels(playlistId, 18).catch(() => []) : [],
-          isBrowsing ? getKidsMovies(playlistId, 18).catch(() => []) : [],
-          isBrowsing ? getKidsSeries(playlistId, 18).catch(() => []) : [],
-          isBrowsing
-            ? cachedRow(`${playlistId}:k-animation`, async () =>
-                matchTmdbInPlaylist(playlistId, await getTmdbFamilyAnimation().catch(() => []), {
-                  limit: 18,
-                  preferType: "movie",
-                }),
-              ).catch(() => [])
-            : ([] as ShowcaseItem[]),
-          isBrowsing
-            ? cachedRow(`${playlistId}:k-shows`, async () =>
-                matchTmdbInPlaylist(playlistId, await getTmdbKidsShows().catch(() => []), {
-                  limit: 18,
-                  preferType: "tv",
-                }),
-              ).catch(() => [])
-            : ([] as ShowcaseItem[]),
-          !isBrowsing && !activeFranchise
-            ? getKidsCatalog(playlistId, { search: searchParams.q, page }).catch(() => null)
-            : null,
-        ]);
+      [
+        franchises,
+        liveChannels,
+        movies,
+        series,
+        animations,
+        shows,
+        smartRecommendations,
+        ageBracketsData,
+        catalog,
+      ] = await Promise.all([
+        Promise.all(
+          FRANCHISES.map(async (franchise) => ({
+            franchise,
+            channels: await getFranchiseChannels(playlistId, franchise, 18).catch(() => []),
+          })),
+        ),
+        isBrowsing ? getKidsLiveChannels(playlistId, 18).catch(() => []) : [],
+        isBrowsing ? getKidsMovies(playlistId, 18).catch(() => []) : [],
+        isBrowsing ? getKidsSeries(playlistId, 18).catch(() => []) : [],
+        isBrowsing
+          ? cachedRow(`${playlistId}:k-animation`, async () =>
+              matchTmdbInPlaylist(playlistId, await getTmdbFamilyAnimation().catch(() => []), {
+                limit: 18,
+                preferType: "movie",
+              }),
+            ).catch(() => [])
+          : ([] as ShowcaseItem[]),
+        isBrowsing
+          ? cachedRow(`${playlistId}:k-shows`, async () =>
+              matchTmdbInPlaylist(playlistId, await getTmdbKidsShows().catch(() => []), {
+                limit: 18,
+                preferType: "tv",
+              }),
+            ).catch(() => [])
+          : ([] as ShowcaseItem[]),
+        isBrowsing
+          ? getKidsSmartRecommendations(playlistId, activeProfile?.id, 18).catch(() => [])
+          : [],
+        isBrowsing
+          ? Promise.all(
+              KIDS_AGE_BRACKETS.map(async (bracket) => ({
+                bracket,
+                channels: await getKidsByAgeBracket(playlistId, bracket, 18).catch(() => []),
+              })),
+            )
+          : [],
+        !isBrowsing && !activeFranchise
+          ? getKidsCatalog(playlistId, { search: searchParams.q, page }).catch(() => null)
+          : null,
+      ]);
     } catch (err) {
       console.warn("[Kids queries warning]", err);
     }
@@ -149,6 +176,22 @@ export default async function KidsHubPage({
                 />
               </div>
             </form>
+          </div>
+        </div>
+
+        {/* Seletor Lúdico de Faixas Etárias */}
+        <div className={`${GUTTER} mt-6`}>
+          <div className="flex flex-wrap items-center gap-3">
+            {KIDS_AGE_BRACKETS.map((b) => (
+              <a
+                key={b.key}
+                href={`#faixa-${b.key}`}
+                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 active:scale-95"
+              >
+                <span className="text-xl">{b.emoji}</span>
+                <span>{b.label}</span>
+              </a>
+            ))}
           </div>
         </div>
 
@@ -243,10 +286,31 @@ export default async function KidsHubPage({
         {/* Vitrine */}
         {isBrowsing && (
           <div className="mt-14 space-y-12">
+            {smartRecommendations.length > 0 && (
+              <KidsRail
+                title="✨ Mágico Para Você"
+                hint="Sugestões da IA baseadas no que você mais gosta"
+                channels={smartRecommendations}
+              />
+            )}
+
+            {/* Trilhas por Faixa Etária */}
+            {ageBracketsData
+              .filter((entry) => entry.channels.length > 0)
+              .map((entry) => (
+                <KidsRail
+                  key={entry.bracket.key}
+                  id={`faixa-${entry.bracket.key}`}
+                  title={`${entry.bracket.emoji} ${entry.bracket.label}`}
+                  hint={`Conteúdos selecionados para ${entry.bracket.badge}`}
+                  channels={entry.channels}
+                />
+              ))}
+
             {liveChannels.length > 0 && (
               <KidsRail
-                title="Passando agora"
-                hint="Canais de desenho 24 horas"
+                title="📺 Canais de Desenho 24 Horas"
+                hint="Transmissão ao vivo ininterrupta"
                 channels={liveChannels}
                 live
               />
@@ -254,40 +318,24 @@ export default async function KidsHubPage({
 
             {shows.length > 0 && (
               <KidsRail
-                title="Séries que todo mundo assiste"
-                hint="As mais populares do momento"
+                title="⭐ Desenhos que Todo Mundo Assiste"
+                hint="Os mais populares do momento"
                 channels={shows.map(toKidsCard)}
               />
             )}
 
             {enrichedMovies.length > 0 && (
               <KidsRail
-                title="Filmes para a sessão da tarde"
-                hint="Animações completas"
+                title="🍿 Filmes para a Sessão Pipoca"
+                hint="Grandes animações completas"
                 channels={enrichedMovies}
-              />
-            )}
-
-            {animations.length > 1 && (
-              <KidsRail
-                title="Novidades da criançada"
-                hint="Animações em alta que estão na sua lista"
-                channels={animations.slice(1).map(toKidsCard)}
-              />
-            )}
-
-            {enrichedSeries.length > 0 && (
-              <KidsRail
-                title="Episódios para maratonar"
-                hint="Desenhos com temporadas completas"
-                channels={enrichedSeries}
               />
             )}
 
             {available.map((entry) => (
               <KidsRail
                 key={entry.franchise.key}
-                title={entry.franchise.label}
+                title={`👑 ${entry.franchise.label}`}
                 channels={entry.channels}
                 href={`/tv/kids?franquia=${entry.franchise.key}`}
               />
@@ -381,40 +429,42 @@ function KidsSpotlight({
 }
 
 function KidsRail({
+  id,
   title,
   hint,
   channels,
   href,
   live = false,
 }: {
+  id?: string;
   title: string;
   hint?: string;
-  channels: Array<Parameters<typeof KidsCard>[0]["channel"]>;
+  channels: KidsCardData[];
   href?: string;
   live?: boolean;
 }) {
   if (channels.length === 0) return null;
 
   return (
-    <section>
+    <section id={id} className="scroll-mt-24">
       <div className={`${GUTTER} mb-4 flex items-end justify-between gap-4`}>
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-bold tracking-tight text-foreground md:text-2xl">
+          <h2 className="truncate text-2xl font-black tracking-tight text-foreground md:text-3xl">
             {title}
           </h2>
-          {hint && <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{hint}</p>}
+          {hint && <p className="mt-1 truncate text-sm font-medium text-pink-300/80">{hint}</p>}
         </div>
         {href && (
           <Link
             href={href}
-            className="shrink-0 rounded-full bg-white/[0.06] px-4 py-1.5 text-[13px] font-semibold text-muted transition-colors hover:bg-white/10 hover:text-foreground"
+            className="shrink-0 rounded-full bg-white/10 px-5 py-2 text-sm font-bold text-white shadow-md transition-transform hover:scale-105 hover:bg-white/20"
           >
             Ver tudo
           </Link>
         )}
       </div>
 
-      <Rail itemClassName="w-[136px] md:w-[164px]">
+      <Rail itemClassName="w-[150px] md:w-[190px]">
         {channels.map((channel) => (
           <KidsCard key={channel.id} channel={channel} live={live} />
         ))}

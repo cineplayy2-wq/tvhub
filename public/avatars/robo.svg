@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Avatar">
+  <defs>
+    <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#57C4D8"/>
+      <stop offset="1" stop-color="#2A7E95"/>
+    </linearGradient>
+    <radialGradient id="gl5" cx="0.32" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="url(#bg5)"/>
+  <circle cx="100" cy="100" r="100" fill="url(#gl5)"/>
+  <path d="M100 34v16" stroke="#D9F4FA" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="100" cy="32" r="7" fill="#F0A93C"/>
+  <rect x="54" y="58" width="92" height="86" rx="26" fill="#E4F4F8"/>
+  <rect x="68" y="78" width="64" height="42" rx="18" fill="#22303A"/>
+  <circle cx="86" cy="99" r="8" fill="#5FE0F0"/>
+  <circle cx="114" cy="99" r="8" fill="#5FE0F0"/>
+  <circle cx="88.5" cy="96.5" r="2.8" fill="#fff"/>
+  <circle cx="116.5" cy="96.5" r="2.8" fill="#fff"/>
+  <rect x="86" y="128" width="28" height="7" rx="3.5" fill="#9FBCC7"/>
+  <rect x="40" y="88" width="12" height="28" rx="6" fill="#B4D8E2"/>
+  <rect x="148" y="88" width="12" height="28" rx="6" fill="#B4D8E2"/>
+  <rect x="76" y="148" width="48" height="14" rx="7" fill="#B4D8E2"/>
+</svg>

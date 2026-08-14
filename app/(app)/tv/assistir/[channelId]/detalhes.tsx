@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Calendar, Radio, Star } from "lucide-react";
 
 import { FavoriteButton } from "@/components/iptv/favorite-button";
-import { QualityBadge } from "@/components/iptv/quality-badge";
 import { SectionHeader } from "@/components/iptv/section";
 import { TileCard } from "@/components/iptv/tile-card";
 import { getPlaylistChannels } from "@/lib/queries/iptv";
@@ -102,7 +101,7 @@ export async function DetalhesDoConteudo({
               />
             ) : (
               <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-gradient-to-br from-primary/20 to-primary/5 md:h-28 md:w-20">
-                <Radio className="h-8 w-8 text-primary/60" strokeWidth={1.5} />
+                <Radio className="h-8 w-8 text-accent/60" strokeWidth={1.5} />
               </div>
             )}
 
@@ -115,13 +114,12 @@ export async function DetalhesDoConteudo({
                 {group && (
                   <Link
                     href={`/tv/${group.slug}`}
-                    className="rounded-md border border-border/50 bg-surface-elevated px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:text-primary"
+                    className="rounded-md border border-border/50 bg-surface-elevated px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:text-accent"
                   >
                     {group.name}
                   </Link>
                 )}
 
-                <QualityBadge quality={quality} />
 
                 {group?.category === "live" && (
                   <span className="flex items-center gap-1.5 rounded-full bg-danger px-2.5 py-0.5 font-bold uppercase tracking-wider text-white">
@@ -150,7 +148,7 @@ export async function DetalhesDoConteudo({
                   {tmdbDetails.genres.map((genero) => (
                     <span
                       key={genero}
-                      className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary"
+                      className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-accent"
                     >
                       {genero}
                     </span>

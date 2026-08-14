@@ -54,9 +54,9 @@ export function EmptyPlaylist({ status }: { status?: string }) {
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <div className="card-edge mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-surface">
         {status === "SYNCING" ? (
-          <Loader2 className="h-8 w-8 animate-spin text-primary" strokeWidth={1.5} />
+          <Loader2 className="h-8 w-8 animate-spin text-accent" strokeWidth={1.5} />
         ) : (
-          <Radio className="h-8 w-8 text-primary" strokeWidth={1.5} />
+          <Radio className="h-8 w-8 text-accent" strokeWidth={1.5} />
         )}
       </div>
 

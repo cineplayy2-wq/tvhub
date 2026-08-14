@@ -84,7 +84,7 @@ export function AuthShell({
       {/* Luzes ambiente Mesh Neon */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-40 -top-40 h-[700px] w-[700px] rounded-full bg-gradient-to-br from-primary/30 via-violet-600/20 to-transparent opacity-60 blur-[140px] animate-pulse"
+        className="pointer-events-none absolute -left-40 -top-40 h-[700px] w-[700px] rounded-full bg-gradient-to-br from-primary/30 via-primary-hover/20 to-transparent opacity-60 blur-[140px] animate-pulse"
         style={{ animationDuration: "8s" }}
       />
       <div
@@ -122,16 +122,16 @@ export function AuthShell({
           {/* Logo HUBFLIX */}
           <div className="relative z-20 flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3 group transition-transform duration-300 hover:scale-105">
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary via-violet-600 to-indigo-500 p-0.5 shadow-[0_0_30px_rgba(108,29,255,0.7)]">
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary via-primary-hover to-primary-active p-0.5 shadow-[0_0_30px_rgba(124,42,158,0.7)]">
                 <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-black">
                   <LogoHMark className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div>
                 <span className="text-2xl font-black tracking-tight text-white">
-                  HUB<span className="text-primary drop-shadow-[0_0_12px_rgba(108,29,255,0.9)]">FLIX</span>
+                  HUB<span className="text-accent drop-shadow-[0_0_12px_rgba(124,42,158,0.9)]">FLIX</span>
                 </span>
-                <span className="block text-[10px] font-bold uppercase tracking-widest text-primary/90">
+                <span className="block text-[10px] font-bold uppercase tracking-widest text-accent/90">
                   STREAMING PREMIUM
                 </span>
               </div>
@@ -141,7 +141,7 @@ export function AuthShell({
           {/* Destaque do Filme Atual */}
           <div className="relative z-20 my-auto max-w-xl py-8 space-y-6">
             <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/20 px-3.5 py-1 text-xs font-bold text-primary backdrop-blur-md shadow-[0_0_15px_rgba(108,29,255,0.3)]">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/20 px-3.5 py-1 text-xs font-bold text-accent backdrop-blur-md shadow-[0_0_15px_rgba(124,42,158,0.3)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 {activeSlide.category}
               </span>
@@ -181,7 +181,7 @@ export function AuthShell({
             {/* Badges */}
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur-md">
-                <Tv className="h-4 w-4 text-primary shrink-0" />
+                <Tv className="h-4 w-4 text-accent shrink-0" />
                 <div className="text-[11px]">
                   <span className="block font-bold text-white">+10.000</span>
                   <span className="text-white/60">Títulos em 4K</span>
@@ -216,7 +216,7 @@ export function AuthShell({
                   onClick={() => setCurrentSlideIndex(idx)}
                   className={`h-2 rounded-full transition-all duration-300 ${
                     idx === currentSlideIndex
-                      ? "w-8 bg-primary shadow-[0_0_10px_rgba(108,29,255,0.8)]"
+                      ? "w-8 bg-primary shadow-[0_0_10px_rgba(124,42,158,0.8)]"
                       : "w-2 bg-white/30 hover:bg-white/60"
                   }`}
                   aria-label={`Slide ${idx + 1}`}
@@ -235,17 +235,17 @@ export function AuthShell({
             {/* Logo Mobile */}
             <div className="mb-8 text-center lg:hidden">
               <Link href="/" className="inline-flex items-center gap-3">
-                <LogoHMark className="h-9 w-9 text-primary drop-shadow-[0_0_20px_rgba(108,29,255,0.8)]" />
+                <LogoHMark className="h-9 w-9 text-accent drop-shadow-[0_0_20px_rgba(124,42,158,0.8)]" />
                 <span className="text-2xl font-black text-white">
-                  HUB<span className="text-primary">FLIX</span>
+                  HUB<span className="text-accent">FLIX</span>
                 </span>
               </Link>
             </div>
 
             {/* Container Glassmorphic */}
-            <div className="group relative rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-primary/30 to-white/5 shadow-[0_0_50px_rgba(108,29,255,0.25)]">
+            <div className="group relative rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-primary/30 to-white/5 shadow-[0_0_50px_rgba(124,42,158,0.25)]">
               <div className="relative rounded-[23px] bg-black/80 p-7 sm:p-9 backdrop-blur-2xl">
-                <div className="pointer-events-none absolute inset-x-8 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_15px_rgba(108,29,255,1)]" />
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_15px_rgba(124,42,158,1)]" />
 
                 <div className="mb-7 text-center">
                   <h1 className="text-2xl font-extrabold tracking-tight text-white">

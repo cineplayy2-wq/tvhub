@@ -278,6 +278,24 @@ export function getTmdbUpcoming() {
   return discoverList("/movie/upcoming", { region: "BR", page: "1" }, "movie");
 }
 
+/** Busca trailer / clipe no YouTube no TMDB para o feed de cortes (Reels) */
+export async function getTmdbVideoKey(
+  tmdbId: number,
+  mediaType: "movie" | "tv",
+): Promise<string | null> {
+  try {
+    const data = await tmdbFetch<{
+      results: Array<{ key: string; site: string; type: string }>;
+    }>(`/${mediaType}/${tmdbId}/videos`);
+    const trailer = data.results?.find(
+      (v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser" || v.type === "Clip"),
+    );
+    return trailer?.key ?? data.results?.[0]?.key ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Populares do momento, por tipo. */
 export function getTmdbPopular(type: "movie" | "tv") {
   return discoverList(
@@ -290,6 +308,24 @@ export function getTmdbPopular(type: "movie" | "tv") {
 /** Séries que vão ao ar hoje — bom sinal de "novo episódio". */
 export function getTmdbAiringToday() {
   return discoverList("/tv/airing_today", { page: "1" }, "tv");
+}
+
+/** Recomendações e semelhantes com base em um título visto pelo usuário */
+export async function getTmdbSimilarAndRecommended(
+  tmdbId: number,
+  type: "movie" | "tv",
+): Promise<TmdbSearchResult[]> {
+  const [recs, similar] = await Promise.all([
+    discoverList(`/${type}/${tmdbId}/recommendations`, { page: "1" }, type),
+    discoverList(`/${type}/${tmdbId}/similar`, { page: "1" }, type),
+  ]);
+  const combined = [...recs, ...similar];
+  const seen = new Set<number>();
+  return combined.filter((item) => {
+    if (seen.has(item.tmdbId)) return false;
+    seen.add(item.tmdbId);
+    return true;
+  });
 }
 
 /** Aclamados: nota alta com volume mínimo de votos. */
@@ -336,10 +372,21 @@ export function getTmdbKidsShows() {
   );
 }
 
+import { prisma } from "@/lib/prisma";
 import { cleanMediaTitle, dedupeChannels, mapWithConcurrency } from "@/lib/utils";
 
 /** Requisições simultâneas ao TMDB. Acima disso a API começa a devolver 429. */
 const ENRICH_CONCURRENCY = 6;
+
+/**
+ * Quantas buscas NOVAS uma renderização pode disparar.
+ *
+ * Não é mais um teto de quantos itens ganham capa — é um teto de quanto se
+ * gasta de rede numa renderização. Quem já foi resolvido antes vem do banco de
+ * graça, então na segunda visita a página inteira aparece com arte; só o que
+ * nunca foi visto entra nesta cota, e o resto é resolvido nas próximas.
+ */
+const MAX_BUSCAS_NOVAS = 24;
 
 export type EnrichedChannel<T> = T & {
   posterUrl?: string | null;
@@ -351,40 +398,119 @@ export type EnrichedChannel<T> = T & {
   overview?: string;
 };
 
-export async function enrichChannelsWithTmdb<T extends { id: string; name: string; logoUrl?: string | null }>(
+type CanalCru = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  tmdbPosterUrl?: string | null;
+  tmdbBackdropUrl?: string | null;
+  tmdbRating?: number | null;
+  tmdbYear?: number | null;
+  tmdbOverview?: string | null;
+  tmdbSyncedAt?: Date | null;
+};
+
+/** Aplica ao item o que já está gravado, sem tocar na rede. */
+function doBanco<T extends CanalCru>(ch: T): EnrichedChannel<T> {
+  const arte = ch.tmdbPosterUrl || ch.logoUrl || null;
+  return {
+    ...ch,
+    logoUrl: arte,
+    posterUrl: arte,
+    tmdbPosterUrl: arte,
+    backdropUrl: ch.tmdbBackdropUrl ?? null,
+    tmdbRating: ch.tmdbRating ?? 0,
+    year: ch.tmdbYear ?? null,
+    overview: ch.tmdbOverview ?? "",
+  };
+}
+
+/**
+ * Grava o que o TMDB respondeu, para nunca mais perguntar.
+ *
+ * Falha de escrita é ignorada de propósito: a página já tem a arte em mãos e
+ * não pode quebrar porque o banco recusou um UPDATE. O pior caso é consultar
+ * de novo na próxima vez.
+ */
+async function gravarNoCanal(
+  id: string,
+  dados: {
+    tmdbId?: number | null;
+    tmdbMediaType?: string | null;
+    tmdbPosterUrl?: string | null;
+    tmdbBackdropUrl?: string | null;
+    tmdbRating?: number | null;
+    tmdbYear?: number | null;
+    tmdbOverview?: string | null;
+  },
+) {
+  try {
+    await prisma.m3uChannel.update({
+      where: { id },
+      data: { ...dados, tmdbSyncedAt: new Date() },
+    });
+  } catch {}
+}
+
+export async function enrichChannelsWithTmdb<T extends CanalCru>(
   rawChannels: T[],
-  limit = 24
+  limit = MAX_BUSCAS_NOVAS,
 ): Promise<EnrichedChannel<T>[]> {
   const channels = dedupeChannels(rawChannels);
 
   if (!isTmdbConfigured()) {
-    return channels.map((c) => ({ ...c, posterUrl: c.logoUrl ?? null, tmdbPosterUrl: c.logoUrl ?? null, tmdbRating: 0 }));
+    return channels.map((c) => doBanco(c));
   }
 
-  return mapWithConcurrency(channels, ENRICH_CONCURRENCY, async (ch, idx) => {
-    if (idx < limit) {
-      try {
-        const cleanName = cleanMediaTitle(ch.name);
-        const results = await searchTmdb(cleanName);
-        if (results.length > 0) {
-          const first = results[0];
-          const poster = tmdbImage(first.posterPath, "w342");
-          return {
-            ...ch,
-            logoUrl: poster || ch.logoUrl || null,
-            posterUrl: poster || ch.logoUrl || null,
-            tmdbPosterUrl: poster || ch.logoUrl || null,
-            backdropUrl: tmdbImage(first.backdropPath, "w1280"),
-            tmdbRating: first.rating || 0,
-            year: first.releaseYear,
-            overview: first.overview,
-          };
-        }
-      } catch {
-        // fallback em caso de falha de requisição
+  // Quem já foi consultado alguma vez sai daqui sem tocar na rede — inclusive
+  // quem foi consultado e não deu em nada (tmdbSyncedAt preenchido, poster
+  // nulo). Sem essa segunda parte, título que o TMDB não conhece seria
+  // reconsultado em toda renderização e consumiria a cota para sempre.
+  const pendentes = channels.filter((c) => !c.tmdbSyncedAt);
+  const cota = new Set(pendentes.slice(0, limit).map((c) => c.id));
+
+  return mapWithConcurrency(channels, ENRICH_CONCURRENCY, async (ch) => {
+    if (!cota.has(ch.id)) return doBanco(ch);
+
+    try {
+      const results = await searchTmdb(cleanMediaTitle(ch.name));
+      const first = results[0];
+
+      if (!first) {
+        // Marca como consultado sem resultado: é o que impede o retrabalho.
+        // `gravarNoCanal` já carimba o tmdbSyncedAt.
+        await gravarNoCanal(ch.id, {});
+        return doBanco(ch);
       }
+
+      const poster = tmdbImage(first.posterPath, "w342");
+      const backdrop = tmdbImage(first.backdropPath, "w1280");
+
+      await gravarNoCanal(ch.id, {
+        tmdbId: first.tmdbId,
+        tmdbMediaType: first.mediaType,
+        tmdbPosterUrl: poster,
+        tmdbBackdropUrl: backdrop,
+        tmdbRating: first.rating || 0,
+        tmdbYear: first.releaseYear,
+        tmdbOverview: first.overview,
+      });
+
+      const arte = poster || ch.logoUrl || null;
+      return {
+        ...ch,
+        logoUrl: arte,
+        posterUrl: arte,
+        tmdbPosterUrl: arte,
+        backdropUrl: backdrop,
+        tmdbRating: first.rating || 0,
+        year: first.releaseYear,
+        overview: first.overview,
+      };
+    } catch {
+      // Rede fora do ar não vira marca de "consultado": tem que tentar de novo.
+      return doBanco(ch);
     }
-    return { ...ch, posterUrl: ch.logoUrl ?? null, tmdbPosterUrl: ch.logoUrl ?? null, tmdbRating: 0 };
   });
 }
 

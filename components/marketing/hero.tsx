@@ -34,7 +34,7 @@ export function Hero({ fromPriceCents, titleCount }: HeroProps) {
         className="pointer-events-none absolute left-1/2 top-[-25%] -z-10 h-[80vh] w-[130vw] -translate-x-1/2 rounded-[50%] opacity-[0.18] blur-[130px]"
         style={{
           background:
-            "radial-gradient(ellipse at center, #E8B44C 0%, transparent 62%)",
+            "radial-gradient(ellipse at center, #B569D2 0%, transparent 62%)",
         }}
       />
 

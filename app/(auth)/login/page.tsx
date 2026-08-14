@@ -23,7 +23,7 @@ export default function LoginPage({
           Ainda não tem conta?{" "}
           <Link
             href="/cadastro"
-            className="font-medium text-primary transition-colors hover:text-primary-hover"
+            className="font-medium text-accent transition-colors hover:text-primary-hover"
           >
             Assine agora
           </Link>

@@ -65,13 +65,14 @@ export function UserProfileMenu({
             <ProfileAvatar
               id={current.id}
               name={current.name}
+              avatarUrl={current.avatarUrl}
               isKids={current.isKids}
               avatarUrl={current.avatarUrl}
               size="sm"
               className="h-7 w-7 rounded-full ring-1 ring-primary/40"
             />
           ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-primary">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-accent">
               <User className="h-4 w-4" />
             </div>
           )}
@@ -101,7 +102,7 @@ export function UserProfileMenu({
               {/* Cabeçalho com Conta do Assinante */}
               <div className="mb-3 border-b border-white/[0.08] pb-3">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                  <span className="flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-accent">
                     <Crown className="h-3 w-3" />
                     Assinante VIP
                   </span>
@@ -148,6 +149,7 @@ export function UserProfileMenu({
                           <ProfileAvatar
                             id={profile.id}
                             name={profile.name}
+                            avatarUrl={profile.avatarUrl}
                             isKids={profile.isKids}
                             avatarUrl={profile.avatarUrl}
                             size="sm"
@@ -157,7 +159,7 @@ export function UserProfileMenu({
                             {profile.name}
                           </span>
                           {profile.isKids && (
-                            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-400">
+                            <span className="rounded bg-primary/25 px-1.5 py-0.5 text-[9px] font-black uppercase text-accent">
                               Kids
                             </span>
                           )}
@@ -191,7 +193,7 @@ export function UserProfileMenu({
                     setIsFormOpen(true);
                     setIsOpen(false);
                   }}
-                  className="mb-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-white/15 p-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                  className="mb-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-white/15 p-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-accent"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Adicionar novo perfil</span>

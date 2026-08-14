@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { MapPin, Radio, Search } from "lucide-react";
 
 import { CategoryTiles } from "@/components/iptv/category-tiles";
@@ -40,17 +40,20 @@ export default async function LiveChannelsPage({
   searchParams: { cat?: string; q?: string; page?: string };
 }) {
   const user = await requireUser();
-  const [playlist, profile] = await Promise.all([
+  const [playlist, activeProfile] = await Promise.all([
     getViewablePlaylist(user.id),
-    getActiveProfile(user.id),
+    getActiveProfile(user.id).catch(() => null),
   ]);
 
   if (!playlist) notFound();
   if (!playlist.hasChannels) return <EmptyPlaylist status={playlist.syncStatus} />;
   if (playlist.lockedCategories.includes("live")) notFound();
+  if (activeProfile?.isKids) {
+    redirect("/tv/kids");
+  }
 
   const playlistId = playlist.id;
-  const profileId = profile?.id ?? null;
+  const profileId = activeProfile?.id ?? null;
   const region = await detectRegion();
   const page = Math.max(1, Number(searchParams.page) || 1);
   const isFiltered = Boolean(searchParams.cat || searchParams.q);
@@ -98,7 +101,7 @@ export default async function LiveChannelsPage({
       <div className={`${GUTTER} border-b border-white/[0.06] py-8`}>
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
               <Radio className="h-3.5 w-3.5" />
               Ao vivo
             </p>
@@ -155,6 +158,10 @@ export default async function LiveChannelsPage({
         />
       ) : (
         <div className="mt-12 space-y-12">
+          {recentChannels.length > 0 && (
+            <ContinueWatchingRail items={recentChannels} variant="live" />
+          )}
+
           {stateChannels.length > 0 && region && (
             <section>
               <SectionHeader
@@ -168,7 +175,7 @@ export default async function LiveChannelsPage({
                 className={`${GUTTER} mb-4`}
                 actions={
                   <span className="hidden items-center gap-1.5 rounded-full border border-white/[0.08] bg-surface/60 px-3 py-1 text-[11px] font-medium text-muted-foreground sm:flex">
-                    <MapPin className="h-3 w-3 text-primary" />
+                    <MapPin className="h-3 w-3 text-accent" />
                     {region.state}
                   </span>
                 }

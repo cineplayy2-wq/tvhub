@@ -44,6 +44,14 @@ export type FilterGroup = {
  */
 export const FILTER_GROUPS: FilterGroup[] = [
   {
+    id: "tipo",
+    label: "Tipo",
+    options: [
+      { id: "filmes", label: "Filmes", terms: ["filme", "movie", "cinema"] },
+      { id: "series", label: "Séries", terms: ["serie", "série", "series"] },
+    ],
+  },
+  {
     id: "genero",
     label: "Gênero",
     options: [
@@ -59,49 +67,16 @@ export const FILTER_GROUPS: FilterGroup[] = [
       { id: "animacao", label: "Animação", terms: ["animacao", "animação"] },
       { id: "documentario", label: "Documentário", terms: ["documentario", "documentário"] },
       { id: "faroeste", label: "Faroeste", terms: ["faroeste"] },
+      { id: "familia", label: "Família", terms: ["familia", "família", "livre"] },
     ],
   },
   {
     id: "destaques",
     label: "Destaques",
     options: [
-      { id: "lancamentos", label: "Lançamentos", terms: ["lançamento", "lancamento"] },
+      { id: "lancamentos", label: "Lançamentos", terms: ["lançamento", "lancamento", "2024", "2025", "2026"] },
       { id: "quatrok", label: "4K e UHD", terms: ["4k", "uhd"] },
-      { id: "natal", label: "Especial de Natal", terms: ["natal"] },
-    ],
-  },
-  {
-    id: "origem",
-    label: "Origem",
-    options: [
-      { id: "nacional", label: "Nacional", terms: ["nacional", "brasil"] },
-      { id: "dorama", label: "Coreano", terms: ["dorama", "k-drama"] },
-      { id: "anime", label: "Anime", terms: ["crunchyroll", "funimation", "anime"] },
-      { id: "legendado", label: "Legendado", terms: ["legendado"] },
-    ],
-  },
-  {
-    id: "catalogo",
-    label: "Catálogo",
-    options: [
-      { id: "netflix", label: "Netflix", terms: ["netflix"] },
-      { id: "prime", label: "Prime Video", terms: ["prime video"] },
-      { id: "disney", label: "Disney+", terms: ["disney"] },
-      { id: "hbo", label: "HBO Max", terms: ["hbo"] },
-      { id: "globoplay", label: "Globoplay", terms: ["globoplay"] },
-      { id: "appletv", label: "Apple TV+", terms: ["apple tv"] },
-      { id: "paramount", label: "Paramount+", terms: ["paramount"] },
-    ],
-  },
-  {
-    id: "ocasiao",
-    label: "Ocasião",
-    options: [
-      // Apelidos editoriais sobre gênero — não são dado novo
-      { id: "prarir", label: "Pra rir", terms: ["comedia", "comédia"] },
-      { id: "prachorar", label: "Pra chorar", terms: ["drama", "romance"] },
-      { id: "tensao", label: "Tensão máxima", terms: ["terror", "suspense"] },
-      { id: "familia", label: "Em família", terms: ["animacao", "animação", "infantil"] },
+      { id: "populares", label: "Populares", terms: ["top", "populares", "alta"] },
     ],
   },
 ];
