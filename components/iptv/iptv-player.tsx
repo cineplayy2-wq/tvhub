@@ -431,22 +431,16 @@ export function IptvPlayer({
     async function detectarFormato(url: string): Promise<"hls" | "mpegts" | null> {
       abortarSonda = new AbortController();
       try {
-        const resposta = await fetch(url, {
-          headers: { Range: "bytes=0-7" },
+        const resposta = await fetch(`${url}&sonda=1`, {
           signal: abortarSonda.signal,
         });
-        const buffer = new Uint8Array(await resposta.arrayBuffer());
-        if (buffer.length === 0) return null;
-
-        const texto = new TextDecoder().decode(buffer.slice(0, 7));
-        if (texto.startsWith("#EXTM3U")) return "hls";
-        if (buffer[0] === 0x47) return "mpegts";
-        return null;
+        if (!resposta.ok) return null;
+        const dados = (await resposta.json()) as { formato: "hls" | "mpegts" | null };
+        return dados.formato ?? null;
       } catch {
-        // Sonda falhou (rede, CORS, aborto): segue pelo palpite da extensão.
+        // Sonda falhou (rede, aborto): segue pelo palpite da extensão.
         return null;
       } finally {
-        abortarSonda?.abort();
         abortarSonda = null;
       }
     }
@@ -529,11 +523,41 @@ export function IptvPlayer({
               // que absorve a diferença entre o que chega e o que é exibido.
               enableStashBuffer: true,
               stashInitialSize: plano.stashInitialSize,
-              // Perseguir a borda continua ligado, mas com faixa larga: só
-              // corrige atraso grande, e ao corrigir mantém o colchão.
-              liveBufferLatencyChasing: isLive,
-              liveBufferLatencyMaxLatency: plano.latenciaMaximaSegundos,
-              liveBufferLatencyMinRemain: plano.colchaoSegundos,
+
+              /**
+               * Perseguição de latência DESLIGADA.
+               *
+               * Ela funciona dando SEEK para a frente no fluxo ao vivo, e seek
+               * em MPEG-TS sobre MSE reinicia a decodificação — engasgo na
+               * imagem. Pior: ela come exatamente o colchão de buffer que é a
+               * única defesa contra oscilação de rede, então trabalha contra o
+               * objetivo de não travar. A issue xqq/mpegts.js#13 relata tela
+               * preta nos primeiros segundos com ela ligada.
+               *
+               * O preço de deixar desligada é o atraso crescer numa sessão
+               * muito longa. É barato: ninguém compara canal com relógio, e
+               * travar é o que incomoda.
+               */
+              liveBufferLatencyChasing: false,
+
+              /**
+               * Limpeza automática do buffer de mídia. LIGADA.
+               *
+               * O padrão da biblioteca é `false`, e é o que faz canal congelar
+               * depois de um tempo ligado. Sem limpeza o SourceBuffer acumula
+               * TUDO que já passou — uma hora de canal são centenas de MB.
+               * Ao bater na cota do navegador o `appendBuffer` falha e a
+               * imagem para. Não é rede nem provedor: é memória, e por isso o
+               * congelamento vem "do nada", sempre depois de um tempo, e
+               * sempre pior nos aparelhos mais fracos.
+               */
+              autoCleanupSourceBuffer: true,
+              autoCleanupMaxBackwardDuration: 120,
+              autoCleanupMinBackwardDuration: 60,
+
+              /** Evita dessincronizar áudio e vídeo em fluxo com furo. */
+              fixAudioTimestampGap: true,
+
               lazyLoad: false,
             },
           );
@@ -590,7 +614,37 @@ export function IptvPlayer({
             levelLoadingTimeOut: 10000,
             fragLoadingTimeOut: 20000,
             fragLoadingMaxRetry: 4,
-            startLevel: -1,
+
+            /**
+             * Começa na faixa mais leve e sobe sozinho.
+             *
+             * `-1` deixa o hls.js escolher pela banda estimada, e no primeiro
+             * segundo essa estimativa ainda não existe — na prática ele parte
+             * de uma faixa alta. O primeiro quadro é justamente o que a pessoa
+             * está esperando; buscá-lo em 1080p numa rede que ainda não foi
+             * medida é o jeito mais rápido de transformar "abrir o canal" em
+             * dez segundos de tela preta. O ABR sobe em poucos segundos assim
+             * que tem medição confiável.
+             */
+            startLevel: 0,
+            abrEwmaDefaultEstimate: 800_000,
+            /** Não busca faixa maior que o tamanho real do vídeo na tela. */
+            capLevelToPlayerSize: true,
+
+            /**
+             * Furo tolerado no buffer. O padrão é 0.1 e há relato de
+             * travamento com valores altos (video-dev/hls.js#2226): quanto
+             * maior o furo aceito, mais tempo o player espera parado antes de
+             * saltar por cima dele. 0.3 dá folga para emenda irregular de
+             * segmento sem chegar perto da faixa que trava.
+             */
+            maxBufferHole: 0.3,
+            nudgeOffset: 0.15,
+            nudgeMaxRetry: 6,
+
+            /** Segura a memória em canal ligado por horas. */
+            backBufferLength: isLive ? 30 : 60,
+
             startFragPrefetch: true,
             /**
              * Começa a três segmentos da borda, não a dois. Com pedaços de
@@ -707,7 +761,8 @@ export function IptvPlayer({
 
     const clearStall = () => {
       if (stallTimer) {
-        clearTimeout(stallTimer);
+        // O vigia virou `setInterval`; `clearInterval` é o par correto.
+        clearInterval(stallTimer as unknown as ReturnType<typeof setInterval>);
         stallTimer = undefined;
       }
       setShowDebouncedSpinner(false);
@@ -740,23 +795,67 @@ export function IptvPlayer({
 
     const onPause = () => setState((s) => (s === "error" ? s : "paused"));
 
+    /**
+     * `waiting` não é sentença — quem julga é o PROGRESSO do buffer.
+     *
+     * Antes, doze segundos engasgado trocavam de fonte. Só que `waiting` é o
+     * navegador ENCHENDO o buffer, e num 4G isso passa de doze segundos com
+     * frequência. A fonte certa era abandonada no meio do carregamento, o
+     * player descia a lista de reservas (que costuma ser pior) e terminava em
+     * "não consegui abrir". No computador, com fibra, o buffer enchia antes do
+     * prazo e o mesmo canal abria — daí "funciona no PC e no celular não".
+     *
+     * Agora o relógio só corre enquanto NADA se mexe: nem o fim do buffer, nem
+     * o tempo do vídeo. Fonte de verdade morta continua sendo detectada em
+     * poucos segundos, porque aí realmente nada avança.
+     */
     const onWaiting = () => {
       setState((s) => (s === "error" ? s : "stalled"));
 
-      // Debounce do spinner: não cancela o timer recém-criado (bug antigo
-      // limpava o debounce no clearStall e o spinner nunca aparecia).
       if (!stallDebounceTimer.current) {
         stallDebounceTimer.current = setTimeout(() => {
           stallDebounceTimer.current = undefined;
           setShowDebouncedSpinner(true);
-          // Passou de um segundo e meio parado: é travada de verdade, não um
-          // engasgo. Cair de resolução aqui é o que impede a próxima.
+          /**
+           * Só derruba a resolução depois de QUATRO segundos parado, não um e
+           * meio. Um segundo e meio é o tempo normal de trocar de segmento
+           * numa rede móvel: derrubar ali prendia o assinante em SD por uma
+           * oscilação corriqueira, e a espera para voltar a subir dobra a cada
+           * queda (chega a oito minutos). O resultado era pagar por HD e
+           * assistir SD a sessão inteira.
+           */
           baixarQualidade();
-        }, 1500);
+        }, 4000);
       }
 
       if (stallTimer) clearTimeout(stallTimer);
-      stallTimer = setTimeout(() => tryNextSourceOrFail(), 12000);
+
+      let ultimoFim = -1;
+      let ultimoTempo = -1;
+      let paradoDesde = Date.now();
+
+      const vigiar = () => {
+        const b = video.buffered;
+        const fim = b.length > 0 ? b.end(b.length - 1) : 0;
+        const t = video.currentTime;
+
+        // Pausado pelo usuário nunca é fonte morta.
+        if (video.paused) {
+          paradoDesde = Date.now();
+        } else if (fim > ultimoFim + 0.05 || t > ultimoTempo + 0.05) {
+          // Buffer crescendo ou relógio andando: está vivo, zera o prazo.
+          ultimoFim = fim;
+          ultimoTempo = t;
+          paradoDesde = Date.now();
+        } else if (Date.now() - paradoDesde > 20000) {
+          clearInterval(stallTimer as ReturnType<typeof setInterval>);
+          stallTimer = undefined;
+          tryNextSourceOrFail();
+          return;
+        }
+      };
+
+      stallTimer = setInterval(vigiar, 1000) as unknown as ReturnType<typeof setTimeout>;
     };
 
     const onError = () => {

@@ -188,6 +188,90 @@ function ehFalhaPassageira(erro: unknown) {
   );
 }
 
+/**
+ * Fecha uma resposta do provedor que não vai ser usada.
+ *
+ * `resume()` antes de `destroy()` é de propósito: drenar devolve o socket ao
+ * pool de keep-alive para ser reaproveitado, o que é melhor que matá-lo. O
+ * `destroy()` cobre o caso de a resposta ser grande demais para valer a pena.
+ *
+ * Toda resposta abandonada sem isto continua ocupando uma vaga do agente (teto
+ * de 256) e uma das poucas conexões que o painel concede por conta.
+ */
+function descartarUpstream(res: http.IncomingMessage | null | undefined) {
+  if (!res) return;
+  try {
+    if (!res.destroyed) {
+      res.resume();
+      res.destroy();
+    }
+  } catch {}
+}
+
+// ==========================================================
+// FORMATO REAL DA FONTE (memória do que já foi farejado)
+// ==========================================================
+
+type FormatoReal = "hls" | "mpegts" | null;
+
+/**
+ * Meia hora. O painel não muda o container de um canal no meio do dia, e uma
+ * sincronização de catálogo reinicia o processo de qualquer forma.
+ */
+const CACHE_FORMATO_MS = 30 * 60 * 1000;
+const formatoCache = new Map<string, { formato: FormatoReal; ate: number }>();
+
+function formatoEmCache(url: string): FormatoReal | undefined {
+  const guardado = formatoCache.get(url);
+  if (!guardado) return undefined;
+  if (guardado.ate < Date.now()) {
+    formatoCache.delete(url);
+    return undefined;
+  }
+  return guardado.formato;
+}
+
+function guardarFormato(url: string, formato: FormatoReal) {
+  // Teto simples de tamanho: o catálogo tem 150 mil endereços e este mapa não
+  // pode virar um vazamento de memória dentro de um contêiner de 320 MB.
+  if (formatoCache.size > 5000) formatoCache.clear();
+  formatoCache.set(url, { formato, ate: Date.now() + CACHE_FORMATO_MS });
+}
+
+/**
+ * Dois sinais bastam, e nenhum depende de o provedor mandar cabeçalho certo:
+ * manifesto HLS começa obrigatoriamente com `#EXTM3U`; MPEG-TS começa com o
+ * byte de sincronismo 0x47.
+ */
+function farejarFormato(res: http.IncomingMessage): Promise<FormatoReal> {
+  return new Promise((resolve) => {
+    let pronto = false;
+    const encerrar = (f: FormatoReal) => {
+      if (pronto) return;
+      pronto = true;
+      clearTimeout(prazo);
+      resolve(f);
+    };
+
+    // Provedor que aceita a conexão e não manda byte nenhum não pode segurar
+    // a sonda para sempre.
+    const prazo = setTimeout(() => encerrar(null), 6000);
+
+    res.once("data", (pedaco: Buffer) => {
+      const buf = Buffer.isBuffer(pedaco) ? pedaco : Buffer.from(pedaco);
+      if (buf.length === 0) return encerrar(null);
+      if (buf.subarray(0, 7).toString("utf-8").startsWith("#EXTM3U")) {
+        return encerrar("hls");
+      }
+      if (buf[0] === 0x47) return encerrar("mpegts");
+      encerrar(null);
+    });
+
+    res.once("end", () => encerrar(null));
+    res.once("error", () => encerrar(null));
+  });
+}
+
 /** O DNS afirma que este nome não tem endereço — não é lentidão, é ausência. */
 function ehHostInexistente(erro: unknown) {
   const codigo = (erro as NodeJS.ErrnoException)?.code;
@@ -279,6 +363,9 @@ function fetchUpstream(
       const isHttps = parsedUrl.protocol === "https:";
       const httpModule = isHttps ? https : http;
 
+      /** Já vieram os cabeçalhos? Depois disso, socket ocioso é normal. */
+      let respondeu = false;
+
       const req = httpModule.get(
         currentUrl,
         {
@@ -293,6 +380,28 @@ function fetchUpstream(
           agent: isHttps ? agenteHttps : agenteHttp,
         },
         (res) => {
+          respondeu = true;
+
+          /**
+           * Desarma o cronômetro assim que a resposta começa.
+           *
+           * `timeout` no `http.get` NÃO é prazo de conexão: é prazo de socket
+           * OCIOSO, e vale enquanto o socket existir. Num filme, o navegador
+           * enche o buffer e para de ler; a contrapressão sobe, o provedor
+           * para de mandar bytes e o socket fica ocioso PORQUE está tudo
+           * funcionando. Quinze segundos depois o handler abaixo chamava
+           * `req.destroy()` e matava a conexão no meio da reprodução.
+           *
+           * O `<video>` não recebia erro: para ele o arquivo tinha TERMINADO
+           * ali. Tocava o buffer restante e congelava. O minuto exato dependia
+           * só de quando o ciclo de contrapressão se alinhava — por isso
+           * parecia aleatório.
+           *
+           * Reproduzido em tests/prova-timeout-socket.mjs.
+           */
+          req.setTimeout(0);
+          res.socket?.setTimeout(0);
+
           if (
             res.statusCode &&
             res.statusCode >= 300 &&
@@ -319,8 +428,15 @@ function fetchUpstream(
         }
       );
 
-      req.on("error", reject);
+      req.on("error", (erro) => {
+        // Erro depois da resposta pertence ao fluxo, não à conexão: a promessa
+        // já foi resolvida e rejeitá-la de novo só geraria rejeição não tratada.
+        if (!respondeu) reject(erro);
+      });
+
       req.on("timeout", () => {
+        // Só vale ANTES da resposta. Depois dela, socket ocioso é normal.
+        if (respondeu) return;
         req.destroy();
         reject(new Error("Timeout ao conectar com o servidor de IPTV"));
       });
@@ -469,6 +585,43 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  /**
+   * Sonda de formato — responde QUE FORMATO é, sem entregar vídeo.
+   *
+   * O player precisa saber se a URL entrega manifesto HLS ou MPEG-TS puro
+   * antes de escolher o motor, porque o painel Xtream nomeia canal ao vivo
+   * como `.m3u8` mesmo servindo TS sem manifesto nenhum.
+   *
+   * Antes ele descobria isso sozinho, pedindo `Range: bytes=0-7` na própria
+   * URL de reprodução. Funcionava, e cobrava caro: era UMA CONEXÃO COM O
+   * PROVEDOR POR TENTATIVA. Somando as três insistências na mesma fonte, as
+   * variantes de formato e as fontes de reserva, uma única abertura de canal
+   * podia bater no painel dez vezes em poucos segundos — e o painel concede
+   * poucas conexões simultâneas por conta. Passado o limite, ele recusa tudo:
+   * o assinante vê "não roda nada", e a culpa parece do player.
+   *
+   * Aqui a resposta fica guardada por URL. Só o primeiro espectador de cada
+   * endereço paga uma conexão; do segundo em diante a sonda é instantânea e
+   * não toca no provedor.
+   */
+  if (searchParams.get("sonda") === "1") {
+    const emCache = formatoEmCache(urlPedido);
+    if (emCache) {
+      return NextResponse.json({ formato: emCache, cache: true });
+    }
+
+    try {
+      const sonda = await fetchUpstream(urlPedido, "bytes=0-7");
+      const formato = await farejarFormato(sonda.res);
+      descartarUpstream(sonda.res);
+      guardarFormato(urlPedido, formato);
+      return NextResponse.json({ formato, cache: false });
+    } catch {
+      // Sonda falhou: o player segue pelo palpite da extensão, como antes.
+      return NextResponse.json({ formato: null, cache: false });
+    }
+  }
+
   try {
     const rangeHeader = request.headers.get("range");
 
@@ -509,16 +662,33 @@ export async function GET(request: NextRequest) {
       try {
         const tsUpstream = await fetchUpstream(tsTarget, rangeHeader);
         if (tsUpstream.res.statusCode && tsUpstream.res.statusCode < 400) {
+          /**
+           * A resposta 404 original precisa ser fechada AQUI.
+           *
+           * Sem isto ela ficava pendurada: ninguém mais ia lê-la, mas o Node
+           * não tem como saber disso e o socket continuava ocupando uma das
+           * 256 vagas do agente — e, pior, uma das poucas conexões que o
+           * painel do provedor concede por conta.
+           *
+           * Este caminho roda em TODA abertura de canal cujo provedor não
+           * publica HLS, que é a maioria. Some com o vazamento da sonda de
+           * formato e da troca de fonte, e em pouco tempo o provedor passa a
+           * recusar tudo — o sintoma que chega é "não roda nada".
+           */
+          descartarUpstream(upstreamResponse);
           upstreamResponse = tsUpstream.res;
           // Sem isto o TS recuperado continuava sendo anunciado como manifesto.
           urlEfetiva = tsUpstream.urlFinal;
           statusCode = tsUpstream.res.statusCode;
+        } else {
+          // A tentativa também falhou: fecha as duas, não só a original.
+          descartarUpstream(tsUpstream.res);
         }
       } catch {}
     }
 
     if (statusCode >= 400) {
-      upstreamResponse.destroy();
+      descartarUpstream(upstreamResponse);
       return new NextResponse(`Erro upstream: ${statusCode}`, {
         status: statusCode,
       });

@@ -133,6 +133,23 @@ A `main` guarda o código. A VPS só muda pelo botão **Run workflow** no Action
 e só se `TVHUB_PROTECT_IMAGE` não estiver em `1`. Sem isso, o próximo push
 apaga a imagem de emergência — logo e configs que o GitHub ainda não tem.
 
+## 10. Mexeu no player ou na proxy de vídeo? Leia o Manual do Player antes.
+
+**[docs/MANUAL-DO-PLAYER.md](MANUAL-DO-PLAYER.md)** — obrigatório antes de
+tocar em `components/iptv/iptv-player.tsx`, `app/api/iptv/stream/route.ts`,
+`lib/iptv/credentials.ts`, `lib/playback/connection.ts` ou `lib/iptv/quality.ts`.
+
+É diário de bordo: guarda sintoma, causa e correção de tudo que já quebrou a
+reprodução, **e o que já foi tentado e deu errado** — inclusive mudanças que
+pareciam melhoria óbvia, com o motivo técnico e o link da issue. Sem ler, a
+chance de reintroduzir uma delas é alta.
+
+A **regra zero** do manual vale para qualquer trabalho grande, não só player:
+rode `git fetch` e confira `origin/main` antes de abrir o primeiro arquivo. Já
+houve auditoria inteira feita sobre uma base 25 commits atrasada.
+
+Terminou? **Acrescente a entrada no diário.** Principalmente se deu errado.
+
 ---
 
 ## Antes de abrir o PR
