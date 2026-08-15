@@ -586,6 +586,7 @@ model StreamSession {
 model IptvLine {
   id         String    @id @default(cuid())
   label      String
+  serverCode String    @default("C1")
   serverUrl  String
   username   String
   password   String
@@ -603,6 +604,7 @@ model IptvLine {
   sessions   StreamSession[]
 
   @@index([isActive])
+  @@index([serverCode])
 }
 
 // ==========================================================
@@ -818,6 +820,8 @@ model M3uChannel {
   playlist M3uPlaylist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   group    M3uGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
   progress WatchProgress[]
+  /// Servidores que tem este conteudo (ver ChannelSource).
+  sources  ChannelSource[]
   favorites ChannelFavorite[]
   sessions StreamSession[]
 
@@ -847,4 +851,51 @@ model QuizLead {
   atualizadoEm DateTime @default(now()) @updatedAt
 
   @@index([criadoEm])
+}
+
+/// Em QUAIS servidores um conteúdo existe, e sob qual endereço em cada um.
+///
+/// ------------------------------------------------------------------
+/// É a peça que faltava para o pool de linhas funcionar de verdade.
+/// ------------------------------------------------------------------
+///
+/// Cada linha M3U vem de um servidor diferente, e cada servidor tem um acervo
+/// PRÓPRIO — nem todos têm o mesmo canal, e alguns têm conteúdo exclusivo.
+/// Sem registrar isso, o catálogo virava uma lista plana sem procedência, e
+/// duas coisas quebravam:
+///
+///  1. A sincronização não conseguia unificar: o mesmo canal vindo de três
+///     servidores virava três itens repetidos na grade, e o que era exclusivo
+///     de um servidor não tinha como ser distinguido.
+///
+///  2. A alocação de linha escolhia a MENOS OCUPADA sem saber se aquele
+///     servidor tinha o conteúdo pedido. O assinante clicava, era mandado para
+///     um servidor que não tem aquele canal, e recebia 404 — o "clicou e não
+///     roda" que não aparecia em log nenhum, porque do ponto de vista do pool
+///     estava tudo certo.
+///
+/// Com esta tabela, `M3uChannel` passa a ser o conteúdo CANÔNICO (um por
+/// `nameKey`) e as fontes ficam aqui. Conteúdo exclusivo é simplesmente um
+/// canal com uma única fonte.
+model ChannelSource {
+  id         String @id @default(cuid())
+  channelId  String
+  /// Mesmo código de `IptvLine.serverCode` (C1, C2, …). É por ele que o
+  /// roteador cruza "quem tem o conteúdo" com "quem tem vaga".
+  serverCode String
+  /// Endereço do conteúdo NESTE servidor. Difere entre servidores: o id
+  /// numérico do Xtream não é o mesmo em painéis diferentes.
+  streamUrl  String @db.Text
+
+  /// Última vez que a sincronização confirmou que este servidor ainda tem o
+  /// conteúdo. Fonte que some da lista do provedor para de ser confirmada e
+  /// pode ser varrida sem apagar o canal, que existe em outros servidores.
+  vistoEm    DateTime @default(now())
+  criadoEm   DateTime @default(now())
+
+  channel M3uChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, serverCode])
+  @@index([channelId])
+  @@index([serverCode])
 }

@@ -7,6 +7,7 @@ import { BackButton } from "@/components/iptv/back-button";
 import { IptvPlayer } from "@/components/iptv/iptv-player";
 import { getActiveProfile, requireUser } from "@/lib/auth/session";
 import { credencialDoUsuario } from "@/lib/iptv/credentials";
+import { resolverFontes, type FonteResolvida } from "@/lib/iptv/source-router";
 import { getChannelById, getQualityVariants, getSeriesEpisodes } from "@/lib/queries/iptv";
 import { isAdultContent } from "@/lib/iptv/category-detector";
 import { prisma } from "@/lib/prisma";
@@ -156,10 +157,21 @@ export default async function WatchChannelPage({
     channel.streamUrl.includes("/movie/") ||
     channel.streamUrl.includes("/series/");
 
+  /**
+   * Quais servidores têm ESTE conteúdo, e em qual deles cabe mais um.
+   *
+   * Resolvido aqui, no servidor, antes de o player montar: assim o primeiro
+   * clique já sai com o endereço certo e a lista de reservas pronta, sem
+   * nenhuma ida extra à rede na hora de tocar. É o que faz "clicou, rodou".
+   */
+  const fontes: FonteResolvida[] = linhaIptv
+    ? await resolverFontes(channel.id, linhaIptv).catch(() => [] as FonteResolvida[])
+    : [];
+
   // Só canal ao vivo vem repetido por qualidade; filme e episódio são únicos.
   const qualidades = isVod
     ? []
-    : await getQualityVariants(channel.playlist.id, channel.name, channel.streamUrl).catch(() => []);
+    : await getQualityVariants(systemId || channel.playlist.id, channel.name, channel.streamUrl).catch(() => []);
 
   let seriesEpisodes: Array<{
     id: string;
@@ -222,11 +234,35 @@ export default async function WatchChannelPage({
       <div className="relative aspect-video w-full bg-black shadow-2xl">
         {linhaIptv ? (
           <IptvPlayer
-            streamUrl={channel.streamUrl}
+            /*
+             * A primeira fonte é a do servidor que TEM o conteúdo e está com
+             * mais folga — não a URL gravada no canal.
+             *
+             * O endereço em `channel.streamUrl` é o do servidor onde o item
+             * foi visto primeiro. Com várias linhas de servidores diferentes,
+             * insistir nele manda o assinante para um painel que pode estar
+             * lotado, ou que nem tem mais aquele conteúdo. O roteador resolve
+             * isso antes de o player existir (ver lib/iptv/source-router.ts).
+             *
+             * Se o roteador não achar nada (catálogo ainda sem fontes, logo
+             * após o deploy), cai na URL do canal — que é o comportamento
+             * anterior e continua funcionando.
+             */
+            streamUrl={fontes[0]?.streamUrl ?? channel.streamUrl}
             channelName={channel.name}
             channelId={channel.id}
             isLive={!isVod}
-            alternativeStreams={channel.backupStreamUrl ? [channel.backupStreamUrl] : []}
+            /*
+             * TODAS as outras fontes vão junto, já com a credencial certa de
+             * cada servidor. É o que permite o player trocar de servidor
+             * sozinho quando um falha, sem uma nova ida ao banco — e é o que
+             * transforma "clicou e não rodou" em "clicou e rodou pela segunda
+             * fonte, sem a pessoa perceber".
+             */
+            alternativeStreams={[
+              ...fontes.slice(1).map((f) => f.streamUrl),
+              ...(channel.backupStreamUrl ? [channel.backupStreamUrl] : []),
+            ]}
             qualidades={qualidades}
             initialPosition={initialPosition}
             episodes={seriesEpisodes}
