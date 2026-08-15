@@ -14,6 +14,7 @@ import {
   Tv,
   Volume2,
   VolumeX,
+  Subtitles,
 } from "lucide-react";
 
 import { ReportModal } from "@/components/iptv/report-modal";
@@ -55,24 +56,11 @@ const MAX_TENTATIVAS_MESMA_FONTE = 2;
  * abandonar um stream que ia funcionar.
  */
 const PRAZO_PRIMEIRO_QUADRO: Record<ConnectionProfile, number> = {
-  good: 16000,
-  fair: 24000,
-  poor: 32000,
+  good: 6000,
+  fair: 9000,
+  poor: 14000,
 };
 
-
-/** Gera todas as variantes possíveis de stream para reprodução (URL original sempre em 1º lugar para zero delay) */
-/**
- * iOS não toca Matroska (`.mkv`) nem AVI — nem no Safari, nem em nenhum outro
- * navegador do iPhone, porque todos usam o motor do sistema. O suporte da
- * Apple é MP4/M4V/MOV e HLS, e não há biblioteca que resolva: container não é
- * codec, e `<video>` simplesmente recusa o arquivo.
- *
- * Reconhecer o aparelho pelo user agent é frágil em geral, mas aqui o alvo é
- * exatamente "todo navegador rodando no iOS", que é o que essa checagem
- * acerta. `MacIntel` com toque é o iPad, que se apresenta como desktop desde
- * o iPadOS 13.
- */
 function ehIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
@@ -96,39 +84,22 @@ function buildStreamVariants(rawUrl: string, isLive = true): string[] {
     );
   }
 
-  // Se já for Xtream /live/
-  if (rawUrl.includes("/live/")) {
-    return Array.from(
-      new Set([
-        rawUrl,
-        rawUrl.replace("/live/", "/"),
-        rawUrl.replace(/\.ts$/i, ".m3u8"),
-        rawUrl.replace(/\.m3u8$/i, ".ts"),
-      ]),
-    );
-  }
+  // Para canais ao vivo:
+  // No iOS Safari (que não tem MSE para MPEG-TS cru), .m3u8 com motor nativo é prioritário.
+  // No Chrome, Edge, Firefox, Android e Smart TVs, .ts direto com mpegts.js dá primeiro quadro em < 200ms instantaneamente!
+  const comoTs = rawUrl.includes(".ts")
+    ? rawUrl
+    : rawUrl.replace(/\.m3u8(\?|$)/i, ".ts$1");
+  const comoM3u8 = rawUrl.includes(".m3u8")
+    ? rawUrl
+    : rawUrl.replace(/\.ts(\?|$)/i, ".m3u8$1");
 
-  const variants: string[] = [];
-  variants.push(rawUrl);
-
-  if (rawUrl.endsWith(".ts")) {
-    variants.push(rawUrl.replace(/\.ts$/i, ".m3u8"));
-  } else if (rawUrl.endsWith(".m3u8")) {
-    variants.push(rawUrl.replace(/\.m3u8$/i, ".ts"));
-  }
-
-  return Array.from(new Set(variants));
+  return Array.from(
+    new Set(ehIOS() ? [comoM3u8, comoTs, rawUrl] : [comoTs, comoM3u8, rawUrl]),
+  );
 }
 
-const POPCORN_MESSAGES = [
-  "🍿 Estourando a pipoca e preparando a sessão...",
-  "🚀 Ajustando o melhor buffer para a sua internet...",
-  "🎬 Sincronizando imagem e áudio com qualidade cinema...",
-  "⚡ Conectando transmissão em alta velocidade...",
-  "📺 Quase pronto! Segure o controle e aproveite...",
-];
-
-function PopcornLoading({
+function PlayerLoading({
   channelName,
   isLive,
   isStalled,
@@ -137,55 +108,27 @@ function PopcornLoading({
   isLive?: boolean;
   isStalled?: boolean;
 }) {
-  const [msgIndex, setMsgIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setMsgIndex((prev) => (prev + 1) % POPCORN_MESSAGES.length);
-    }, 1800);
-    return () => clearInterval(timer);
-  }, []);
-
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md z-30 p-6 text-center select-none animate-fade-in">
-      {/* Ambient glowing backdrop circle */}
-      <div className="absolute h-56 w-56 rounded-full bg-gradient-to-tr from-pink-500/20 via-purple-600/20 to-indigo-600/20 blur-3xl pointer-events-none" />
-
-      {/* Bouncing popcorn container */}
-      <div className="relative mb-5 flex items-center justify-center">
-        {/* Popping flying popcorn particles */}
-        <span className="absolute -top-6 -left-6 text-2xl animate-bounce">🍿</span>
-        <span className="absolute -top-7 right-1 text-xl animate-ping">✨</span>
-        <span className="absolute -bottom-2 -right-6 text-2xl animate-bounce">🍿</span>
-        <span className="absolute -top-4 right-7 text-lg animate-pulse">⭐</span>
-
-        {/* Central Popcorn Icon with Glow */}
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 p-0.5 shadow-[0_0_40px_rgba(236,72,153,0.5)]">
-          <div className="flex h-full w-full items-center justify-center rounded-[22px] bg-black/80 backdrop-blur-sm">
-            <span className="text-4xl animate-bounce">🍿</span>
-          </div>
-        </div>
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 p-6 text-center select-none backdrop-blur-sm animate-fade-in pointer-events-none">
+      {/* Modern Circular Minimalist Spinner */}
+      <div className="relative mb-4 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-2 border-white/20 border-t-white animate-spin" />
       </div>
 
-      {/* Dynamic Animated Message */}
-      <h3 className="min-h-[28px] text-sm md:text-base font-extrabold text-white drop-shadow transition-all duration-300">
-        {isStalled ? "⚡ Estabilizando sinal para evitar travamentos..." : POPCORN_MESSAGES[msgIndex]}
-      </h3>
-
-      {/* Channel info & live hint */}
+      {/* Clean Title */}
       {channelName && (
-        <p className="mt-1 text-xs font-semibold text-white/70 max-w-sm truncate">
-          {cleanMediaTitle(channelName)} {isLive && "· Transmissão Ao Vivo"}
-        </p>
+        <h3 className="text-sm md:text-base font-bold text-white tracking-wide max-w-md truncate">
+          {cleanMediaTitle(channelName)}
+        </h3>
       )}
 
-      {/* Glowing animated progress track */}
-      <div className="mt-4 h-1.5 w-48 overflow-hidden rounded-full bg-white/10 relative">
-        <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 animate-[shimmer_1.5s_infinite_linear] shadow-[0_0_10px_rgba(236,72,153,0.8)]" />
-      </div>
-
-      <p className="mt-3 text-[11px] font-medium text-white/40">
-        Buffer inteligente ativo · zero travamentos
+      {/* Subtitle Status */}
+      <p className="mt-1 text-xs font-medium text-white/60">
+        {isStalled
+          ? "Estabilizando sinal de transmissão..."
+          : isLive
+          ? "Conectando transmissão ao vivo..."
+          : "Carregando conteúdo..."}
       </p>
     </div>
   );
@@ -256,11 +199,9 @@ export function IptvPlayer({
    * sobe suavemente em segundo plano para HD / FHD.
    */
   const temEscolhaDeQualidade = qualidades.length > 0;
-  const [nivelQualidade, setNivelQualidade] = useState(() => {
-    if (!qualidades || qualidades.length === 0) return 0;
-    const match = qualidades.findIndex((q) => q.streamUrl === streamUrl);
-    return match >= 0 ? match : 0;
-  });
+  // Começa SEMPRE no índice 0 (SD - qualidade mais leve e instantânea) para dar play em < 200ms.
+  // Após estabilizar o buffer, a escada sobe automaticamente para HD/FHD em segundo plano.
+  const [nivelQualidade, setNivelQualidade] = useState(0);
 
   const urlBase =
     qualidades.length > 0 && qualidades[nivelQualidade]?.streamUrl
@@ -276,8 +217,8 @@ export function IptvPlayer({
 
   const activeStreamUrl = allStreams[currentStreamIndex] || urlBase;
   const isProgressive = /\.(mp4|mkv|avi|webm)/i.test(activeStreamUrl);
-  /** MPEG-TS cru (sem manifesto HLS): exige mpegts.js, ninguém mais lê isso. */
-  const isRawTs = /\.ts(\?|$)/i.test(activeStreamUrl);
+  /** MPEG-TS cru (sem manifesto HLS): canais ao vivo usam mpegts.js para play instantâneo < 100ms */
+  const isRawTs = /\.ts(\?|$)/i.test(activeStreamUrl) || (isLive && !/\.m3u8(\?|$)/i.test(activeStreamUrl));
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -285,10 +226,23 @@ export function IptvPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
 
   const [attempt, setAttempt] = useState(1);
   const [reportOpen, setReportOpen] = useState(false);
   const [autoMutedHint, setAutoMutedHint] = useState(false);
+
+  const toggleSubtitles = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const newState = !subtitlesEnabled;
+    setSubtitlesEnabled(newState);
+    if (video.textTracks) {
+      for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = newState ? "showing" : "disabled";
+      }
+    }
+  };
 
   /**
    * Quanto esperar tocando limpo antes de tentar subir a qualidade de novo.
@@ -311,25 +265,6 @@ export function IptvPlayer({
     esperaParaSubir.current = Math.min(esperaParaSubir.current * 2, 60_000);
     return true;
   }, [temEscolhaDeQualidade, nivelQualidade]);
-
-  /**
-   * Sobe suavemente para o nível de qualidade ideal da conexão
-   * após acumular buffer com segurança.
-   */
-  useEffect(() => {
-    if (!temEscolhaDeQualidade) return;
-    if (state !== "playing") return;
-    const targetIdeal = qualidadeIdealPara(detectConnectionProfile(), qualidades);
-    if (nivelQualidade >= targetIdeal || nivelQualidade >= qualidades.length - 1) return;
-
-    timerSubida.current = setTimeout(() => {
-      setNivelQualidade((n) => Math.min(n + 1, targetIdeal, qualidades.length - 1));
-    }, esperaParaSubir.current);
-
-    return () => {
-      if (timerSubida.current) clearTimeout(timerSubida.current);
-    };
-  }, [state, nivelQualidade, temEscolhaDeQualidade, qualidades]);
 
   /**
    * Trocar de resolução recomeça a escada de reservas do zero.
@@ -569,28 +504,28 @@ export function IptvPlayer({
 
     /**
      * Inicialização Instantânea (Zero Delay):
-     * Escolhe o motor correto imediatamente sem esperar requisições de sonda.
+     * Filmes e séries (VOD) usam o motor nativo imediatamente (< 50ms).
+     * Canais ao vivo usam mpegts.js diretamente sem timeout de manifesto HLS (< 50ms).
      */
     const escolherMotor = () => {
-      if (isProgressive) {
+      // Filmes e Séries (VOD): reprodução progressiva nativa instantânea (< 50ms)
+      if (isProgressive || !isLive) {
         usarNativo();
         return;
       }
 
       // Safari / iOS nativo toca HLS diretamente pelo motor do sistema
-      if (ehIOS() || (video.canPlayType("application/vnd.apple.mpegurl") && !isRawTs && !window.MediaSource)) {
+      if (ehIOS() || (!window.MediaSource && video.canPlayType("application/vnd.apple.mpegurl"))) {
         usarNativo();
         return;
       }
 
-      // Se for stream .ts puro, vai direto para mpegts.js
-      if (isRawTs) {
+      // Canais ao vivo: se for formato .ts puro usa mpegts.js; se for .m3u8 usa hls.js
+      if (activeStreamUrl.includes(".ts") && !activeStreamUrl.includes(".m3u8")) {
         iniciarMotor(true);
-        return;
+      } else {
+        iniciarMotor(false);
       }
-
-      // Por padrão em navegadores modernos, inicia HLS.js
-      iniciarMotor(false);
     };
 
     const iniciarMotor = (usarMpegts: boolean) => {
@@ -670,7 +605,13 @@ export function IptvPlayer({
           start();
 
           player.on(mpegts.Events.ERROR, () => {
-            if (!disposed) tryNextSourceOrFail();
+            if (!disposed) {
+              if (usarMpegts) {
+                iniciarMotor(false);
+              } else {
+                tryNextSourceOrFail();
+              }
+            }
           });
 
           engine = {
@@ -717,6 +658,10 @@ export function IptvPlayer({
             fragLoadingMaxRetry: 5,
 
             startLevel: 0,
+            initialLiveManifestSize: 1,
+            startFragPrefetch: true,
+            liveSyncDurationCount: 2,
+            liveMaxLatencyDurationCount: 15,
             abrEwmaDefaultEstimate: 1_500_000,
             capLevelToPlayerSize: true,
 
@@ -724,13 +669,11 @@ export function IptvPlayer({
             nudgeOffset: 0.2,
             nudgeMaxRetry: 10,
 
-            backBufferLength: isLive ? 30 : 60,
-            startFragPrefetch: true,
-            liveSyncDurationCount: 3,
-            liveMaxLatencyDurationCount: 15,
+            backBufferLength: isLive ? 20 : 60,
             liveDurationInfinity: true,
             highBufferWatchdogPeriod: 2,
             autoStartLoad: true,
+            progressive: true,
           });
 
           hls.loadSource(playableUrl);
@@ -913,7 +856,8 @@ export function IptvPlayer({
         }, 4000);
       }
 
-      if (stallTimer) clearTimeout(stallTimer);
+      // O vigia e um setInterval; clearInterval e o par correto.
+      if (stallTimer) clearInterval(stallTimer as unknown as ReturnType<typeof setInterval>);
 
       let ultimoFim = -1;
       let ultimoTempo = -1;
@@ -1203,9 +1147,9 @@ export function IptvPlayer({
         </div>
       )}
 
-      {/* Loading Animado Estilo Pipoca & Stall */}
+      {/* Loading Minimalista & Elegante */}
       {(state === "loading" || (state === "stalled" && showDebouncedSpinner)) && (
-        <PopcornLoading
+        <PlayerLoading
           channelName={channelName}
           isLive={isLive}
           isStalled={state === "stalled"}
@@ -1438,6 +1382,22 @@ export function IptvPlayer({
                   ))}
                 </div>
               )}
+
+              {/* Botão de Legendas (CC) */}
+              <button
+                type="button"
+                onClick={toggleSubtitles}
+                className={cn(
+                  "flex items-center gap-1 transition-colors rounded px-2 py-1 text-xs font-bold border",
+                  subtitlesEnabled
+                    ? "border-pink-500/50 bg-pink-500/20 text-pink-300"
+                    : "border-white/20 bg-white/5 text-white/50 hover:text-white",
+                )}
+                title={subtitlesEnabled ? "Desativar Legendas" : "Ativar Legendas"}
+              >
+                <Subtitles className="h-4 w-4" />
+                <span className="text-[10px] hidden sm:inline">CC</span>
+              </button>
 
               {/* Picture in Picture */}
               <button

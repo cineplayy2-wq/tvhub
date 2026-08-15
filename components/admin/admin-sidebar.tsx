@@ -22,7 +22,10 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface/40">
+    /* Um plano acima do fundo, com desfoque: sem isso a coluna não tem onde
+       começar e o menu se confunde com a página — mesmo problema que o menu
+       do app tinha. */
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-white/[0.08] bg-surface/70 supports-[backdrop-filter]:bg-surface/50 supports-[backdrop-filter]:backdrop-blur-xl">
       <div className="flex h-16 items-center px-5 border-b border-border/50">
         <Link href="/admin" className="flex items-center gap-2">
           <Logo size="sm" />

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
-import { ArrowLeft, KeyRound, Mail, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, KeyRound, Mail, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { loginAction, resendOtpAction, type AuthFormState } from "@/app/actions/auth";
 import { FormError } from "@/components/ui/form-error";
@@ -14,6 +14,7 @@ const INITIAL: AuthFormState = {};
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useFormState(loginAction, INITIAL);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   
@@ -201,19 +202,40 @@ export function LoginForm({ next }: { next?: string }) {
       />
 
       <div>
-        <Input
-          name="password"
-          type="password"
-          label="Sua Senha"
-          placeholder="••••••••"
-          autoComplete="current-password"
-          error={state.fieldErrors?.password}
-          icon={<KeyRound className="h-4 w-4 text-accent/70" />}
-        />
+        {/*
+          Mostrar/ocultar não é enfeite: no celular, digitar senha às cegas em
+          teclado virtual é a maior fonte de erro do formulário — e cada erro
+          aqui é uma pessoa que desiste de entrar.
+        */}
+        <div className="relative">
+          <Input
+            name="password"
+            type={mostrarSenha ? "text" : "password"}
+            label="Sua Senha"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            error={state.fieldErrors?.password}
+            icon={<KeyRound className="h-4 w-4 text-accent/70" />}
+          />
+          <button
+            type="button"
+            onClick={() => setMostrarSenha((v) => !v)}
+            aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+            className="absolute right-3 top-[38px] flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+
         <div className="mt-2 text-right">
-          <span className="text-xs font-medium text-muted-foreground/70">
-            Esqueceu a senha? Fale com o suporte.
-          </span>
+          <a
+            href="https://wa.me/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-muted-foreground transition-colors hover:text-accent"
+          >
+            Esqueceu a senha? Falar com o suporte
+          </a>
         </div>
       </div>
 
@@ -224,6 +246,20 @@ export function LoginForm({ next }: { next?: string }) {
       >
         Continuar
       </SubmitButton>
+
+      {/*
+        Sinais de confiança logo abaixo do botão, não no rodapé.
+        É o último ponto de hesitação: quem parou aqui está decidindo se
+        entrega o dado, e é aqui que a objeção precisa ser respondida.
+      */}
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-1 text-[11px] font-medium text-muted-foreground">
+        {["Pagamento por PIX", "2 telas ao mesmo tempo", "Sem fidelidade"].map((item) => (
+          <span key={item} className="flex items-center gap-1.5">
+            <Check className="h-3 w-3 text-success" strokeWidth={3} />
+            {item}
+          </span>
+        ))}
+      </div>
     </form>
   );
 }
