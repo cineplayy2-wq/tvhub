@@ -31,6 +31,23 @@ services:
     # Acesso externo só via proxy temporário na rede attachable + túnel SSH.
     volumes:
       - tvhub-pgdata:/var/lib/postgresql/data
+      # -----------------------------------------------------------------
+      # /dev/shm de 1 GB. Obrigatório junto com o tuning abaixo.
+      #
+      # O Docker monta /dev/shm com 64 MB. O Postgres usa memória
+      # compartilhada para trocar dados entre os workers de uma consulta
+      # PARALELA, e com `work_mem` de 32 MB um plano paralelo pede segmentos
+      # maiores que essa fatia. Quando não cabe, a consulta morre com
+      # "could not resize shared memory segment ... No space left on device"
+      # — que engana, porque o disco tem 277 GB livres.
+      #
+      # Aconteceu de verdade aqui: uma agregação sobre ChannelSource (650 mil
+      # linhas) falhou logo depois de o tuning entrar. Subir work_mem sem
+      # subir /dev/shm troca lentidão por erro.
+      - type: tmpfs
+        target: /dev/shm
+        tmpfs:
+          size: 1073741824
     networks:
       - tvhub-internal
     # -----------------------------------------------------------------
@@ -43,59 +60,34 @@ services:
     # lentidão vira timeout, e timeout vira container reiniciando.
     command: >
       postgres
-      -c shared_buffers=1GB
-      -c effective_cache_size=3GB
-      -c work_mem=32MB
-      -c maintenance_work_mem=512MB
-      -c max_connections=100
+      -c shared_buffers=2GB
+      -c effective_cache_size=6GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=1GB
+      -c max_connections=250
       -c random_page_cost=1.1
       -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      -c wal_buffers=32MB
+      -c max_wal_size=4GB
     deploy:
       replicas: 1
       resources:
         limits:
-          # Era 256M — dimensionado para a VPS antiga de 830 MB dividida com um
-          # Odoo. Numa máquina dedicada de 24 GB isso é o gargalo mais caro que
-          # existe: o Postgres passa a vida despejando cache e lendo do disco.
-          memory: 4G
+          memory: 6G
         reservations:
-          memory: 1G
+          memory: 2G
       restart_policy:
-        # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
-        # reprovado, o processo sai com código 0. Com on-failure isso é lido
-        # como término bem-sucedido e o serviço fica parado em 0/1 para sempre.
         condition: any
         delay: 10s
       update_config:
-        # stop-first aqui, ao contrário do app: dois Postgres apontando para o
-        # mesmo volume ao mesmo tempo corrompem o banco. Banco não faz rolling.
         order: stop-first
 
   redis:
     image: redis:7-alpine
-    # appendonly: as sessões de reprodução sobrevivem a restart do container.
-    # maxmemory-policy noeviction: a trava de 2 telas não pode ter chave
-    # despejada por pressão de memória — isso liberaria telas extras em silêncio.
-    # -----------------------------------------------------------------
-    # `noeviction` com 32 MB era uma bomba-relógio.
-    #
-    # A política está certa: a trava de telas não pode ter chave despejada em
-    # silêncio. Mas o TETO estava absurdamente baixo, e é o MESMO Redis que
-    # guarda o cache do TMDB (JSON de metadados, TTL de 24h), os contadores de
-    # rate limit e as curtidas. Trinta e dois megabytes enchem em horas.
-    #
-    # E `noeviction` cheio não descarta nada: ele passa a RECUSAR toda escrita
-    # com OOM. A partir daí o app quebra em cascata sem nada aparecer nos logs
-    # do Postgres nem do Node — cache que não grava, rate limit que não conta,
-    # sessão que não registra.
-    #
-    # 2 GB é folga real para o volume deste catálogo, e a política continua
-    # protegendo a trava de telas.
     command: >
       redis-server
       --appendonly yes
-      --maxmemory 2gb
+      --maxmemory 3gb
       --maxmemory-policy noeviction
       --save 900 1
       --save 300 10
@@ -107,9 +99,9 @@ services:
       replicas: 1
       resources:
         limits:
-          memory: 2560M
+          memory: 3500M
         reservations:
-          memory: 512M
+          memory: 1G
       restart_policy:
         # `any`, não `on-failure`: quando o Swarm para uma task por healthcheck
         # reprovado, o processo sai com código 0. Com on-failure isso é lido
@@ -174,7 +166,7 @@ services:
       # rede já existem serviços chamados `postgres` e `redis` de outra stack.
       # Com o nome curto, o DNS do Swarm resolve para o banco alheio: foi o que
       # aconteceu aqui, e só não virou corrupção de dados porque a senha diferia.
-      DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public&connection_limit=25
+      DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public&connection_limit=30
       DIRECT_DATABASE_URL: postgresql://tvhub:${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public
       REDIS_URL: redis://tvhub_redis:6379
       AUTH_SECRET: ${TVHUB_AUTH_SECRET}
@@ -189,23 +181,6 @@ services:
       # URL do XMLTV da grade. Opcional; também configurável pelo admin.
       EPG_XMLTV_URL: ${TVHUB_EPG_URL:-}
 
-      # ---------------------------------------------------------------
-      # Chaves de terceiros. NENHUMA tem valor padrão aqui, de propósito.
-      #
-      # Antes elas viviam neste arquivo como fallback (`${VAR:-valor_real}`),
-      # o que significava a chave em texto puro num arquivo versionado. Bastava
-      # o repositório virar público por um instante para os bots de varredura
-      # colherem as três — e privar depois não desfaz, porque a chave já foi
-      # lida e continua no histórico e em qualquer fork.
-      #
-      # A sintaxe `${VAR:?mensagem}` faz o `docker stack deploy` ABORTAR se a
-      # variável não existir, em vez de subir com string vazia. É a escolha
-      # deliberada: um deploy que falha na hora é barato; uma chave vazia vira
-      # capa de filme que não carrega e recomendação que não responde, sem erro
-      # em log nenhum, e alguém descobre dias depois.
-      #
-      # Os valores moram em /opt/tvhub/.env na VPS, fora do Git.
-      # ---------------------------------------------------------------
       TMDB_API_KEY: ${TMDB_API_KEY:?defina TMDB_API_KEY em /opt/tvhub/.env}
       TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:?defina TMDB_READ_TOKEN em /opt/tvhub/.env}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?defina DEEPSEEK_API_KEY em /opt/tvhub/.env}
@@ -217,35 +192,10 @@ services:
       - minha_rede
 
     deploy:
-      # -----------------------------------------------------------------
-      # RÉPLICAS SÃO A ALAVANCA DE ESCALA. Não é a RAM.
-      # -----------------------------------------------------------------
-      #
-      # O Node roda JavaScript em UMA thread. O `/api/iptv/stream` empurra o
-      # vídeo de todos os espectadores por essa thread única: cada pedaço que
-      # chega do provedor passa pelo event loop antes de sair para o
-      # assinante. Com uma réplica, todo o tráfego de vídeo do produto disputa
-      # um núcleo — e quando esse núcleo satura, não trava um canal, travam
-      # TODOS ao mesmo tempo.
-      #
-      # Aumentar memória não resolve isso. Réplicas resolvem: o Swarm
-      # distribui as conexões entre elas e cada uma usa um núcleo.
-      #
-      # 3 é o ponto de partida para uma máquina de 24 GB. Ajuste por
-      # TVHUB_REPLICAS no /opt/tvhub/.env — a regra prática é uma réplica por
-      # núcleo disponível, menos um reservado para Postgres e sistema.
-      #
-      # O que é seguro replicar: o estado compartilhado (trava de telas,
-      # sessões, rate limit) vive no Redis, não na memória do processo. Os
-      # caches em memória (DNS, formato de fonte, host morto) passam a existir
-      # um por réplica — isso só reduz taxa de acerto, não gera divergência.
-      replicas: ${TVHUB_REPLICAS:-3}
+      replicas: ${TVHUB_REPLICAS:-4}
       resources:
         limits:
-          # Era 320M, dimensionado para a VPS antiga compartilhada com um Odoo.
-          # 4G por réplica × 3 = 12 GB, deixando 12 GB para Postgres, Redis e
-          # sistema numa máquina de 24 GB.
-          memory: 4G
+          memory: 3500M
         reservations:
           memory: 512M
 

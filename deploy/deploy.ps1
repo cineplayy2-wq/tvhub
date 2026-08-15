@@ -43,7 +43,9 @@ Write-Host "==> Deploy de emergencia · $Image" -ForegroundColor Yellow
 
 # ---------- 1. Build ----------
 if (-not $SkipBuild) {
-  Write-Host "==> Build local (standalone)..." -ForegroundColor Cyan
+  Write-Host "==> Sincronizando Prisma Client e compilando (standalone)..." -ForegroundColor Cyan
+  if (Test-Path ".\.next") { Remove-Item -Recurse -Force ".\.next" }
+  npx prisma generate
   npm run build
   if ($LASTEXITCODE -ne 0) { throw "build falhou" }
 }
@@ -127,11 +129,28 @@ echo "imagem $Image montada"
 Write-Host "==> Aplicando migrations..." -ForegroundColor Cyan
 $prismaVersao = (Get-Content ".\node_modules\prisma\package.json" -Raw | ConvertFrom-Json).version
 Write-Host "    prisma $prismaVersao"
+# ATENÇÃO: este passo PRECISA rodar `prisma migrate deploy`.
+#
+# Ele já foi substituído uma vez por um `ALTER TABLE` avulso, e o efeito foi
+# silencioso e caro: o deploy passava, o site respondia 200, e as migrations
+# novas simplesmente NÃO eram aplicadas. As tabelas que o código esperava não
+# existiam, e o defeito só aparecia na primeira consulta — longe daqui, sem
+# nada no log do deploy dizendo que algo tinha sido pulado.
+#
+# O `ALTER TABLE` de segurança pode ficar, mas nunca NO LUGAR do migrate.
 Invoke-Remote @"
 set -e
 cd /opt/tvhub
 set -a; . ./.env; set +a
 DB="postgresql://tvhub:`${TVHUB_DB_PASSWORD}@tvhub_postgres:5432/tvhub?schema=public"
+
+# Rede de segurança para bancos anteriores à migration do pool.
+PG_ID=`$(docker ps -q --filter name=tvhub_postgres | head -n 1)
+if [ -n "`$PG_ID" ]; then
+  docker exec "`$PG_ID" psql -U tvhub -d tvhub -c 'ALTER TABLE "IptvLine" ADD COLUMN IF NOT EXISTS "serverCode" TEXT DEFAULT '\''C1'\'';' || true
+fi
+
+# O que de fato aplica o que está em prisma/migrations.
 docker run --rm --network tvhub_tvhub-internal \
   -v /opt/tvhub/build/migrations:/app/prisma/migrations:ro \
   -v /opt/tvhub/build/schema.prisma:/app/prisma/schema.prisma:ro \
@@ -172,9 +191,11 @@ do {
   if ($estado -like "rollback*") {
     throw "o Swarm reverteu o deploy - a versao nova nao ficou saudavel. Veja: docker service ps tvhub_app --no-trunc"
   }
-} while ($estado -ne "completed" -and $estado -ne "" -and ($replicas -notlike "*1/1*" -or $estado -eq "updating") -and (Get-Date) -lt $deadline)
+  $parts = ($replicas -split "/") | ForEach-Object { $_.Trim() }
+  $convergiu = ($parts.Length -eq 2 -and [int]$parts[0] -gt 0 -and $parts[0] -eq $parts[1] -and $estado -ne "updating")
+} while (-not $convergiu -and (Get-Date) -lt $deadline)
 
-if ($replicas -notlike "*1/1*") { throw "nao convergiu - veja: docker service ps tvhub_app" }
+if (-not $convergiu) { throw "nao convergiu ($replicas) - veja: docker service ps tvhub_app" }
 
 # ---------- 8. Conferir pela internet ----------
 $url = (@(Invoke-Remote 'grep "^TVHUB_PUBLIC_URL=" /opt/tvhub/.env | cut -d= -f2-' -split "`n"))[-1].ToString().Trim().Trim('"')
